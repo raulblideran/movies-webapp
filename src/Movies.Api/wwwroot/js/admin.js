@@ -43,50 +43,121 @@
         else App.closeModal();
     }
 
+    // Chips with a themed suggestion list (a native <datalist> popup can't be styled).
     function chipInput(container, initial, suggestions, listId) {
         const values = [...initial];
-        container.className = `${CLS.input} flex flex-wrap gap-1.5 items-center min-h-[42px] cursor-text`;
-        container.innerHTML = `<datalist id="${listId}">${suggestions.map((s) => `<option value="${esc(s)}">`).join("")}</datalist>`;
+        container.className = "input chip-input";
+        container.innerHTML = `<ul class="suggest hidden" id="${listId}" role="listbox"></ul>`;
+        const list = container.querySelector(".suggest");
         const input = document.createElement("input");
-        input.setAttribute("list", listId);
-        input.className = "flex-1 min-w-[100px] bg-transparent outline-none text-sm text-white";
         input.placeholder = "Type and press Enter";
+        input.autocomplete = "off";
+        input.setAttribute("role", "combobox");
+        input.setAttribute("aria-autocomplete", "list");
+        input.setAttribute("aria-controls", listId);
+        input.setAttribute("aria-expanded", "false");
+        if (container.dataset.label) input.setAttribute("aria-label", container.dataset.label);
+        let matches = [];
+        let active = -1;
 
         function render() {
             container.querySelectorAll("[data-chip]").forEach((c) => c.remove());
             values.forEach((v, i) => {
                 const chip = document.createElement("span");
                 chip.dataset.chip = "";
-                chip.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/20 border border-primary/40 text-xs text-white";
-                chip.innerHTML = `${esc(v)} <button type="button" class="text-gray-300 hover:text-white">×</button>`;
-                chip.querySelector("button").onclick = () => {
+                chip.className = "chip-value";
+                chip.innerHTML = `${esc(v)} <button type="button" aria-label="Remove ${esc(v)}">×</button>`;
+                chip.querySelector("button").onclick = (e) => {
+                    e.stopPropagation();
                     values.splice(i, 1);
                     render();
                 };
                 container.insertBefore(chip, input);
             });
         }
+        function hideList() {
+            list.classList.add("hidden");
+            input.setAttribute("aria-expanded", "false");
+            input.removeAttribute("aria-activedescendant");
+            active = -1;
+        }
+        function showList() {
+            const q = input.value.trim().toLowerCase();
+            const taken = new Set(values.map((v) => v.toLowerCase()));
+            matches = suggestions
+                .filter((s) => !taken.has(s.toLowerCase()) && s.toLowerCase().includes(q))
+                .sort((a, b) => a.toLowerCase().startsWith(q) === b.toLowerCase().startsWith(q) ? 0 : a.toLowerCase().startsWith(q) ? -1 : 1);
+            if (!matches.length) return hideList();
+            active = Math.min(active, matches.length - 1);
+            list.innerHTML = matches
+                .map((m, i) => `<li role="option" id="${listId}-${i}" data-i="${i}" aria-selected="${i === active}">${esc(m)}</li>`)
+                .join("");
+            list.classList.remove("hidden");
+            input.setAttribute("aria-expanded", "true");
+            if (active >= 0) {
+                input.setAttribute("aria-activedescendant", `${listId}-${active}`);
+                list.children[active].scrollIntoView({ block: "nearest" });
+            } else input.removeAttribute("aria-activedescendant");
+        }
+        function add(v) {
+            v = v.trim();
+            if (v && !values.some((x) => x.toLowerCase() === v.toLowerCase())) values.push(v);
+        }
         function commit() {
-            for (const part of input.value.split(",")) {
-                const v = part.trim();
-                if (v && !values.some((x) => x.toLowerCase() === v.toLowerCase())) values.push(v);
-            }
+            for (const part of input.value.split(",")) add(part);
             input.value = "";
             render();
         }
+        function pick(i) {
+            add(matches[i]);
+            input.value = "";
+            render();
+            active = -1;
+            showList();
+            input.focus();
+        }
         input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === ",") {
+            const open = !list.classList.contains("hidden");
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                 e.preventDefault();
-                commit();
+                if (!open) return showList();
+                // -1 means "nothing highlighted" (Enter adds what's typed); the cycle wraps through it
+                if (e.key === "ArrowDown") active = active + 1 >= matches.length ? -1 : active + 1;
+                else active = active - 1 < -1 ? matches.length - 1 : active - 1;
+                showList();
+            } else if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                if (open && active >= 0 && e.key === "Enter") pick(active);
+                else {
+                    commit();
+                    showList();
+                }
+            } else if (e.key === "Escape" && open) {
+                e.preventDefault();
+                e.stopPropagation(); // keep the dialog open
+                hideList();
             } else if (e.key === "Backspace" && !input.value && values.length) {
                 values.pop();
                 render();
             }
         });
-        input.addEventListener("change", commit); // picking from the datalist
-        input.addEventListener("blur", commit);
+        input.addEventListener("input", () => {
+            active = -1;
+            showList();
+        });
+        input.addEventListener("focus", showList);
+        input.addEventListener("blur", () => {
+            commit();
+            hideList();
+        });
+        // mousedown so the pick lands before the input's blur
+        list.addEventListener("mousedown", (e) => {
+            const li = e.target.closest("[data-i]");
+            e.preventDefault();
+            if (li) pick(Number(li.dataset.i));
+        });
         container.addEventListener("click", () => input.focus());
-        container.appendChild(input);
+        container.insertBefore(input, list);
         render();
         return { get: () => (commit(), values) };
     }
@@ -111,49 +182,54 @@
             withBogdan: false,
         };
         const poster = { tmdbId: row.tmdbId ?? null, tmdbMediaType: row.tmdbMediaType ?? null, posterPath: row.posterPath ?? null };
-        const f = (label, html, cls = "") => `<div class="${cls}"><label class="${CLS.label}">${label}</label>${html}</div>`;
+        // Field: a label tied to the first control in html (by name).
+        const f = (label, html) => {
+            const name = html.match(/name="(\w+)"/)?.[1];
+            const id = name ? `ed-${name}` : "";
+            return `<div><label class="label"${id ? ` for="${id}"` : ""}>${label}</label>${id ? html.replace(`name="${name}"`, `name="${name}" id="${id}"`) : html}</div>`;
+        };
         const v = (x) => (x == null ? "" : esc(x));
 
         const d = dialog(
-            isNew ? "➕ Add title" : `✏️ Edit ${esc(row.name)}`,
+            isNew ? "Add a title" : `Edit ${esc(row.name)}`,
             `
-            <div data-error class="${CLS.error}"></div>
-            <form class="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-6">
-                <div class="space-y-2">
-                    <div data-poster class="w-full aspect-[2/3] rounded-xl bg-gradient-to-br from-primary/20 to-black/40 flex items-center justify-center text-4xl overflow-hidden">🎬</div>
-                    <button type="button" data-find class="${CLS.btn} ${CLS.secondary} w-full justify-center">🔎 Find poster</button>
-                    <button type="button" data-clear-poster class="${CLS.btn} ${CLS.secondary} w-full justify-center text-xs">Remove poster</button>
+            <div data-error class="${CLS.error}" role="alert"></div>
+            <form class="editor">
+                <div class="editor-poster">
+                    <div data-poster class="poster-slot">No poster</div>
+                    <button type="button" data-find class="btn btn-block">Find poster</button>
+                    <button type="button" data-clear-poster class="btn btn-small btn-block">Remove poster</button>
                 </div>
-                <div class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-3">
-                        ${f("Name", `<input name="name" required maxlength="300" class="${CLS.input}" value="${v(row.name)}">`)}
-                        ${f("Type", `<select name="type" class="${CLS.input}">${["Film", "Series"].map((t) => `<option ${t === row.type ? "selected" : ""}>${t}</option>`).join("")}</select>`)}
+                <div class="stack">
+                    <div class="row row-name">
+                        ${f("Name", `<input name="name" required maxlength="300" class="input" value="${v(row.name)}">`)}
+                        ${f("Type", `<select name="type" class="input">${["Film", "Series"].map((t) => `<option ${t === row.type ? "selected" : ""}>${t}</option>`).join("")}</select>`)}
                     </div>
                     <div data-results class="hidden"></div>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        ${f("Rating /10", `<input name="rating" type="number" min="0" max="11" step="0.5" placeholder="?" class="${CLS.input}" value="${v(row.rating)}">`)}
-                        ${f("Rewatch /10", `<input name="rewatchPotential" type="number" min="0" max="10" step="1" class="${CLS.input}" value="${v(row.rewatchPotential)}">`)}
-                        ${f("Watch count", `<input name="watchCount" type="number" min="0" step="1" class="${CLS.input}" value="${v(row.watchCount)}">`)}
-                        ${f("Release year", `<input name="releaseYear" type="number" min="1870" max="2200" class="${CLS.input}" value="${v(row.releaseYear)}">`)}
+                    <div class="row row-4">
+                        ${f("Rating out of 10", `<input name="rating" type="number" min="0" max="11" step="0.5" placeholder="?" class="input" value="${v(row.rating)}">`)}
+                        ${f("Rewatch out of 10", `<input name="rewatchPotential" type="number" min="0" max="10" step="1" class="input" value="${v(row.rewatchPotential)}">`)}
+                        ${f("Watch count", `<input name="watchCount" type="number" min="0" step="1" class="input" value="${v(row.watchCount)}">`)}
+                        ${f("Release year", `<input name="releaseYear" type="number" min="1870" max="2200" class="input" value="${v(row.releaseYear)}">`)}
                     </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        ${f("1st watch", `<input name="firstWatch" type="month" class="${CLS.input}" value="${toMonthInput(row.firstWatch)}">`)}
-                        ${f("Latest watch", `<input name="latestWatch" type="month" class="${CLS.input}" value="${toMonthInput(row.latestWatch)}">`)}
-                        ${f("Seasons", `<input name="seasons" type="number" min="0" class="${CLS.input}" value="${v(row.seasons)}">`)}
-                        ${f("Episodes", `<input name="episodesTotal" type="number" min="0" class="${CLS.input}" value="${v(row.episodesTotal)}">`)}
+                    <div class="row row-4">
+                        ${f("First watch", `<input name="firstWatch" type="month" class="input" value="${toMonthInput(row.firstWatch)}">`)}
+                        ${f("Latest watch", `<input name="latestWatch" type="month" class="input" value="${toMonthInput(row.latestWatch)}">`)}
+                        ${f("Seasons", `<input name="seasons" type="number" min="0" class="input" value="${v(row.seasons)}">`)}
+                        ${f("Episodes", `<input name="episodesTotal" type="number" min="0" class="input" value="${v(row.episodesTotal)}">`)}
                     </div>
-                    ${f("Genres", `<div data-genres></div>`)}
-                    ${f("Physical formats", `<div data-formats></div>`)}
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
-                        <label class="flex items-center gap-2 text-sm text-gray-300 pb-2"><input type="checkbox" name="withBogdan" ${row.withBogdan ? "checked" : ""}> 👥 Watched with Bogdan</label>
-                        ${f("Date with Bogdan", `<input name="dateWithBogdan" type="month" class="${CLS.input}" value="${toMonthInput(row.dateWithBogdan)}">`)}
-                        ${f("Price paid (£)", `<input name="pricePaid" type="number" min="0" step="0.01" class="${CLS.input}" value="${v(row.pricePaid)}">`)}
+                    ${f("Genres", `<div data-genres data-label="Add a genre"></div>`)}
+                    ${f("Physical formats", `<div data-formats data-label="Add a physical format"></div>`)}
+                    <div class="row row-3" style="align-items:end">
+                        <label class="check" style="padding-bottom:10px"><input type="checkbox" name="withBogdan" ${row.withBogdan ? "checked" : ""}> Watched with Bogdan</label>
+                        ${f("Date with Bogdan", `<input name="dateWithBogdan" type="month" class="input" value="${toMonthInput(row.dateWithBogdan)}">`)}
+                        ${f("Price paid (£)", `<input name="pricePaid" type="number" min="0" step="0.01" class="input" value="${v(row.pricePaid)}">`)}
                     </div>
-                    ${f("CeX links (one per line)", `<textarea name="cexLinks" rows="2" class="${CLS.input} font-mono text-xs">${esc(row.cexLinks.join("\n"))}</textarea>`)}
-                    ${f("Comments", `<textarea name="comments" rows="3" maxlength="4000" class="${CLS.input}">${v(row.comments)}</textarea>`)}
-                    <div class="flex gap-2 justify-end pt-2">
-                        <button type="button" data-cancel class="${CLS.btn} ${CLS.secondary}">Cancel</button>
-                        <button type="submit" class="${CLS.btn} ${CLS.primary}">${isNew ? "Add title" : "Save changes"}</button>
+                    ${f("CeX links, one per line", `<textarea name="cexLinks" rows="2" class="input code">${esc(row.cexLinks.join("\n"))}</textarea>`)}
+                    ${f("Comments", `<textarea name="comments" rows="3" maxlength="4000" class="input">${v(row.comments)}</textarea>`)}
+                    <div class="actions">
+                        <button type="button" data-cancel class="btn">Cancel</button>
+                        <button type="submit" class="btn btn-primary">${isNew ? "Add title" : "Save changes"}</button>
                     </div>
                 </div>
             </form>`,
@@ -167,8 +243,8 @@
         const renderPoster = () => {
             const el = d.$("[data-poster]");
             el.innerHTML = poster.posterPath
-                ? `<img src="https://image.tmdb.org/t/p/w500${esc(poster.posterPath)}" class="w-full h-full object-cover" alt="">`
-                : "🎬";
+                ? `<img src="https://image.tmdb.org/t/p/w500${esc(poster.posterPath)}" alt="Chosen poster">`
+                : "No poster";
         };
         renderPoster();
 
@@ -188,17 +264,17 @@
                 const box = d.$("[data-results]");
                 box.classList.remove("hidden");
                 box.innerHTML = results.length
-                    ? `<div class="flex gap-2 overflow-x-auto pb-2">${results
+                    ? `<div class="poster-results">${results
                           .map(
                               (r, i) => `
-                        <button type="button" data-pick="${i}" title="${esc(r.title)} (${esc(r.year ?? "?")})" class="shrink-0 w-24 text-left rounded-lg overflow-hidden border-2 border-transparent hover:border-primary transition-all">
-                            <img src="${esc(r.posterUrl)}" class="w-24 h-36 object-cover" alt="">
-                            <div class="text-[10px] text-gray-300 p-1 truncate">${esc(r.title)}</div>
-                            <div class="text-[10px] text-gray-500 px-1 pb-1">${esc(r.year ?? "?")} · ${r.mediaType === "tv" ? "TV" : "Film"}</div>
+                        <button type="button" data-pick="${i}" title="${esc(r.title)} (${esc(r.year ?? "?")})">
+                            <img src="${esc(r.posterUrl)}" alt="">
+                            <span>${esc(r.title)}</span>
+                            <span>${esc(r.year ?? "?")}, ${r.mediaType === "tv" ? "TV" : "film"}</span>
                         </button>`,
                           )
                           .join("")}</div>`
-                    : `<p class="text-sm text-gray-400">No posters found. Try correcting the name or the release year.</p>`;
+                    : `<p class="muted">No posters found. Check the name or the release year.</p>`;
                 box.querySelectorAll("[data-pick]").forEach((b) => {
                     b.onclick = () => {
                         const r = results[Number(b.dataset.pick)];
@@ -277,16 +353,16 @@
         controls.innerHTML = "";
         if (me.canEdit) {
             const add = document.createElement("button");
-            add.className =
-                "flex items-center gap-2 bg-primary/10 hover:bg-primary/20 border border-primary/30 px-4 py-2.5 rounded-lg text-sm font-semibold text-primary transition-all cursor-pointer";
-            add.innerHTML = "<span>➕ Add</span>";
+            add.type = "button";
+            add.className = "btn btn-primary";
+            add.textContent = "Add title";
             add.onclick = () => openEditor(null);
             controls.appendChild(add);
         } else if (Auth.mustEnrolMfa()) {
             const setup = document.createElement("button");
-            setup.className =
-                "flex items-center gap-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 px-4 py-2.5 rounded-lg text-sm font-semibold text-yellow-400 transition-all cursor-pointer";
-            setup.innerHTML = "<span>🛡️ Set up 2FA to edit</span>";
+            setup.type = "button";
+            setup.className = "btn btn-warn";
+            setup.textContent = "Set up 2FA to edit";
             setup.onclick = Auth.openMfaSetup;
             controls.appendChild(setup);
         }
@@ -296,11 +372,11 @@
         onModalOpened(row) {
             const bar = document.getElementById("modalAdminBar");
             if (!bar || !Auth.me.canEdit) return;
-            bar.className = "flex gap-2 flex-wrap mb-5 pb-5 border-b border-white/10";
+            bar.className = "modal-actions";
             bar.innerHTML = `
-                <button data-edit class="${CLS.btn} ${CLS.secondary}">✏️ Edit</button>
-                <button data-watch class="${CLS.btn} ${CLS.secondary}" title="Increase the watch count and set the latest watch to this month">➕ Watched again</button>
-                <button data-delete class="${CLS.btn} ${CLS.danger}">🗑️ Delete</button>`;
+                <button type="button" data-edit class="btn">Edit</button>
+                <button type="button" data-watch class="btn" title="Add one to the watch count and set the latest watch to this month">Watched again</button>
+                <button type="button" data-delete class="btn btn-danger">Delete</button>`;
             bar.querySelector("[data-edit]").onclick = () => openEditor(row);
             bar.querySelector("[data-watch]").onclick = () => addWatch(row);
             bar.querySelector("[data-delete]").onclick = () => deleteTitle(row);

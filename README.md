@@ -4,7 +4,7 @@ Personal film & series collection for **movies.raulblideran.uk**.
 
 - **API:** ASP.NET Core 10 Minimal APIs, EF Core and SQLite.
 - **Auth:** ASP.NET Core Identity with users, roles and TOTP two-factor.
-- **Front-end:** the original watched-films page, served from `src/Movies.Api/wwwroot`.
+- **Front-end:** plain HTML/JS in `src/Movies.Api/wwwroot`. Styles are in `css/site.css` (the default "Picture house" theme). Each film theme is one file in `css/themes/`, plus its hero artwork in `js/theme.js`. Visitors pick a theme from the top bar, and `?theme=<id>` links straight to one. Hero photos: film stills are loaded from TMDB's image server (credited in the footer); the default theme's cinema photos in `wwwroot/img/` are by Eden, Janine and Jim on Wikimedia Commons, CC BY 2.0.
 
 The only thing your machine needs is **podman**. The .NET SDK lives in the dev container.
 
@@ -16,7 +16,7 @@ The only thing your machine needs is **podman**. The .NET SDK lives in the dev c
 ./dev.sh create-user raul --role Admin      # create your account (prompts for a password, 12+ chars)
 ```
 
-Then sign in with the **🔐 Admin** link in the page footer, or open `http://localhost:5080/?admin`. The first time you sign in you have to set up an authenticator app (Aegis, 2FAS, Google Authenticator…). Save the recovery codes it shows you.
+Then sign in with **Sign in** in the top bar, or open `http://localhost:5080/?admin`. The first time you sign in you have to set up an authenticator app (Aegis, 2FAS, Google Authenticator…). Save the recovery codes it shows you.
 
 Settings live in `.env.dev`, which is git-ignored and created from `.env.dev.example` on the first run:
 
@@ -54,7 +54,7 @@ If the app is running, these commands `exec` into it; otherwise they run in a th
 ## Users and security
 
 - **Roles.** **Admin** manages titles and users. **Editor** manages titles only. Anyone not signed in can only read.
-- **No public sign-up.** Admins add users from **Users** in the footer, or with `./dev.sh create-user`.
+- **No public sign-up.** Admins add users from **Users** in the top bar, or with `./dev.sh create-user`.
 - **Passwords.**
   - Minimum 12 characters.
   - 5 failed attempts lock the account for 15 minutes.

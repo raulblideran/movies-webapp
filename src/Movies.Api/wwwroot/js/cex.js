@@ -29,7 +29,7 @@
 
     function hideLoading() {
         const overlay = document.getElementById("loadingOverlay");
-        overlay.classList.add("opacity-0");
+        overlay.classList.add("is-fading");
         setTimeout(() => overlay.classList.add("hidden"), 300);
     }
 
@@ -59,12 +59,12 @@
             ? filtered
                   .map(
                       (s) =>
-                          `<div data-store-id="${s.storeId}" class="px-4 py-3 cursor-pointer hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors text-sm font-medium ${
-                              selectedStore?.storeId === s.storeId ? "bg-green-500/10 text-green-400" : ""
+                          `<div data-store-id="${s.storeId}" role="option" aria-selected="${selectedStore?.storeId === s.storeId}" class="${
+                              selectedStore?.storeId === s.storeId ? "is-selected" : ""
                           }">${esc(s.storeName)}</div>`,
                   )
                   .join("")
-            : `<div class="p-3 text-center text-gray-400 text-sm">No stores found</div>`;
+            : `<div class="faint" style="padding:10px;text-align:center">No stores match</div>`;
         dropdown.querySelectorAll("[data-store-id]").forEach((opt) => {
             opt.onclick = () => selectStore(allStores.find((s) => s.storeId === Number(opt.dataset.storeId)));
         });
@@ -73,11 +73,16 @@
     function selectStore(store) {
         selectedStore = store;
         document.getElementById("storeSearch").value = store.storeName;
-        document.getElementById("storeDropdown").classList.add("hidden");
+        setDropdown(false);
         savePreference(store.storeId);
         stock.clear();
         render();
         loadStock(items);
+    }
+
+    function setDropdown(open) {
+        document.getElementById("storeDropdown").classList.toggle("hidden", !open);
+        document.getElementById("storeSearch").setAttribute("aria-expanded", String(open));
     }
 
     function initStoreSelector() {
@@ -94,19 +99,19 @@
         const options = () => dropdown.querySelectorAll("[data-store-id]");
         const highlight = () =>
             options().forEach((o, i) => {
-                o.classList.toggle("bg-cyan-500/20", i === selectedIndex);
+                o.classList.toggle("is-highlighted", i === selectedIndex);
                 if (i === selectedIndex) o.scrollIntoView({ block: "nearest" });
             });
 
         input.addEventListener("input", () => {
             selectedIndex = -1;
             renderStoreDropdown(input.value);
-            dropdown.classList.remove("hidden");
+            setDropdown(true);
         });
         input.addEventListener("focus", () => {
             input.select();
             renderStoreDropdown("");
-            dropdown.classList.remove("hidden");
+            setDropdown(true);
         });
         input.addEventListener("keydown", (e) => {
             if (e.key === "ArrowDown") {
@@ -121,14 +126,14 @@
                 e.preventDefault();
                 options()[selectedIndex].click();
             } else if (e.key === "Escape") {
-                dropdown.classList.add("hidden");
+                setDropdown(false);
                 input.value = location_().storeName;
                 input.blur();
             }
         });
         document.addEventListener("click", (e) => {
             if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-                dropdown.classList.add("hidden");
+                setDropdown(false);
                 if (!input.value.trim()) input.value = location_().storeName;
             }
         });
@@ -148,6 +153,7 @@
                     stock.set(item.id, null);
                 }
                 updateStock(item);
+                renderStats();
             }
         }
         await Promise.all([worker(), worker(), worker(), worker()]);
@@ -155,28 +161,36 @@
     }
 
     function stockHtml(item) {
-        if (!stock.has(item.id))
-            return `<div class="pt-2 border-t border-slate-700/50 text-gray-500 text-xs text-center animate-pulse">Checking stock…</div>`;
+        if (!stock.has(item.id)) return `<div class="stock stock-wait pulse">Checking stock…</div>`;
         const stores = stock.get(item.id);
-        if (stores === null)
-            return `<div class="pt-2 border-t border-slate-700/50 text-gray-500 text-xs text-center">Stock unavailable</div>`;
-        if (stores.length === 0)
-            return `<div class="pt-2 border-t border-slate-700/50 text-red-400 font-semibold text-xs text-center">Not in stock</div>`;
+        if (stores === null) return `<div class="stock stock-wait">Stock unavailable right now</div>`;
+        if (stores.length === 0) return `<div class="stock stock-none">Not in stock anywhere</div>`;
 
         const nearest = stores[0];
         const isSelected = selectedStore && nearest.storeName === selectedStore.storeName;
         return `
-            <div class="pt-2 border-t border-slate-700/50 flex items-center justify-between gap-2">
-                <div class="flex-1 min-w-0">
-                    <div class="${isSelected ? "text-yellow-400" : "text-green-400"} font-semibold text-xs truncate">${esc(nearest.storeName)}</div>
-                    <div class="text-gray-400 text-[10px] mt-0.5">${kmToMiles(nearest.distanceKm).toFixed(1)} mi • ${nearest.quantity} in stock</div>
+            <div class="stock">
+                <div style="min-width:0">
+                    <div class="stock-store${isSelected ? " is-home" : ""}">${esc(nearest.storeName)}</div>
+                    <div class="stock-meta">${kmToMiles(nearest.distanceKm).toFixed(1)} mi, ${nearest.quantity} in stock</div>
                 </div>
                 ${
                     stores.length > 1
-                        ? `<button data-more class="px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-500 text-cyan-400 rounded-md text-[10px] font-semibold transition-all flex-shrink-0">+${stores.length - 1}</button>`
+                        ? `<button type="button" data-more class="btn btn-small" aria-label="Show all ${stores.length} stores">+${stores.length - 1}</button>`
                         : ""
                 }
             </div>`;
+    }
+
+    function renderStats() {
+        const el = document.getElementById("stats");
+        if (!el) return;
+        const checked = items.filter((i) => stock.has(i.id));
+        const inStock = checked.filter((i) => stock.get(i.id)?.length > 0).length;
+        const near = checked.filter((i) => (stock.get(i.id)?.[0]?.distanceKm ?? Infinity) <= 16.1).length;
+        const stats = [[items.length, "tracked"]];
+        if (checked.length === items.length && items.length) stats.push([inStock, "in stock"], [near, "within 10 mi"]);
+        el.innerHTML = stats.map(([v, l]) => `<div class="stat"><dt>${l}</dt><dd>${v}</dd></div>`).join("");
     }
 
     function updateStock(item) {
@@ -199,19 +213,19 @@
             .map((s) => {
                 const isSelected = selectedStore && s.storeName === selectedStore.storeName;
                 return `
-                <div class="p-4 bg-slate-700/30 rounded-lg hover:bg-slate-700/50 transition-colors">
-                    <div class="font-semibold mb-2 ${isSelected ? "text-yellow-400" : "text-white"}">${esc(s.storeName)}</div>
-                    <div class="flex gap-4 text-sm">
-                        <span class="text-green-400 font-semibold">${s.quantity} in stock</span>
-                        <span class="text-cyan-400">${kmToMiles(s.distanceKm).toFixed(1)} mi from ${esc(locationName)}</span>
-                    </div>
+                <div class="store-row">
+                    <strong class="${isSelected ? "is-home" : ""}">${esc(s.storeName)}</strong>
+                    <span><span class="status-on">${s.quantity} in stock</span>, ${kmToMiles(s.distanceKm).toFixed(1)} mi from ${esc(locationName)}</span>
                 </div>`;
             })
             .join("");
+        const opener = document.activeElement;
         overlay.classList.remove("hidden");
+        document.getElementById("modalClose").focus();
         const close = () => {
             overlay.classList.add("hidden");
             document.removeEventListener("keydown", onEscape);
+            if (opener?.isConnected) opener.focus();
         };
         const onEscape = (e) => {
             if (e.key === "Escape") close();
@@ -229,27 +243,25 @@
         "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='40' fill='%23475569'%3E📦%3C/text%3E%3C/svg%3E";
 
     function cardHtml(item) {
+        const title = item.title ?? `Product ${item.sku}`;
         return `
-        <a href="${esc(item.url)}" target="_blank" rel="noopener" data-item-id="${item.id}"
-           class="group relative block bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden hover:border-cyan-500/50 hover:shadow-xl hover:shadow-cyan-500/20 hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300">
-            <div class="relative h-64 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center overflow-hidden">
-                <img src="${esc(item.imageUrl || PLACEHOLDER)}" alt="" class="max-w-[90%] max-h-[90%] object-contain drop-shadow-2xl">
+        <a href="${esc(item.url)}" target="_blank" rel="noopener" data-item-id="${item.id}" class="product">
+            <div class="product-image">
+                <img src="${esc(item.imageUrl || PLACEHOLDER)}" alt="" loading="lazy">
+                ${item.sellPrice != null ? `<span class="price-tag">£${item.sellPrice}</span>` : ""}
                 ${
                     canEdit
-                        ? `<div class="absolute top-2 right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                               <button data-edit title="Edit" class="w-8 h-8 rounded-lg bg-slate-900/80 border border-cyan-500/30 hover:border-cyan-400 text-sm">✏️</button>
-                               <button data-delete title="Stop tracking" class="w-8 h-8 rounded-lg bg-slate-900/80 border border-red-500/30 hover:border-red-400 text-sm">🗑️</button>
+                        ? `<div class="product-tools">
+                               <button type="button" data-edit class="btn btn-small" aria-label="Edit ${esc(title)}">Edit</button>
+                               <button type="button" data-delete class="btn btn-small btn-danger" aria-label="Stop tracking ${esc(title)}">Remove</button>
                            </div>`
                         : ""
                 }
             </div>
-            <div class="p-3">
-                <div class="flex items-center justify-between gap-2 mb-2">
-                    <div class="inline-block bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-900 px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider truncate">${esc(item.category ?? "Product")}</div>
-                    ${item.sellPrice != null ? `<div class="bg-red-900 text-white px-2 py-0.5 rounded-md text-xs font-bold">£${item.sellPrice}</div>` : ""}
-                </div>
-                <div class="text-white font-bold text-sm mb-2 line-clamp-2 leading-snug">${esc(item.title ?? `Product ${item.sku}`)}</div>
-                ${item.notes ? `<div class="text-gray-400 text-[11px] italic mb-2 line-clamp-2">${esc(item.notes)}</div>` : ""}
+            <div class="product-body">
+                <div class="product-category">${esc(item.category ?? "Product")}</div>
+                <h3 class="product-title">${esc(title)}</h3>
+                ${item.notes ? `<p class="product-notes">${esc(item.notes)}</p>` : ""}
                 <div data-stock>${stockHtml(item)}</div>
             </div>
         </a>`;
@@ -259,6 +271,7 @@
         const list = sortByDistance ? [...items].sort((a, b) => nearestDistance(a) - nearestDistance(b)) : items;
         grid.innerHTML = list.map(cardHtml).join("");
         document.getElementById("emptyState").classList.toggle("hidden", items.length > 0);
+        renderStats();
         for (const item of list) {
             updateStock(item);
             const card = grid.querySelector(`[data-item-id="${item.id}"]`);
@@ -280,12 +293,12 @@
         if (me.canEdit) {
             bar.classList.remove("hidden");
             bar.innerHTML = `
-                <form class="flex gap-2">
-                    <input name="url" autocomplete="off" placeholder="📋 Paste a CeX product link to start tracking it…"
-                        class="flex-1 bg-slate-800/50 border border-cyan-500/30 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all">
-                    <button class="bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-900 font-bold px-5 rounded-xl text-sm hover:brightness-110 disabled:opacity-50">Add</button>
+                <form>
+                    <input name="url" autocomplete="off" class="input" aria-label="CeX product link"
+                        placeholder="Paste a CeX product link to start tracking it">
+                    <button class="btn btn-primary">Track</button>
                 </form>
-                <p data-status class="text-xs mt-2 text-center min-h-[1rem]"></p>`;
+                <p data-status class="track-status" aria-live="polite"></p>`;
             const form = bar.querySelector("form");
             form.onsubmit = (e) => {
                 e.preventDefault();
@@ -299,7 +312,7 @@
             );
         } else if (Auth.mustEnrolMfa()) {
             bar.classList.remove("hidden");
-            bar.innerHTML = `<div class="text-center"><button class="bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 px-4 py-2.5 rounded-lg text-sm font-semibold text-yellow-400">🛡️ Set up 2FA to edit</button></div>`;
+            bar.innerHTML = `<div style="text-align:center"><button type="button" class="btn btn-warn">Set up 2FA to edit</button></div>`;
             bar.querySelector("button").onclick = Auth.openMfaSetup;
         } else {
             bar.classList.add("hidden");
@@ -313,7 +326,7 @@
         const url = form.url.value.trim();
         if (!url || button.disabled) return;
         button.disabled = true;
-        status.className = "text-xs mt-2 text-center min-h-[1rem] text-cyan-300 animate-pulse";
+        status.className = "track-status is-working pulse";
         status.textContent = "Looking it up on CeX…";
         try {
             const item = await Auth.api("POST", "/api/cex-items", { url });
@@ -321,10 +334,10 @@
             render();
             loadStock([item]);
             form.reset();
-            status.className = "text-xs mt-2 text-center min-h-[1rem] text-green-400";
-            status.textContent = `✅ Now tracking "${item.title}" (£${item.sellPrice})`;
+            status.className = "track-status is-ok";
+            status.textContent = `Now tracking ${item.title}, £${item.sellPrice}`;
         } catch (e) {
-            status.className = "text-xs mt-2 text-center min-h-[1rem] text-red-400";
+            status.className = "track-status is-error";
             status.textContent = e.message;
         } finally {
             button.disabled = false;
@@ -336,24 +349,24 @@
         const { CLS } = Auth;
         const updated = item.refreshedAt ? new Date(item.refreshedAt).toLocaleString() : "never";
         const d = Auth.dialog(
-            "✏️ Edit tracked item",
+            "Edit tracked item",
             `
-            <div data-error class="${CLS.error}"></div>
-            <form class="space-y-4">
-                <div class="flex gap-3 items-center">
-                    <img src="${esc(item.imageUrl || PLACEHOLDER)}" class="w-16 h-16 object-contain rounded-lg bg-slate-900/60" alt="">
-                    <div class="min-w-0">
-                        <div class="text-white font-semibold text-sm">${esc(item.title ?? item.sku)}</div>
-                        <div class="text-xs text-gray-400">£${item.sellPrice ?? "?"} · cash £${item.cashPrice ?? "?"} · voucher £${item.exchangePrice ?? "?"}</div>
-                        <div class="text-[11px] text-gray-500">Prices captured ${esc(updated)}</div>
+            <div data-error class="${CLS.error}" role="alert"></div>
+            <form class="stack">
+                <div class="item-summary">
+                    <img src="${esc(item.imageUrl || PLACEHOLDER)}" alt="">
+                    <div style="min-width:0">
+                        <div><b>${esc(item.title ?? item.sku)}</b></div>
+                        <div class="muted" style="font-size:14px">£${item.sellPrice ?? "?"} to buy, £${item.cashPrice ?? "?"} cash, £${item.exchangePrice ?? "?"} voucher</div>
+                        <div class="faint" style="font-size:13px">Prices from ${esc(updated)}</div>
                     </div>
                 </div>
-                <div><label class="${CLS.label}">CeX link</label><input name="url" class="${CLS.input} font-mono text-xs" value="${esc(item.url)}"></div>
-                <div><label class="${CLS.label}">Notes</label><textarea name="notes" rows="2" maxlength="1000" class="${CLS.input}" placeholder="e.g. birthday present, wait for under £10">${esc(item.notes ?? "")}</textarea></div>
-                <div class="flex gap-2 justify-end">
-                    <button type="button" data-refresh class="${CLS.btn} ${CLS.secondary} mr-auto">🔄 Refresh from CeX</button>
-                    <button type="button" data-cancel class="${CLS.btn} ${CLS.secondary}">Cancel</button>
-                    <button type="submit" class="${CLS.btn} ${CLS.primary}">Save</button>
+                <div><label class="label" for="cex-url">CeX link</label><input id="cex-url" name="url" class="input code" value="${esc(item.url)}"></div>
+                <div><label class="label" for="cex-notes">Notes</label><textarea id="cex-notes" name="notes" rows="2" maxlength="1000" class="input" placeholder="For example: birthday present, wait for under £10">${esc(item.notes ?? "")}</textarea></div>
+                <div class="actions">
+                    <button type="button" data-refresh class="btn push">Refresh from CeX</button>
+                    <button type="button" data-cancel class="btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>`,
         );
@@ -370,7 +383,7 @@
                 const saved = await Auth.api("POST", `/api/cex-items/${item.id}/refresh`);
                 replace(saved);
                 d.close();
-                Auth.showSuccess(`Updated "${saved.title}" (£${saved.sellPrice})`);
+                Auth.showSuccess(`Refreshed ${saved.title}: £${saved.sellPrice}`);
             });
         form.onsubmit = (e) => {
             e.preventDefault();
@@ -410,9 +423,8 @@
 
     document.getElementById("sortBtn").addEventListener("click", (e) => {
         sortByDistance = !sortByDistance;
-        e.currentTarget.textContent = sortByDistance ? "Default Order" : "Sort by Distance";
-        e.currentTarget.classList.toggle("bg-cyan-500/20", sortByDistance);
-        e.currentTarget.classList.toggle("border-cyan-500", sortByDistance);
+        e.currentTarget.setAttribute("aria-pressed", String(sortByDistance));
+        e.currentTarget.classList.toggle("btn-primary", sortByDistance);
         render();
     });
 

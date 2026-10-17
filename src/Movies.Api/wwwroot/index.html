@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-asset-version="{{stamp}}">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,553 +7,178 @@
         <link rel="icon" href="favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-        <meta name="theme-color" content="#2a0a0a" />
-        <script src="https://cdn.tailwindcss.com"></script>
+        <meta name="theme-color" content="#240509" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=Big+Shoulders+Display:wght@600;800;900&display=swap"
+        />
+        <link rel="stylesheet" href="css/site.css" />
         <script>
-            tailwind.config = {
-                theme: {
-                    extend: {
-                        colors: {
-                            primary: "#e94560",
-                            "primary-dark": "#8b0000",
-                        },
-                        animation: {
-                            fadeInDown: "fadeInDown 0.6s ease",
-                            fadeInUp: "fadeInUp 0.6s ease",
-                            fadeIn: "fadeIn 0.3s ease",
-                            slideUp: "slideUp 0.3s ease",
-                            "pulse-slow": "pulse 1.5s ease-in-out infinite",
-                        },
-                        keyframes: {
-                            fadeInDown: {
-                                "0%": {
-                                    opacity: "0",
-                                    transform: "translateY(-30px)",
-                                },
-                                "100%": {
-                                    opacity: "1",
-                                    transform: "translateY(0)",
-                                },
-                            },
-                            fadeInUp: {
-                                "0%": {
-                                    opacity: "0",
-                                    transform: "translateY(30px)",
-                                },
-                                "100%": {
-                                    opacity: "1",
-                                    transform: "translateY(0)",
-                                },
-                            },
-                            fadeIn: {
-                                "0%": { opacity: "0" },
-                                "100%": { opacity: "1" },
-                            },
-                            slideUp: {
-                                "0%": {
-                                    opacity: "0",
-                                    transform: "translateY(50px)",
-                                },
-                                "100%": {
-                                    opacity: "1",
-                                    transform: "translateY(0)",
-                                },
-                            },
-                        },
-                    },
-                },
-            };
+            // Load the saved theme before first paint (js/theme.js owns the picker).
+            (function () {
+                var t = new URLSearchParams(location.search).get("theme");
+                try {
+                    if (t) localStorage.setItem("theme", t);
+                    else t = localStorage.getItem("theme");
+                } catch (e) {}
+                if (t && t !== "house" && /^[a-z-]+$/.test(t)) {
+                    document.documentElement.dataset.theme = t;
+                    document.write('<link rel="stylesheet" id="themeCss" href="css/themes/' + t + '.css?v={{stamp}}">');
+                }
+            })();
         </script>
-        <style>
-            /* Custom styles for collapse functionality and special effects */
-            #filtersSection.collapsed {
-                max-height: 0 !important;
-            }
-
-            #filtersSection:not(.collapsed) {
-                max-height: 1000px;
-            }
-
-            .modal-poster.hidden {
-                display: none;
-            }
-
-            /* Custom scrollbar for genre filters */
-            #genreFilters::-webkit-scrollbar {
-                width: 8px;
-            }
-            #genreFilters::-webkit-scrollbar-track {
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 10px;
-            }
-            #genreFilters::-webkit-scrollbar-thumb {
-                background: #e94560;
-                border-radius: 10px;
-            }
-            #genreFilters::-webkit-scrollbar-thumb:hover {
-                background: #c41e3a;
-            }
-
-            /* Card top border gradient */
-            .card::before {
-                content: "";
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 4px;
-                background: linear-gradient(90deg, #e94560 0%, #8b0000 100%);
-            }
-        </style>
     </head>
-    <body
-        data-export-url="/api/export.csv"
-        class="min-h-screen p-5 text-white bg-gradient-to-br from-[#1a0808] via-[#2a0a0a] to-[#0f0f0f] font-sans"
-    >
-        <nav
-            id="topBar"
-            class="relative z-40 -mx-5 -mt-5 mb-8 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-md border-b border-white/10"
-        >
-            <div class="px-4 sm:px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm">
-                <div class="flex items-center gap-1">
-                    <a href="/" aria-current="page" class="px-3 py-1.5 rounded-lg bg-white/10 text-white font-semibold">🎬 Collection</a>
-                    <a href="/cex" class="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">🛒 CeX Tracker</a>
-                </div>
-                <div id="authArea" class="text-xs text-gray-400 text-center sm:text-right"></div>
+    <body data-export-url="/api/export.csv">
+        <nav class="topbar" id="topBar" aria-label="Site">
+            <div class="topbar-nav">
+                <a href="/" aria-current="page">Collection</a>
+                <a href="/cex">CeX tracker</a>
             </div>
-            <div class="h-[2px] bg-gradient-to-r from-primary via-red-400 to-primary-dark"></div>
+            <div class="topbar-end">
+                <div id="themeSlot"></div>
+                <div id="authArea" class="account"></div>
+            </div>
         </nav>
-        <div class="container mx-auto max-w-full">
-            <!-- Hero Section -->
-            <div class="text-center mb-12 animate-fadeInDown">
-                <h1 class="text-6xl md:text-7xl mb-3 font-black">
-                    <span class="text-6xl md:text-7xl">🎬</span>
-                    <span
-                        class="bg-gradient-to-r from-primary via-red-400 to-primary bg-clip-text text-transparent"
-                        style="text-shadow: 0 0 40px rgba(233, 69, 96, 0.3)"
-                        >Movie & Series Collection</span
-                    >
-                </h1>
-            </div>
 
-            <!-- Stats Section -->
-            <div
-                class="flex gap-4 justify-center flex-wrap mb-4 max-w-6xl mx-auto"
-                id="stats"
-            ></div>
-
-            <!-- CeX Collection Value -->
-            <div
-                class="flex gap-4 justify-center flex-wrap mb-10 max-w-6xl mx-auto"
-                id="cexValueSection"
-            >
-                <div
-                    class="bg-gradient-to-br from-white/8 to-white/12 backdrop-blur-md px-6 py-4 rounded-xl border border-white/15 flex items-center gap-4"
-                >
-                    <button
-                        id="calcCexBtn"
-                        onclick="calculateCollectionValue()"
-                        class="flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-4 py-2.5 rounded-lg text-sm font-semibold text-emerald-400 transition-all cursor-pointer hover:scale-105"
-                    >
-                        <span id="calcCexIcon">💷</span>
-                        <span>Calculate CeX Value</span>
-                    </button>
-                    <div id="cexTotals" class="hidden flex gap-4 items-center">
-                        <div class="text-center">
-                            <div
-                                class="text-[10px] uppercase tracking-wider text-gray-400"
-                            >
-                                Cost
-                            </div>
-                            <div
-                                class="text-xl font-black text-white"
-                                id="totalSell"
-                            >
-                                -
-                            </div>
-                        </div>
-                        <div class="text-center">
-                            <div
-                                class="text-[10px] uppercase tracking-wider text-gray-400"
-                            >
-                                Cash
-                            </div>
-                            <div
-                                class="text-xl font-black text-emerald-400"
-                                id="totalCash"
-                            >
-                                -
-                            </div>
-                        </div>
-                        <div class="text-center">
-                            <div
-                                class="text-[10px] uppercase tracking-wider text-gray-400"
-                            >
-                                Voucher
-                            </div>
-                            <div
-                                class="text-xl font-black text-yellow-400"
-                                id="totalVoucher"
-                            >
-                                -
-                            </div>
-                        </div>
-                        <div class="text-center border-l border-white/20 pl-4">
-                            <div
-                                class="text-[10px] uppercase tracking-wider text-gray-400"
-                            >
-                                Paid (CeX)
-                            </div>
-                            <div
-                                class="text-xl font-black text-primary"
-                                id="totalPaidCex"
-                            >
-                                -
-                            </div>
-                        </div>
-                        <div class="text-center">
-                            <div
-                                class="text-[10px] uppercase tracking-wider text-gray-400"
-                            >
-                                Paid (Other)
-                            </div>
-                            <div
-                                class="text-xl font-black text-cyan-400"
-                                id="totalPaidOther"
-                            >
-                                -
-                            </div>
-                        </div>
-                        <div class="text-center">
-                            <div
-                                class="text-[10px] uppercase tracking-wider text-gray-400"
-                            >
-                                Total
-                            </div>
-                            <div
-                                class="text-xl font-black text-amber-400"
-                                id="totalPaidAll"
-                            >
-                                -
-                            </div>
-                        </div>
-                        <div class="text-center border-l border-white/20 pl-4">
-                            <div
-                                class="text-[10px] uppercase tracking-wider text-gray-400"
-                            >
-                                Items
-                            </div>
-                            <div
-                                class="text-xl font-black text-white"
-                                id="totalCexItems"
-                            >
-                                -
-                            </div>
-                        </div>
-                    </div>
+        <header class="hero">
+            <div class="hero-art" aria-hidden="true"></div>
+            <div class="marquee">
+                <div class="marquee-board">
+                    <p class="hero-tagline" id="heroTagline">Now showing</p>
+                    <h1 class="hero-title">Movie &amp; Series Collection</h1>
+                    <dl class="hero-stats" id="stats">
+                        <div class="stat stat-placeholder"><dt>titles</dt><dd>000</dd></div>
+                    </dl>
                 </div>
             </div>
+        </header>
 
-            <!-- Notification toasts -->
-            <div
-                class="fixed top-5 right-5 z-50 p-4 rounded-xl max-w-md hidden backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.4)] bg-red-500/10 border border-red-500/30 text-red-400 text-sm"
-                id="error"
-            ></div>
-            <div
-                class="fixed top-5 right-5 z-50 p-4 rounded-xl max-w-md hidden backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.4)] bg-green-500/10 border border-green-500/30 text-green-400 text-sm"
-                id="success"
-            ></div>
+        <main class="page">
+            <section class="tally" id="cexValueSection" aria-label="Collection value at CeX">
+                <button type="button" id="calcCexBtn" class="btn" onclick="calculateCollectionValue()">
+                    Calculate CeX value
+                </button>
+                <dl id="cexTotals" class="tally-figures hidden" aria-live="polite">
+                    <div><dt>CeX sells for</dt><dd id="totalSell">-</dd></div>
+                    <div><dt>Cash</dt><dd id="totalCash" class="is-cash">-</dd></div>
+                    <div><dt>Voucher</dt><dd id="totalVoucher" class="is-voucher">-</dd></div>
+                    <div class="tally-break"><dt>Paid at CeX</dt><dd id="totalPaidCex" class="is-paid">-</dd></div>
+                    <div><dt>Paid elsewhere</dt><dd id="totalPaidOther" class="is-other">-</dd></div>
+                    <div><dt>Total paid</dt><dd id="totalPaidAll" class="is-total">-</dd></div>
+                    <div class="tally-break"><dt>Items</dt><dd id="totalCexItems">-</dd></div>
+                </dl>
+            </section>
 
-            <!-- Loading overlay -->
-            <div
-                class="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm hidden items-center justify-center"
-                id="loadingOverlay"
-            >
-                <div
-                    class="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 p-8 max-w-md text-center shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-                >
-                    <div class="mb-4 text-6xl animate-pulse-slow">📡</div>
-                    <h3 class="text-2xl font-bold text-white mb-2">
-                        Fetching Data
-                    </h3>
-                    <p class="text-gray-400 text-sm mb-4">
-                        Loading your collection...
-                    </p>
-                    <div class="flex gap-2 justify-center">
-                        <div
-                            class="w-3 h-3 bg-primary rounded-full animate-bounce"
-                            style="animation-delay: 0s"
-                        ></div>
-                        <div
-                            class="w-3 h-3 bg-primary rounded-full animate-bounce"
-                            style="animation-delay: 0.2s"
-                        ></div>
-                        <div
-                            class="w-3 h-3 bg-primary rounded-full animate-bounce"
-                            style="animation-delay: 0.4s"
-                        ></div>
-                    </div>
-                    <p class="text-gray-500 text-xs mt-4">
-                        This may take a few seconds...
-                    </p>
-                </div>
-            </div>
-
-            <div
-                class="relative z-50 bg-gradient-to-br from-white/8 to-white/12 backdrop-blur-xl rounded-2xl border border-white/15 mb-8 animate-fadeInUp controls p-4"
-                id="controls"
-            >
-                <!-- Search and Sort Row -->
-                <div class="flex gap-3 items-center mb-4 flex-wrap">
-                    <div class="flex-1 min-w-[300px]">
+            <div class="toolbar" id="controls">
+                <div class="toolbar-row">
+                    <label class="search">
+                        <span class="sr-only">Search the collection</span>
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <circle cx="8.5" cy="8.5" r="6" />
+                            <path d="m13 13 5 5" stroke-linecap="round" />
+                        </svg>
                         <input
-                            type="text"
-                            class="w-full px-4 py-2.5 border border-white/10 bg-black/40 text-white rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 hover:border-white/20 transition-all"
+                            type="search"
+                            class="input"
                             id="searchBox"
-                            placeholder="🔍 Search by title, genre, or anything..."
-                            onkeyup="filterCards()"
+                            placeholder="Search titles, genres, comments…"
+                            oninput="filterCards()"
                         />
-                    </div>
-                    <button
-                        id="refreshButton"
-                        onclick="refreshData()"
-                        class="flex items-center gap-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 px-4 py-2.5 rounded-lg text-sm font-semibold text-green-500 transition-all cursor-pointer hover:scale-105"
-                        title="Reload the collection"
-                    >
-                        <span id="refreshIcon">🔄</span>
-                        <span>Refresh</span>
-                    </button>
-                    <div class="relative z-[100] w-[250px]">
+                    </label>
+                    <span class="result-count" id="resultCount" aria-live="polite"></span>
+                    <div class="menu-wrap">
                         <button
+                            type="button"
                             id="sortButton"
+                            class="btn"
+                            aria-haspopup="menu"
+                            aria-expanded="false"
                             onclick="toggleSortDropdown()"
-                            class="flex items-center justify-between gap-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 px-4 py-2.5 rounded-lg text-sm font-semibold text-yellow-500 transition-all cursor-pointer w-full"
                         >
-                            <span id="sortButtonText">📝 Name (A-Z)</span>
-                            <span class="text-xs">▼</span>
+                            Sort: <span id="sortButtonText">Name (A–Z)</span>
+                            <span class="caret" aria-hidden="true">▼</span>
                         </button>
-                        <div
-                            id="sortDropdown"
-                            class="hidden absolute top-full right-0 mt-2 w-full bg-gray-900 border border-yellow-500/30 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden z-[1000]"
-                        >
-                            <div
-                                class="py-3 px-4 cursor-pointer text-sm font-semibold text-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 transition-all whitespace-nowrap"
-                                data-active="true"
-                                onclick="
-                                    selectSort('name', '📝 Name (A-Z)', this)
-                                "
-                            >
-                                📝 Name (A-Z)
-                            </div>
-                            <div
-                                class="py-3 px-4 cursor-pointer text-sm font-semibold text-white hover:bg-yellow-500/20 transition-all whitespace-nowrap"
-                                onclick="
-                                    selectSort(
-                                        'rating-desc',
-                                        '⭐ Rating (High to Low)',
-                                        this,
-                                    )
-                                "
-                            >
-                                ⭐ Rating (High to Low)
-                            </div>
-                            <div
-                                class="py-3 px-4 cursor-pointer text-sm font-semibold text-white hover:bg-yellow-500/20 transition-all whitespace-nowrap"
-                                onclick="
-                                    selectSort(
-                                        'rating-asc',
-                                        '⭐ Rating (Low to High)',
-                                        this,
-                                    )
-                                "
-                            >
-                                ⭐ Rating (Low to High)
-                            </div>
-                            <div
-                                class="py-3 px-4 cursor-pointer text-sm font-semibold text-white hover:bg-yellow-500/20 transition-all whitespace-nowrap"
-                                onclick="
-                                    selectSort(
-                                        'date-latest',
-                                        '📅 Latest Watch',
-                                        this,
-                                    )
-                                "
-                            >
-                                📅 Latest Watch
-                            </div>
-                            <div
-                                class="py-3 px-4 cursor-pointer text-sm font-semibold text-white hover:bg-yellow-500/20 transition-all whitespace-nowrap"
-                                onclick="
-                                    selectSort(
-                                        'date-first',
-                                        '📅 First Watch',
-                                        this,
-                                    )
-                                "
-                            >
-                                📅 First Watch
-                            </div>
-                            <div
-                                class="py-3 px-4 cursor-pointer text-sm font-semibold text-white hover:bg-yellow-500/20 transition-all whitespace-nowrap"
-                                onclick="
-                                    selectSort(
-                                        'watch-count',
-                                        '🔢 Watch Count',
-                                        this,
-                                    )
-                                "
-                            >
-                                🔢 Watch Count
-                            </div>
+                        <div id="sortDropdown" class="menu hidden" role="menu">
+                            <button type="button" role="menuitemradio" aria-checked="true" data-sort="name">Name (A–Z)</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="rating-desc">Rating, highest first</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="rating-asc">Rating, lowest first</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="date-latest">Latest watch</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="date-first">First watch</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="watch-count">Watch count</button>
                         </div>
                     </div>
                     <button
-                        class="flex items-center gap-2 bg-primary/10 hover:bg-primary/20 border border-primary/30 px-4 py-2.5 rounded-lg text-sm font-semibold text-primary transition-all cursor-pointer"
+                        type="button"
+                        id="filterToggle"
+                        class="btn"
+                        aria-expanded="false"
+                        aria-controls="filtersSection"
                         onclick="toggleFilters()"
                     >
-                        <span>🔍 Filters</span>
-                        <span
-                            class="text-xs transition-transform duration-300 collapse-icon"
-                            id="filterToggleIcon"
-                            >▼</span
-                        >
+                        Filters <span id="filterCount"></span>
+                        <span class="caret" aria-hidden="true">▼</span>
                     </button>
-                    <div id="adminControls" class="flex gap-3 items-center"></div>
+                    <button type="button" id="refreshButton" class="btn" onclick="refreshData()" title="Reload the collection">
+                        Refresh
+                    </button>
+                    <div id="adminControls"></div>
                 </div>
 
-                <!-- Filters Section (Collapsible) -->
-                <div
-                    id="filtersSection"
-                    class="transition-all duration-300 overflow-hidden collapsed"
-                >
-                    <div
-                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 pt-3 border-t border-white/15 filter-grid"
-                    >
-                        <div>
-                            <h3
-                                class="mb-2 text-xs uppercase tracking-wider text-gray-400 font-semibold"
-                            >
-                                📺 Type
-                            </h3>
-                            <div
-                                class="flex gap-2 flex-wrap filter-buttons"
-                                id="typeFilters"
-                            ></div>
-                        </div>
-
-                        <div>
-                            <h3
-                                class="mb-2 text-xs uppercase tracking-wider text-gray-400 font-semibold"
-                            >
-                                🎭 Genre
-                            </h3>
-                            <div
-                                class="flex gap-2 flex-wrap max-h-[200px] overflow-y-auto pr-1 filter-buttons"
-                                id="genreFilters"
-                            ></div>
-                        </div>
-
-                        <div>
-                            <h3
-                                class="mb-2 text-xs uppercase tracking-wider text-gray-400 font-semibold"
-                            >
-                                ⭐ Rating
-                            </h3>
-                            <div
-                                class="flex gap-2 flex-wrap filter-buttons"
-                                id="ratingFilters"
-                            ></div>
-                        </div>
-
-                        <div>
-                            <h3
-                                class="mb-2 text-xs uppercase tracking-wider text-gray-400 font-semibold"
-                            >
-                                💿 Physical Format
-                            </h3>
-                            <div
-                                class="flex gap-2 flex-wrap filter-buttons"
-                                id="physicalFormatFilters"
-                            ></div>
-                        </div>
-
-                        <div>
-                            <h3
-                                class="mb-2 text-xs uppercase tracking-wider text-gray-400 font-semibold"
-                            >
-                                🎥 Special
-                            </h3>
-                            <div
-                                class="flex gap-2 flex-wrap filter-buttons"
-                                id="specialFilters"
-                            ></div>
-                        </div>
+                <div id="filtersSection" class="filters hidden">
+                    <div class="filter-group">
+                        <h3>Type</h3>
+                        <div class="chips" id="typeFilters"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Genre</h3>
+                        <div class="chips chips-scroll" id="genreFilters"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Rating</h3>
+                        <div class="chips" id="ratingFilters"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Physical format</h3>
+                        <div class="chips" id="physicalFormatFilters"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Special</h3>
+                        <div class="chips" id="specialFilters"></div>
                     </div>
                 </div>
-
             </div>
 
-            <div
-                class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 mt-8"
-                id="cardsGrid"
-            ></div>
-        </div>
+            <div class="grid" id="cardsGrid"></div>
+        </main>
 
-        <div
-            class="hidden fixed z-[1000] left-0 top-0 w-full h-full bg-black/85 animate-fadeIn items-center justify-center p-5 modal"
-            id="modal"
-        >
-            <div
-                class="bg-gradient-to-br from-[#1a1a1a] to-[#2a0a0a] rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto relative border-2 border-primary/50 shadow-2xl animate-slideUp flex flex-col md:flex-row modal-content"
-            >
-                <button
-                    class="absolute top-5 right-5 bg-black/70 border-2 border-primary text-white text-3xl w-12 h-12 rounded-full cursor-pointer flex items-center justify-center transition-all duration-300 z-10 hover:bg-primary hover:rotate-90 close-btn"
-                    onclick="closeModal()"
-                >
-                    ×
-                </button>
-                <img
-                    id="modalPoster"
-                    class="w-full md:w-[350px] md:min-w-[350px] h-auto min-h-full object-contain rounded-t-3xl md:rounded-l-3xl md:rounded-tr-none bg-gradient-to-br from-primary/30 to-black/50 modal-poster hidden"
-                    alt=""
-                />
-                <div
-                    class="p-8 flex-1 overflow-y-auto modal-body"
-                    id="modalBody"
-                ></div>
+        <div class="toast toast-error hidden" id="error" role="alert"></div>
+        <div class="toast hidden" id="success" role="status"></div>
+
+        <div class="loading hidden" id="loadingOverlay">
+            <div>
+                <div class="leader" aria-hidden="true"><span>3</span></div>
+                <p>Loading your collection…</p>
             </div>
         </div>
 
-        <footer
-            id="footer"
-            class="relative mt-16 -mx-5 -mb-5 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-md border-t border-white/10"
-        >
-            <div class="h-[3px] bg-gradient-to-r from-primary via-red-400 to-primary-dark"></div>
-            <div
-                class="px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm"
-            >
-                <div class="flex items-center gap-2 text-gray-300 sm:flex-1">
-                    <span class="text-lg">🎬</span>
-                    <span
-                        >Designed by
-                        <span
-                            class="font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-red-400"
-                            >Raul</span
-                        ></span
-                    >
-                </div>
-                <div class="sm:flex-1 flex items-center gap-3 sm:justify-end">
-                    <span
-                        id="appVersion"
-                        class="font-mono text-xs px-2.5 py-1 rounded-md bg-black/30 border border-white/10 text-gray-400"
-                        title="Build date (yyMMdd)"
-                        >v{{version}}</span
-                    >
-                </div>
+        <div class="overlay hidden" id="modal">
+            <div class="panel panel-title" id="modalPanel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+                <button type="button" class="close" onclick="closeModal()" aria-label="Close">×</button>
+                <img id="modalPoster" class="modal-poster hidden" alt="" />
+                <div class="modal-body" id="modalBody"></div>
             </div>
+        </div>
+
+        <footer class="footer" id="footer">
+            <span>Designed by <strong>Raul</strong></span>
+            <span id="photoCredit" class="photo-credit"></span>
+            <span id="appVersion" class="version" title="Build date (yyMMdd)">v{{version}}</span>
         </footer>
 
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+        <script src="js/theme.js"></script>
         <script src="js/app.js"></script>
         <script src="js/auth.js"></script>
         <script src="js/admin.js"></script>

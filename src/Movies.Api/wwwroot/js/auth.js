@@ -15,11 +15,8 @@
         const pageToast = kind === "error" ? window.App?.showError : window.App?.showSuccess;
         if (pageToast) return pageToast(message);
         const el = document.createElement("div");
-        el.className = `fixed top-5 right-5 z-[1200] p-4 rounded-xl max-w-md backdrop-blur-md text-sm shadow-[0_8px_32px_rgba(0,0,0,0.4)] ${
-            kind === "error"
-                ? "bg-red-500/10 border border-red-500/30 text-red-400"
-                : "bg-green-500/10 border border-green-500/30 text-green-400"
-        }`;
+        el.className = `toast${kind === "error" ? " toast-error" : ""}`;
+        el.setAttribute("role", kind === "error" ? "alert" : "status");
         el.textContent = message;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), kind === "error" ? 8000 : 3000);
@@ -27,15 +24,16 @@
     const showError = (m) => toast("error", m);
     const showSuccess = (m) => toast("success", m);
 
+    // Class names from css/site.css, shared with admin.js and cex.js.
     const CLS = {
-        input: "w-full px-3 py-2 border border-white/10 bg-black/40 text-white rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 hover:border-white/20",
-        label: "block mb-1 text-[11px] uppercase tracking-wider text-gray-400 font-semibold",
-        btn: "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed",
-        primary: "bg-gradient-to-r from-primary to-primary-dark text-white hover:brightness-110",
-        secondary: "bg-white/5 hover:bg-white/10 border border-white/15 text-white",
-        danger: "bg-red-500/10 hover:bg-red-500/20 border border-red-500/40 text-red-400",
-        link: "text-gray-400 hover:text-primary underline-offset-2 hover:underline cursor-pointer",
-        error: "hidden mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm",
+        input: "input",
+        label: "label",
+        btn: "btn",
+        primary: "btn-primary",
+        secondary: "",
+        danger: "btn-danger",
+        link: "link",
+        error: "alert alert-error hidden",
     };
 
     let me = { authenticated: false };
@@ -92,12 +90,12 @@
     function dialog(title, bodyHtml, { wide = false, onClose } = {}) {
         const root = document.createElement("div");
         root.setAttribute("data-admin-dialog", "");
-        root.className =
-            "fixed inset-0 z-[1100] bg-black/85 flex items-center justify-center p-5 animate-fadeIn";
+        root.className = "overlay dialog-layer";
+        const titleId = `dialog-${Math.random().toString(36).slice(2)}`;
         root.innerHTML = `
-        <div class="bg-gradient-to-br from-[#1a1a1a] to-[var(--dialog-tint,#2a0a0a)] rounded-3xl ${wide ? "max-w-4xl" : "max-w-md"} w-full max-h-[90vh] overflow-y-auto relative border-2 border-primary/50 shadow-2xl animate-slideUp p-7">
-            <button type="button" data-close class="absolute top-4 right-4 bg-black/70 border-2 border-primary text-white text-2xl w-10 h-10 rounded-full cursor-pointer flex items-center justify-center transition-all duration-300 hover:bg-primary hover:rotate-90">×</button>
-            <h2 class="text-2xl font-black text-white mb-5 pr-12">${title}</h2>
+        <div class="panel panel-body${wide ? " panel-wide" : ""}" role="dialog" aria-modal="true" aria-labelledby="${titleId}">
+            <button type="button" data-close class="close" aria-label="Close">×</button>
+            <h2 class="panel-heading" id="${titleId}">${title}</h2>
             <div data-body>${bodyHtml}</div>
         </div>`;
         const d = {
@@ -108,6 +106,7 @@
             close() {
                 root.remove();
                 document.removeEventListener("keydown", onKey);
+                if (opener?.isConnected) opener.focus();
                 onClose?.();
             },
             error(msg) {
@@ -117,6 +116,7 @@
                 el.classList.toggle("hidden", !msg);
             },
         };
+        const opener = document.activeElement;
         const onKey = (e) => {
             if (e.key === "Escape" && root === [...document.querySelectorAll("[data-admin-dialog]")].pop()) d.close();
         };
@@ -147,22 +147,22 @@
 
     function openLogin() {
         const d = dialog(
-            "🔐 Sign in",
+            "Sign in",
             `
-            <div data-error class="${CLS.error}"></div>
-            <form data-step="password" class="space-y-4">
-                <div><label class="${CLS.label}">Username</label><input name="userName" autocomplete="username" class="${CLS.input}" required></div>
-                <div><label class="${CLS.label}">Password</label><input name="password" type="password" autocomplete="current-password" class="${CLS.input}" required></div>
-                <label class="flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" name="rememberMe" checked> Keep me signed in</label>
-                <button class="${CLS.btn} ${CLS.primary} w-full justify-center">Continue</button>
+            <div data-error class="${CLS.error}" role="alert"></div>
+            <form data-step="password" class="stack">
+                <div><label class="label" for="login-user">Username</label><input id="login-user" name="userName" autocomplete="username" class="input" required></div>
+                <div><label class="label" for="login-pass">Password</label><input id="login-pass" name="password" type="password" autocomplete="current-password" class="input" required></div>
+                <label class="check"><input type="checkbox" name="rememberMe" checked> Keep me signed in</label>
+                <button class="btn btn-primary btn-block">Continue</button>
             </form>
-            <form data-step="mfa" class="space-y-4 hidden">
-                <p class="text-sm text-gray-300" data-mfa-hint>Enter the 6-digit code from your authenticator app.</p>
-                <div data-code><label class="${CLS.label}">Authentication code</label><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" class="${CLS.input} text-center text-2xl tracking-[0.4em]"></div>
-                <div data-recovery class="hidden"><label class="${CLS.label}">Recovery code</label><input name="recoveryCode" autocomplete="off" class="${CLS.input} font-mono"></div>
-                <label class="flex items-center gap-2 text-sm text-gray-300" data-remember><input type="checkbox" name="rememberDevice"> Don't ask again on this device for 30 days</label>
-                <button class="${CLS.btn} ${CLS.primary} w-full justify-center">Verify</button>
-                <div class="text-center text-xs"><a data-toggle-recovery class="${CLS.link}">Use a recovery code instead</a></div>
+            <form data-step="mfa" class="stack hidden">
+                <p class="muted" data-mfa-hint>Enter the 6-digit code from your authenticator app.</p>
+                <div data-code><label class="label" for="login-code">Authentication code</label><input id="login-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" class="input input-code"></div>
+                <div data-recovery class="hidden"><label class="label" for="login-recovery">Recovery code</label><input id="login-recovery" name="recoveryCode" autocomplete="off" class="input code"></div>
+                <label class="check" data-remember><input type="checkbox" name="rememberDevice"> Don't ask again on this device for 30 days</label>
+                <button class="btn btn-primary btn-block">Verify</button>
+                <p style="text-align:center"><button type="button" data-toggle-recovery class="link">Use a recovery code instead</button></p>
             </form>`,
         );
 
@@ -217,7 +217,7 @@
     async function signedIn(d) {
         d.close();
         await refreshMe();
-        showSuccess(`👋 Signed in as ${me.userName}`);
+        showSuccess(`Signed in as ${me.userName}`);
         if (mustEnrolMfa()) openMfaSetup();
     }
 
@@ -238,18 +238,18 @@
             return showError(e.message);
         }
         const d = dialog(
-            "🛡️ Set up two-factor authentication",
+            "Set up two-factor authentication",
             `
-            ${mustEnrolMfa() ? `<p class="mb-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-sm">Two-factor authentication is required before you can make changes.</p>` : ""}
-            <div data-error class="${CLS.error}"></div>
-            <div data-enrol class="space-y-4">
-                <p class="text-sm text-gray-300">1. Scan this QR code with an authenticator app (Aegis, 2FAS, Google Authenticator, 1Password…).</p>
-                <div class="flex justify-center"><div data-qr class="bg-white p-3 rounded-xl"></div></div>
-                <p class="text-xs text-gray-400 text-center">Can't scan? Enter this key manually:<br><code class="text-sm text-white break-all select-all">${esc(setup.sharedKey)}</code></p>
-                <form class="space-y-3">
-                    <p class="text-sm text-gray-300">2. Enter the 6-digit code the app shows.</p>
-                    <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" class="${CLS.input} text-center text-2xl tracking-[0.4em]" required>
-                    <button class="${CLS.btn} ${CLS.primary} w-full justify-center">Turn on two-factor</button>
+            ${mustEnrolMfa() ? `<p class="alert alert-warn">You need two-factor authentication before you can make changes.</p>` : ""}
+            <div data-error class="${CLS.error}" role="alert"></div>
+            <div data-enrol class="stack">
+                <p class="muted">1. Scan this QR code with an authenticator app (Aegis, 2FAS, Google Authenticator, 1Password…).</p>
+                <div class="qr"><div data-qr></div></div>
+                <p class="faint" style="text-align:center;font-size:13px">Can't scan? Enter this key manually:<br><code style="color:var(--ink);user-select:all">${esc(setup.sharedKey)}</code></p>
+                <form class="stack">
+                    <label class="muted" for="mfa-code">2. Enter the 6-digit code the app shows.</label>
+                    <input id="mfa-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" class="input input-code" required>
+                    <button class="btn btn-primary btn-block">Turn on two-factor</button>
                 </form>
             </div>
             <div data-codes class="hidden"></div>`,
@@ -279,15 +279,15 @@
         const el = d.$("[data-codes]");
         el.classList.remove("hidden");
         el.innerHTML = `
-            <p class="mb-3 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm">✅ Two-factor authentication is on.</p>
-            <p class="text-sm text-gray-300 mb-3">Save these recovery codes somewhere safe (a password manager). Each one works once if you lose your authenticator.</p>
-            <div class="grid grid-cols-2 gap-2 p-4 rounded-xl bg-black/40 border border-white/10 font-mono text-sm text-white mb-4 select-all">
+            <p class="alert alert-ok">Two-factor authentication is on.</p>
+            <p class="muted" style="margin-bottom:12px">Save these recovery codes somewhere safe, like a password manager. Each one works once if you lose your authenticator.</p>
+            <div class="codes" style="margin-bottom:16px">
                 ${codes.map((c) => `<div>${esc(c)}</div>`).join("")}
             </div>
-            <div class="flex gap-2 flex-wrap">
-                <button type="button" data-copy class="${CLS.btn} ${CLS.secondary}">📋 Copy</button>
-                <button type="button" data-download class="${CLS.btn} ${CLS.secondary}">💾 Download</button>
-                <button type="button" data-done class="${CLS.btn} ${CLS.primary} ml-auto">I've saved them</button>
+            <div class="actions">
+                <button type="button" data-copy class="btn">Copy</button>
+                <button type="button" data-download class="btn push">Download</button>
+                <button type="button" data-done class="btn btn-primary">I've saved them</button>
             </div>`;
         const text = `Movies recovery codes for ${me.userName ?? ""}\n\n${codes.join("\n")}\n`;
         el.querySelector("[data-copy]").onclick = async () => {
@@ -314,32 +314,32 @@
             return showError(e.message);
         }
         const d = dialog(
-            "👤 Your account",
+            "Your account",
             `
-            <div data-error class="${CLS.error}"></div>
-            <p class="text-sm text-gray-300 mb-5">Signed in as <b class="text-white">${esc(me.userName)}</b> · ${esc(me.roles.join(", "))}</p>
+            <div data-error class="${CLS.error}" role="alert"></div>
+            <p class="muted">Signed in as <b style="color:var(--ink)">${esc(me.userName)}</b>, ${esc(me.roles.join(", ") || "no role")}</p>
 
-            <h3 class="${CLS.label} !text-primary">Two-factor authentication</h3>
-            <div class="mb-6 p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+            <h3 class="subhead">Two-factor authentication</h3>
+            <div class="boxed stack">
                 ${
                     mfa.enabled
-                        ? `<p class="text-sm text-green-400">✅ On · ${mfa.recoveryCodesLeft} recovery codes left</p>
-                           <form data-regen class="flex gap-2">
-                               <input name="code" inputmode="numeric" maxlength="7" placeholder="Current code" class="${CLS.input}" required>
-                               <button class="${CLS.btn} ${CLS.secondary} whitespace-nowrap">New recovery codes</button>
+                        ? `<p class="status-on">On, with ${mfa.recoveryCodesLeft} recovery codes left</p>
+                           <form data-regen class="inline-field">
+                               <input name="code" inputmode="numeric" maxlength="7" placeholder="Current code" aria-label="Current authentication code" class="input" required>
+                               <button class="btn">New recovery codes</button>
                            </form>
-                           ${mfa.required ? "" : `<button type="button" data-disable class="${CLS.btn} ${CLS.danger}">Turn off</button>`}`
-                        : `<p class="text-sm text-yellow-300">⚠️ Off${mfa.required ? " (required to make changes)" : ""}</p>
-                           <button type="button" data-setup class="${CLS.btn} ${CLS.primary}">Set up two-factor</button>`
+                           ${mfa.required ? "" : `<button type="button" data-disable class="btn btn-danger">Turn off two-factor</button>`}`
+                        : `<p class="status-off">Off${mfa.required ? ". You need it to make changes." : ""}</p>
+                           <button type="button" data-setup class="btn btn-primary">Set up two-factor</button>`
                 }
                 <div data-codes class="hidden"></div>
             </div>
 
-            <h3 class="${CLS.label} !text-primary">Change password</h3>
-            <form data-password class="space-y-3 p-4 rounded-xl bg-white/5 border border-white/10">
-                <input name="currentPassword" type="password" autocomplete="current-password" placeholder="Current password" class="${CLS.input}" required>
-                <input name="newPassword" type="password" autocomplete="new-password" placeholder="New password (12+ characters)" minlength="12" class="${CLS.input}" required>
-                <button class="${CLS.btn} ${CLS.secondary}">Change password</button>
+            <h3 class="subhead">Change password</h3>
+            <form data-password class="boxed stack">
+                <input name="currentPassword" type="password" autocomplete="current-password" placeholder="Current password" aria-label="Current password" class="input" required>
+                <input name="newPassword" type="password" autocomplete="new-password" placeholder="New password, 12 or more characters" aria-label="New password" minlength="12" class="input" required>
+                <button class="btn">Change password</button>
             </form>`,
         );
 
@@ -394,28 +394,28 @@
 
     async function openUsers() {
         const d = dialog(
-            "👥 Users",
+            "Users",
             `
-            <div data-error class="${CLS.error}"></div>
-            <div data-notice class="hidden mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-300 text-sm"></div>
-            <div class="overflow-x-auto mb-6">
-                <table class="w-full text-sm">
-                    <thead><tr class="text-left text-[11px] uppercase tracking-wider text-gray-400">
-                        <th class="py-2 pr-3">User</th><th class="py-2 pr-3">Role</th><th class="py-2 pr-3">2FA</th><th class="py-2 pr-3">Status</th><th class="py-2 text-right">Actions</th>
+            <div data-error class="${CLS.error}" role="alert"></div>
+            <div data-notice class="alert alert-ok hidden"></div>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead><tr>
+                        <th>User</th><th>Role</th><th>Two-factor</th><th>Status</th><th class="num">Actions</th>
                     </tr></thead>
                     <tbody data-rows></tbody>
                 </table>
             </div>
-            <h3 class="${CLS.label} !text-primary">Add user</h3>
-            <form data-create class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-2 items-end p-4 rounded-xl bg-white/5 border border-white/10">
-                <div><label class="${CLS.label}">Username</label><input name="userName" autocomplete="off" class="${CLS.input}" required></div>
-                <div><label class="${CLS.label}">Password</label>
-                    <div class="flex gap-1"><input name="password" autocomplete="new-password" minlength="12" class="${CLS.input} font-mono" required>
-                    <button type="button" data-generate title="Generate" class="${CLS.btn} ${CLS.secondary} !px-3">🎲</button></div></div>
-                <div><label class="${CLS.label}">Role</label><select name="role" class="${CLS.input}"><option>Editor</option><option>Admin</option></select></div>
-                <button class="${CLS.btn} ${CLS.primary}">Add</button>
+            <h3 class="subhead">Add a user</h3>
+            <form data-create class="boxed user-form">
+                <div><label class="label" for="new-user">Username</label><input id="new-user" name="userName" autocomplete="off" class="input" required></div>
+                <div><label class="label" for="new-pass">Password</label>
+                    <div class="inline-field"><input id="new-pass" name="password" autocomplete="new-password" minlength="12" class="input code" required>
+                    <button type="button" data-generate class="btn">Generate</button></div></div>
+                <div><label class="label" for="new-role">Role</label><select id="new-role" name="role" class="input"><option>Editor</option><option>Admin</option></select></div>
+                <button class="btn btn-primary">Add user</button>
             </form>
-            <p class="text-xs text-gray-500 mt-2">New users are asked to set up two-factor authentication when they first sign in.</p>`,
+            <p class="faint" style="font-size:13px;margin-top:8px">New users set up two-factor authentication the first time they sign in.</p>`,
             { wide: true },
         );
 
@@ -432,19 +432,19 @@
                     const self = u.userName === me.userName;
                     const role = u.roles[0] ?? "";
                     return `
-                <tr class="border-t border-white/10" data-id="${esc(u.id)}" data-name="${esc(u.userName)}">
-                    <td class="py-2 pr-3 text-white font-semibold">${esc(u.userName)}${self ? ' <span class="text-xs text-gray-500">(you)</span>' : ""}</td>
-                    <td class="py-2 pr-3"><select data-role class="${CLS.input} !py-1 !w-auto" ${self ? "disabled" : ""}>
+                <tr data-id="${esc(u.id)}" data-name="${esc(u.userName)}">
+                    <td><b>${esc(u.userName)}</b>${self ? ' <span class="faint">(you)</span>' : ""}</td>
+                    <td><select data-role class="input" style="width:auto;min-height:32px;padding:4px 28px 4px 8px" aria-label="Role for ${esc(u.userName)}" ${self ? "disabled" : ""}>
                         ${["Editor", "Admin"].map((r) => `<option ${r === role ? "selected" : ""}>${r}</option>`).join("")}
                     </select></td>
-                    <td class="py-2 pr-3">${u.mfaEnabled ? '<span class="text-green-400">On</span>' : '<span class="text-yellow-300">Off</span>'}</td>
-                    <td class="py-2 pr-3">${u.lockedOut ? '<span class="text-red-400">Locked</span>' : '<span class="text-gray-300">Active</span>'}</td>
-                    <td class="py-2 text-right whitespace-nowrap space-x-1">
+                    <td>${u.mfaEnabled ? '<span class="status-on">On</span>' : '<span class="status-off">Off</span>'}</td>
+                    <td>${u.lockedOut ? '<span class="status-bad">Locked</span>' : '<span class="muted">Active</span>'}</td>
+                    <td class="num">
                         ${self ? "" : `
-                        <button data-act="${u.lockedOut ? "unlock" : "lock"}" class="${CLS.btn} ${CLS.secondary} !px-2 !py-1 text-xs">${u.lockedOut ? "Unlock" : "Lock"}</button>
-                        <button data-act="reset-password" class="${CLS.btn} ${CLS.secondary} !px-2 !py-1 text-xs">Reset password</button>
-                        ${u.mfaEnabled ? `<button data-act="reset-mfa" class="${CLS.btn} ${CLS.secondary} !px-2 !py-1 text-xs">Reset 2FA</button>` : ""}
-                        <button data-act="delete" class="${CLS.btn} ${CLS.danger} !px-2 !py-1 text-xs">Delete</button>`}
+                        <button data-act="${u.lockedOut ? "unlock" : "lock"}" class="btn btn-small">${u.lockedOut ? "Unlock" : "Lock"}</button>
+                        <button data-act="reset-password" class="btn btn-small">Reset password</button>
+                        ${u.mfaEnabled ? `<button data-act="reset-mfa" class="btn btn-small">Reset 2FA</button>` : ""}
+                        <button data-act="delete" class="btn btn-small btn-danger">Delete</button>`}
                     </td>
                 </tr>`;
                 })
@@ -479,7 +479,7 @@
                 else if (act === "reset-password") {
                     const password = randomPassword();
                     await api("POST", `/api/users/${id}/reset-password`, { password });
-                    notice(`New password for <b>${esc(name)}</b>: <code class="select-all text-white">${esc(password)}</code>`);
+                    notice(`New password for <b>${esc(name)}</b>: <code style="user-select:all">${esc(password)}</code>`);
                 } else await api("POST", `/api/users/${id}/${act}`);
                 await load();
             });
@@ -494,7 +494,7 @@
                 const password = form.password.value;
                 await api("POST", "/api/users", { userName, password, role: form.role.value });
                 form.reset();
-                notice(`Created <b>${esc(userName)}</b> with password <code class="select-all text-white">${esc(password)}</code>`);
+                notice(`Created <b>${esc(userName)}</b> with password <code style="user-select:all">${esc(password)}</code>`);
                 await load();
             });
         };
@@ -512,15 +512,15 @@
         const footer = document.getElementById("authArea");
         if (footer) {
             if (!me.authenticated) {
-                footer.innerHTML = `<a data-login class="${CLS.link}">🔐 Admin</a>`;
+                footer.innerHTML = `<button type="button" data-login class="link">Sign in</button>`;
                 footer.querySelector("[data-login]").onclick = openLogin;
             } else {
                 footer.innerHTML = `
-                    Signed in as <b class="text-gray-300">${esc(me.userName)}</b>
-                    · <a data-account class="${CLS.link}">Account</a>
-                    ${me.isAdmin ? `· <a data-users class="${CLS.link}">Users</a>` : ""}
-                    ${me.canEdit && document.body.dataset.exportUrl ? `· <a href="${document.body.dataset.exportUrl}" class="${CLS.link}">Export CSV</a>` : ""}
-                    · <a data-logout class="${CLS.link}">Sign out</a>`;
+                    <span>Signed in as <b>${esc(me.userName)}</b></span>
+                    <button type="button" data-account class="link">Account</button>
+                    ${me.isAdmin ? `<button type="button" data-users class="link">Users</button>` : ""}
+                    ${me.canEdit && document.body.dataset.exportUrl ? `<a href="${document.body.dataset.exportUrl}" class="link">Export CSV</a>` : ""}
+                    <button type="button" data-logout class="link">Sign out</button>`;
                 footer.querySelector("[data-account]").onclick = openAccount;
                 footer.querySelector("[data-users]")?.addEventListener("click", openUsers);
                 footer.querySelector("[data-logout]").onclick = signOut;

@@ -171,13 +171,15 @@ var buildVersion = buildInfo.GetValueOrDefault("BuildVersion") ?? "dev";
 var buildStamp = buildInfo.GetValueOrDefault("BuildStamp") ?? buildVersion;
 app.MapGet("/api/version", () => Results.Ok(new { version = buildVersion }));
 
-// Pages are rendered from wwwroot with the version filled in and cache-busting script URLs.
+// Pages are rendered from wwwroot with the version filled in and cache-busting script/stylesheet URLs.
+// {{stamp}} is for URLs built at runtime (the theme stylesheets).
 string RenderPage(string file) =>
     System.Text.RegularExpressions.Regex.Replace(
             File.ReadAllText(Path.Combine(app.Environment.WebRootPath, file)),
-            @"src=""(js/[\w.-]+\.js)""",
-            m => $"src=\"{m.Groups[1].Value}?v={buildStamp}\"")
-        .Replace("{{version}}", buildVersion);
+            @"(src|href)=""((?:js|css)/[\w./-]+\.(?:js|css))""",
+            m => $"{m.Groups[1].Value}=\"{m.Groups[2].Value}?v={buildStamp}\"")
+        .Replace("{{version}}", buildVersion)
+        .Replace("{{stamp}}", buildStamp);
 var renderedPages = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
 IResult Page(HttpContext ctx, string file)
 {

@@ -1,0 +1,193 @@
+/* Halloween (1978, 2018): the opening credits. Pure black, the orange title type,
+   and the carved jack-o'-lantern the camera slowly pushes in on. */
+
+@import url("https://fonts.googleapis.com/css2?family=Marcellus&family=Libre+Franklin:ital,wght@0,400;0,600;0,800;1,400&display=swap");
+
+:root[data-theme="halloween"] {
+    --bg: #000000;
+    --bg-2: #000000;
+    --surface: #0d0805;
+    --surface-2: #050302;
+    --raised: #1a0f08;
+    --ink: #f4e6d4;
+    --ink-2: #c9b49c;
+    --ink-3: #8c7a66;
+    --line: rgba(255, 122, 26, 0.16);
+    --line-strong: rgba(255, 122, 26, 0.38);
+    --accent: #ff7a1a;
+    --accent-ink: #000000;
+    --accent-2: #ff7a1a;
+    --gold: #ffb54d;
+    --gold-ink: #000000;
+    --ok: #c8d66a;
+    --warn: #ffb54d;
+    --danger: #ff5a3c;
+    --tag-film: #ff9a4d;
+    --tag-series: #e8c27a;
+    --tag-bogdan: #e88a8a;
+    --tag-physical: #c9b49c;
+    --tag-rewatch: #c8d66a;
+    --poster-bg: #0d0805;
+    --overlay: rgba(0, 0, 0, 0.88);
+    --focus: #ff7a1a;
+    --hero-shade: rgba(0, 0, 0, 0.4);
+
+    --font-display: "Marcellus", Georgia, serif;
+    --font-body: "Libre Franklin", system-ui, sans-serif;
+    --display-weight: 400;
+    --display-case: uppercase;
+    --display-tracking: 0.05em;
+
+    --radius: 2px;
+    --radius-sm: 2px;
+    --shadow: 0 18px 40px rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="halloween"] body {
+    background: #000;
+}
+
+[data-theme="halloween"] .topbar {
+    background: #000;
+}
+
+[data-theme="halloween"] .topbar-nav a[aria-current="page"] {
+    background: transparent;
+    color: var(--accent);
+    box-shadow: inset 0 -2px 0 var(--accent);
+    border-radius: 0;
+}
+
+/* ---------- hero: the credits ---------- */
+
+[data-theme="halloween"] .hero {
+    padding: 40px 16px 60px;
+    overflow: hidden;
+}
+
+[data-theme="halloween"] .hero-photo {
+    filter: saturate(0.7) contrast(1.1);
+}
+
+[data-theme="halloween"] .hero-art::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 55%, transparent 20%, rgba(0, 0, 0, 0.55) 45%, #000 75%);
+}
+
+[data-theme="halloween"] .marquee,
+[data-theme="halloween"] .marquee-board {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    animation: none;
+    width: min(900px, 100%);
+}
+
+[data-theme="halloween"] .marquee {
+    animation: hw-title 2.2s ease 0.6s both;
+}
+
+@keyframes hw-title {
+    from {
+        opacity: 0;
+    }
+}
+
+[data-theme="halloween"] .hero-tagline {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 14px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: #c9b49c;
+    margin-bottom: 18px;
+}
+
+[data-theme="halloween"] .hero-title {
+    font-weight: 400;
+    font-size: clamp(44px, 8vw, 96px);
+    line-height: 1;
+    letter-spacing: 0.04em;
+    color: #ff7a1a;
+    text-shadow: 0 0 2px #000, 0 0 30px rgba(255, 90, 0, 0.45);
+}
+
+[data-theme="halloween"] .hero-stats {
+    margin-top: 28px;
+    gap: 6px 34px;
+}
+
+[data-theme="halloween"] .stat {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+[data-theme="halloween"] .stat dd {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 34px;
+    color: #f4e6d4;
+    text-shadow: 0 0 10px #000;
+}
+
+[data-theme="halloween"] .stat dt {
+    font-family: var(--font-body);
+    font-size: 12px;
+    letter-spacing: 0.25em;
+    color: #ff7a1a;
+    text-shadow: 0 0 6px #000, 0 0 14px #000;
+}
+
+/* ---------- pieces ---------- */
+
+[data-theme="halloween"] .toolbar::before {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+[data-theme="halloween"] .rating {
+    -webkit-mask: none;
+    mask: none;
+    background: #000;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    font-family: var(--font-display);
+    font-weight: 400;
+}
+
+[data-theme="halloween"] .rating-gold {
+    background: var(--accent);
+    color: #000;
+    box-shadow: 0 0 16px rgba(255, 122, 26, 0.7);
+}
+
+[data-theme="halloween"] .card-poster {
+    box-shadow: 0 0 0 1px rgba(255, 122, 26, 0.12);
+}
+
+[data-theme="halloween"] .card:hover .card-poster,
+[data-theme="halloween"] .product:hover .product-image {
+    box-shadow: 0 0 0 1px var(--accent), 0 0 36px rgba(255, 90, 0, 0.35);
+}
+
+[data-theme="halloween"] .modal-title,
+[data-theme="halloween"] .panel-heading,
+[data-theme="halloween"] .empty h2 {
+    color: var(--accent);
+}
+
+[data-theme="halloween"] .panel {
+    background: #050302;
+}
+
+[data-theme="halloween"] .leader {
+    border-color: var(--accent);
+}
+
+[data-theme="halloween"] .leader span {
+    color: var(--accent);
+}
+
+

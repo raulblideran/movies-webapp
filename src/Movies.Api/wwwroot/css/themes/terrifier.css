@@ -1,0 +1,302 @@
+/* Terrifier 1-3: Art the Clown, in the dark. A black page with bone-white lines; the top bar is
+   a strip of white greasepaint with blood running off it. Red is reserved for blood. */
+
+@import url("https://fonts.googleapis.com/css2?family=Nosifer&family=Archivo:ital,wght@0,400;0,600;0,800;0,900;1,400&display=swap");
+
+:root[data-theme="terrifier"] {
+    --bg: #000000;
+    --bg-2: #000000;
+    --surface: #0e0e0e;
+    --surface-2: #050505;
+    --raised: #1a1a1a;
+    --ink: #f2efe8;
+    --ink-2: #c9c5bc;
+    --ink-3: #8f8b83;
+    --line: rgba(242, 239, 232, 0.16);
+    --line-strong: #f2efe8;
+    --accent: #f2efe8;
+    --accent-ink: #000000;
+    --accent-2: #d4101c;
+    --gold: #d4101c;
+    --gold-ink: #ffffff;
+    --ok: #7fcf8c;
+    --warn: #e8c46a;
+    --danger: #ff3b45;
+    --tag-film: #f2efe8;
+    --tag-series: #f2efe8;
+    --tag-bogdan: #ff3b45;
+    --tag-physical: #b8b4ab;
+    --tag-rewatch: #f2efe8;
+    --poster-bg: #141414;
+    --overlay: rgba(0, 0, 0, 0.86);
+    --focus: #ff3b45;
+    --hero-shade: radial-gradient(ellipse 40% 45% at 50% 52%, rgba(0, 0, 0, 0.55), transparent),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.45) 60%, #000 100%);
+
+    --font-display: "Archivo", system-ui, sans-serif;
+    --font-body: "Archivo", system-ui, sans-serif;
+    --display-weight: 900;
+    --display-case: uppercase;
+    --display-tracking: -0.01em;
+
+    --radius: 0px;
+    --radius-sm: 0px;
+    --radius-pill: 0px;
+    --shadow: 6px 6px 0 #d4101c;
+}
+
+[data-theme="terrifier"] body {
+    background: #000;
+}
+
+/* White greasepaint bar with blood running off its bottom edge */
+[data-theme="terrifier"] .topbar {
+    background: #f2efe8;
+    color: #000;
+    border-bottom: 0;
+    backdrop-filter: none;
+    z-index: 45;
+}
+
+[data-theme="terrifier"] .topbar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 56px;
+    pointer-events: none;
+    background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='56' fill='%23d4101c'><rect width='260' height='5'/><path d='M18 0h12v30a6 6 0 0 1-12 0z'/><circle cx='24' cy='44' r='3.5'/><path d='M70 0h8v14a4 4 0 0 1-8 0z'/><path d='M112 0h14v42a7 7 0 0 1-14 0z'/><path d='M168 0h7v20a3.5 3.5 0 0 1-7 0z'/><circle cx='171.5' cy='31' r='2.5'/><path d='M214 0h10v26a5 5 0 0 1-10 0z'/><path d='M0 5q10 6 20 0M40 5q14 7 28 0M80 5q16 6 30 0M128 5q18 8 36 0M178 5q16 6 34 0M226 5q17 7 34 0'/></svg>") 0 0 / 260px 56px repeat-x;
+}
+
+[data-theme="terrifier"] .topbar-nav a,
+[data-theme="terrifier"] .topbar .link,
+[data-theme="terrifier"] .account {
+    color: #2b2b2b;
+}
+
+[data-theme="terrifier"] .account b {
+    color: #000;
+}
+
+[data-theme="terrifier"] .topbar-nav a:hover {
+    color: #000;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="terrifier"] .topbar-nav a[aria-current="page"] {
+    background: #000;
+    color: #f2efe8;
+}
+
+[data-theme="terrifier"] .theme-button {
+    color: #000;
+    border-color: #000;
+}
+
+[data-theme="terrifier"] .topbar .link:hover {
+    color: #d4101c;
+}
+
+/* ---------- hero ---------- */
+
+[data-theme="terrifier"] .hero {
+    padding: 96px 16px 64px;
+    overflow: hidden;
+}
+
+[data-theme="terrifier"] .hero-photo {
+    filter: grayscale(0.35) contrast(1.15);
+    opacity: 0.85;
+    object-position: center 20%;
+}
+
+[data-theme="terrifier"] .marquee,
+[data-theme="terrifier"] .marquee-board {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    animation: none;
+    width: min(980px, 100%);
+}
+
+[data-theme="terrifier"] .hero-tagline {
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-style: italic;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    color: #ff3b45;
+    margin-bottom: 18px;
+    display: inline-block;
+    padding: 2px 10px;
+    background: #000;
+}
+
+[data-theme="terrifier"] .hero-title {
+    font-family: "Nosifer", "Archivo", sans-serif;
+    font-weight: 400;
+    font-size: clamp(30px, 5.6vw, 70px);
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+    color: #f2efe8;
+    text-shadow: 0 4px 24px #000;
+}
+
+[data-theme="terrifier"] .hero-stats {
+    margin-top: 34px;
+    gap: 0;
+    border: 3px solid #f2efe8;
+    background: rgba(0, 0, 0, 0.82);
+    display: inline-flex;
+    box-shadow: 6px 6px 0 #d4101c;
+}
+
+[data-theme="terrifier"] .stat {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 10px 20px;
+}
+
+[data-theme="terrifier"] .stat + .stat {
+    border-left: 3px solid #f2efe8;
+}
+
+[data-theme="terrifier"] .stat dd {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 32px;
+    color: #f2efe8;
+}
+
+[data-theme="terrifier"] .stat dt {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #b8b4ab;
+}
+
+@media (max-width: 640px) {
+    [data-theme="terrifier"] .hero-stats {
+        display: flex;
+        flex-wrap: wrap;
+        box-shadow: none;
+    }
+    [data-theme="terrifier"] .stat + .stat {
+        border-left: 0;
+    }
+}
+
+[data-theme="terrifier"] .hero-compact .hero-title {
+    font-size: clamp(26px, 4.4vw, 52px);
+}
+
+/* ---------- pieces ---------- */
+
+[data-theme="terrifier"] .toolbar::before {
+    background: rgba(0, 0, 0, 0.92);
+    border-bottom: 3px solid #f2efe8;
+}
+
+[data-theme="terrifier"] .btn,
+[data-theme="terrifier"] .input,
+[data-theme="terrifier"] .chip {
+    border-width: 2px;
+}
+
+[data-theme="terrifier"] .btn:hover {
+    background: #f2efe8;
+    color: #000;
+    border-color: #f2efe8;
+}
+
+[data-theme="terrifier"] .btn-danger:hover {
+    background: #d4101c;
+    border-color: #d4101c;
+    color: #fff;
+}
+
+[data-theme="terrifier"] .card-poster,
+[data-theme="terrifier"] .product-image {
+    border: 3px solid #f2efe8;
+    box-shadow: none;
+}
+
+[data-theme="terrifier"] .card:hover .card-poster,
+[data-theme="terrifier"] .card:focus-visible .card-poster,
+[data-theme="terrifier"] .product:hover .product-image {
+    transform: translate(-3px, -3px);
+    box-shadow: 6px 6px 0 #d4101c;
+}
+
+[data-theme="terrifier"] .rating {
+    -webkit-mask: none;
+    mask: none;
+    top: 0;
+    right: 0;
+    background: #f2efe8;
+    color: #000;
+    font-weight: 900;
+}
+
+[data-theme="terrifier"] .rating-gold {
+    background: #d4101c;
+    color: #fff;
+}
+
+[data-theme="terrifier"] .tag {
+    background: transparent;
+    border-width: 1.5px;
+}
+
+[data-theme="terrifier"] .tag-bogdan {
+    background: #d4101c;
+    color: #fff;
+    border-color: #d4101c;
+}
+
+[data-theme="terrifier"] .milestone {
+    background: #d4101c;
+    color: #fff;
+}
+
+[data-theme="terrifier"] .panel {
+    border: 3px solid #f2efe8;
+    box-shadow: 10px 10px 0 #d4101c;
+}
+
+[data-theme="terrifier"] .close {
+    border-radius: 0;
+    border-width: 2px;
+}
+
+[data-theme="terrifier"] .modal-facts dd.wide {
+    border-left-color: #d4101c;
+}
+
+[data-theme="terrifier"] .price-tag {
+    background: #d4101c;
+}
+
+[data-theme="terrifier"] .suggest li[aria-selected="true"],
+[data-theme="terrifier"] .chip[aria-pressed="true"] {
+    background: #f2efe8;
+    color: #000;
+}
+
+[data-theme="terrifier"] .leader {
+    border-color: #f2efe8;
+    background: conic-gradient(rgba(212, 16, 28, 0.7) var(--sweep, 0deg), transparent 0);
+}
+
+[data-theme="terrifier"] .footer {
+    border-top: 3px solid #f2efe8;
+}
+
+[data-theme="terrifier"] .footer strong {
+    color: #ff3b45;
+}

@@ -1,0 +1,180 @@
+/* The Lion King: the opening sunrise. A huge sun behind Pride Rock, savanna dusk below.
+   The sun rises once when the page opens. */
+
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Mulish:ital,wght@0,400;0,600;0,800;1,400&display=swap");
+
+:root[data-theme="lion-king"] {
+    --bg: #2a1007;
+    --bg-2: #6e2a0e;
+    --surface: #3a170b;
+    --surface-2: #26100a;
+    --raised: #4a1f0f;
+    --ink: #fff1dc;
+    --ink-2: #e7c49a;
+    --ink-3: #b98f66;
+    --line: rgba(255, 196, 120, 0.16);
+    --line-strong: rgba(255, 196, 120, 0.36);
+    --accent: #ffb238;
+    --accent-ink: #2a1007;
+    --accent-2: #d9481a;
+    --gold: #ffd36b;
+    --gold-ink: #2a1600;
+    --ok: #b8d96a;
+    --warn: #ffcf6b;
+    --danger: #ff7b5c;
+    --tag-film: #ffd36b;
+    --tag-series: #9fd8b5;
+    --tag-bogdan: #f6a6c1;
+    --tag-physical: #ff9a5a;
+    --tag-rewatch: #b8d96a;
+    --poster-bg: #26100a;
+    --overlay: rgba(30, 10, 4, 0.82);
+    --focus: #ffd36b;
+    --hero-shade: linear-gradient(180deg, rgba(110, 42, 14, 0.12) 0%, rgba(58, 20, 8, 0.45) 60%, rgba(42, 16, 7, 0.96) 100%);
+
+    --font-display: "Cinzel", Georgia, serif;
+    --font-body: "Mulish", system-ui, sans-serif;
+    --display-weight: 800;
+    --display-case: none;
+    --display-tracking: 0.02em;
+
+    --radius: 8px;
+    --radius-sm: 6px;
+}
+
+[data-theme="lion-king"] .hero-photo {
+    filter: saturate(1.1);
+}
+
+[data-theme="lion-king"] .topbar {
+    background: rgba(60, 18, 6, 0.35);
+    border-bottom-color: rgba(255, 220, 160, 0.25);
+}
+
+[data-theme="lion-king"] .topbar-nav a:not([aria-current]) {
+    color: #ffe7c4;
+}
+
+[data-theme="lion-king"] .topbar .link,
+[data-theme="lion-king"] .account {
+    color: #ffe0b8;
+}
+
+/* ---------- hero ---------- */
+
+[data-theme="lion-king"] .hero {
+    padding: 64px 16px 72px;
+    overflow: hidden;
+}
+
+[data-theme="lion-king"] .marquee,
+[data-theme="lion-king"] .marquee-board {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    animation: none;
+    width: min(860px, 100%);
+}
+
+[data-theme="lion-king"] .hero-tagline {
+    font-family: var(--font-body);
+    font-style: italic;
+    font-weight: 600;
+    font-size: 17px;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    color: #ffd36b;
+    margin-bottom: 12px;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="lion-king"] .hero-title {
+    font-weight: 900;
+    font-size: clamp(40px, 7vw, 84px);
+    line-height: 1;
+    color: #fff1dc;
+    text-shadow: 0 3px 0 #3a0f02, 0 6px 30px rgba(0, 0, 0, 0.55);
+}
+
+[data-theme="lion-king"] .hero-stats {
+    margin-top: 26px;
+    gap: 4px 30px;
+}
+
+[data-theme="lion-king"] .stat {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    text-transform: none;
+}
+
+[data-theme="lion-king"] .stat dd {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 34px;
+    color: #fff1dc;
+    text-shadow: 0 2px 0 #3a0f02;
+}
+
+[data-theme="lion-king"] .stat dt {
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: #ffd36b;
+}
+
+/* ---------- pieces ---------- */
+
+[data-theme="lion-king"] .page {
+    position: relative;
+}
+
+[data-theme="lion-king"] .toolbar::before {
+    background: rgba(30, 11, 5, 0.9);
+}
+
+[data-theme="lion-king"] .rating {
+    -webkit-mask: none;
+    mask: none;
+    border-radius: 50%;
+    min-width: 46px;
+    height: 46px;
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+    background: radial-gradient(circle at 35% 30%, #ffe08a, #ffb238 60%, #d9481a);
+    color: #3a0f02;
+    font-family: var(--font-display);
+    font-size: 16px;
+    line-height: 1;
+}
+
+[data-theme="lion-king"] .rating small {
+    display: none;
+}
+
+[data-theme="lion-king"] .rating-gold {
+    background: radial-gradient(circle at 35% 30%, #fffbe0, #ffd36b 55%, #c98a12);
+    box-shadow: 0 0 0 3px #3a0f02, 0 0 18px rgba(255, 211, 107, 0.7);
+}
+
+[data-theme="lion-king"] .rating-large {
+    min-width: 76px;
+    height: 76px;
+    font-size: 28px;
+}
+
+[data-theme="lion-king"] .modal-title,
+[data-theme="lion-king"] .panel-heading {
+    color: var(--gold);
+}
+
+[data-theme="lion-king"] .leader {
+    border-color: var(--accent);
+    border-radius: 50%;
+}
+
+[data-theme="lion-king"] .footer {
+    border-top-color: rgba(255, 178, 56, 0.3);
+}
