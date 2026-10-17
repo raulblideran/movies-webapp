@@ -44,6 +44,19 @@
         </style>
     </head>
     <body class="min-h-screen text-gray-100 flex flex-col">
+        <nav
+            id="topBar"
+            class="relative z-40  bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-md border-b border-white/10"
+        >
+            <div class="px-4 sm:px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm">
+                <div class="flex items-center gap-1">
+                    <a href="/" class="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">🎬 Collection</a>
+                    <a href="/cex" aria-current="page" class="px-3 py-1.5 rounded-lg bg-white/10 text-white font-semibold">🛒 CeX Tracker</a>
+                </div>
+                <div id="authArea" class="text-xs text-gray-400 text-center sm:text-right"></div>
+            </div>
+            <div class="h-[2px] bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400"></div>
+        </nav>
         <div class="px-6 py-8 flex-1">
             <!-- Store picker + sort -->
             <div class="relative mb-6 flex items-center justify-center gap-4 flex-wrap">
@@ -139,13 +152,7 @@
                         ></span
                     >
                 </div>
-                <div id="adminFooter" class="text-xs text-gray-400 text-center"></div>
                 <div class="sm:flex-1 flex items-center gap-3 sm:justify-end">
-                    <a
-                        href="/"
-                        class="text-xs font-semibold text-gray-300 hover:text-cyan-400 transition-colors"
-                        >🎬 Collection</a
-                    >
                     <span
                         class="font-mono text-xs px-2.5 py-1 rounded-md bg-black/30 border border-white/10 text-gray-400"
                         title="Build date (yyMMdd)"

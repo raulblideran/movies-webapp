@@ -509,7 +509,7 @@
     // ---------- page integration ----------
 
     function render() {
-        const footer = document.getElementById("adminFooter");
+        const footer = document.getElementById("authArea");
         if (footer) {
             if (!me.authenticated) {
                 footer.innerHTML = `<a data-login class="${CLS.link}">🔐 Admin</a>`;
