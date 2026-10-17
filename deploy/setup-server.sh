@@ -4,6 +4,7 @@
 # and secrets/{app.env,cloudflared.env,ghcr.env}.
 set -euo pipefail
 SRC="${1:?usage: setup-server.sh <deploy-dir>}"
+cd /
 U=movies
 
 if ! id "$U" &>/dev/null; then
@@ -31,13 +32,24 @@ install -o "$U" -g "$U" -m 644 "$SRC/podman-auto-update.timer.conf" "$HOME_D/.co
 # Registry login for the private image (token needs read:packages). Stored in the user's config dir so it survives reboots.
 # shellcheck disable=SC1091
 source "$SRC/secrets/ghcr.env"
-printf '%s' "$GHCR_TOKEN" | as_u podman login ghcr.io --username "$GHCR_USER" --password-stdin \
-    --authfile "$HOME_D/.config/containers/auth.json"
+if [[ -n "${GHCR_TOKEN:-}" ]]; then
+    printf '%s' "$GHCR_TOKEN" | as_u podman login ghcr.io --username "$GHCR_USER" --password-stdin \
+        --authfile "$HOME_D/.config/containers/auth.json"
+else
+    echo "No GHCR_TOKEN: skipping registry login (load images with ./deploy/vps.sh push-image)."
+fi
 
 as_u systemctl --user daemon-reload
 as_u systemctl --user enable --now podman-auto-update.timer movies-backup.timer
-as_u podman pull ghcr.io/raulblideran/movies-webapp:latest
-as_u systemctl --user restart movies-app.service cloudflared.service
+if [[ -n "${GHCR_TOKEN:-}" ]]; then
+    as_u podman pull ghcr.io/raulblideran/movies-webapp:latest
+fi
+if as_u podman image exists ghcr.io/raulblideran/movies-webapp:latest; then
+    as_u systemctl --user restart movies-app.service cloudflared.service
+else
+    as_u systemctl --user restart cloudflared.service
+    echo "App image not on the server yet: run ./deploy/vps.sh push-image"
+fi
 sleep 5
 as_u systemctl --user --no-pager status movies-app.service cloudflared.service | grep -E "●|Active:"
 echo "Setup complete."

@@ -95,10 +95,57 @@ src/Movies.Api/
 tests/Movies.Api.Tests/         CSV parsing + API/auth integration tests
 ```
 
-## Not done yet
+## Production (movies.raulblideran.uk)
 
-Hosting is not set up yet:
-- a production stage in the Containerfile
-- a quadlet/pod on the VPS behind Cloudflare
-- forwarded headers for the real client IP
-- SQLite backups
+Runs on an IONOS VPS (Rocky Linux 10). There are **no open web ports**: `cloudflared` keeps an
+outbound Cloudflare Tunnel open, and the tunnel's published route sends `movies.raulblideran.uk`
+to `http://localhost:8080`.
+
+- **App user:** a dedicated `movies` user (no sudo, no login shell) runs everything with rootless
+  podman quadlets (`deploy/quadlet/`).
+- **Pod:** the app and `cloudflared` share a pod. The app's filesystem is read-only, apart from the
+  `movies-data` volume, which holds the DB and key ring.
+- **Updates:** `podman-auto-update` checks GHCR every 10 minutes. GitHub Actions publishes
+  `ghcr.io/raulblideran/movies-webapp:latest` on every push to `main`.
+- **Backups:** the SQLite DB is backed up nightly to `/home/movies/backups`, keeping 30 days.
+
+Day to day, from this repo (the server address is in `deploy/secrets/host`):
+
+```bash
+./deploy/vps.sh status                         # services and timers
+./deploy/vps.sh logs [app|tunnel]
+./deploy/vps.sh create-user <name> --role Admin
+./deploy/vps.sh push-image                     # deploy a local build right now
+./deploy/vps.sh update                         # pull the latest GHCR image right now
+./deploy/vps.sh backup                         # back up and download to ./backups/
+./deploy/vps.sh install                        # re-apply config after editing deploy/ or deploy/secrets/
+```
+
+Secrets live in `deploy/secrets/` (git-ignored; see the `*.example` files):
+- `app.env`: TMDB key
+- `cloudflared.env`: tunnel token
+- `ghcr.env`: a **classic** GitHub token with only `read:packages`. Fine-grained tokens can't read
+  GHCR. Without it, auto-update is off and you deploy with `push-image`.
+
+### Rebuilding the server from scratch
+
+1. **Reinstall Rocky 10.**
+   - Set a root password (keep it in Bitwarden; it's only for the IONOS console).
+   - In User Data, use `deploy/cloud-init.yaml`. It creates the key-only `raul` user.
+2. **If the server has no IPv4 address after boot,** fix it from the IONOS console:
+   - Run `nmcli d connect ens6`.
+   - IONOS's network config targets `ens3`, but the NIC here is `ens6`.
+   - Then make it permanent over SSH:
+     ```
+     sudo nmcli connection add type ethernet ifname ens6 con-name ens6 ipv4.method auto ipv6.method auto
+     echo "network: {config: disabled}" | sudo tee /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+     ```
+3. **Harden:** `scp deploy/harden-server.sh raul@HOST:/tmp/ && ssh raul@HOST sudo bash /tmp/harden-server.sh`
+   - firewall: SSH only
+   - automatic security updates
+   - Cockpit off
+4. **Deploy:**
+   - `./deploy/vps.sh install`
+   - `./deploy/vps.sh push-image` (only if there's no GHCR token)
+   - `./deploy/vps.sh import <csv>` (or restore a backup)
+   - `./deploy/vps.sh create-user …`

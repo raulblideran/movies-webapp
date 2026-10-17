@@ -2,6 +2,7 @@
 # Manage the production server from your machine.
 #
 #   ./deploy/vps.sh install          first-time setup / re-apply config (copies deploy files + secrets, runs setup-server.sh)
+#   ./deploy/vps.sh push-image       build the image locally and copy it to the server (no registry needed)
 #   ./deploy/vps.sh update           pull & restart now (instead of waiting for the 10-minute auto-update)
 #   ./deploy/vps.sh status | logs [app|tunnel]
 #   ./deploy/vps.sh create-user <name> [--role Admin|Editor]
@@ -20,7 +21,7 @@ IMAGE=ghcr.io/raulblideran/movies-webapp:latest
 # Run a command as the "movies" service user.
 as_movies() {
     local cmd; printf -v cmd '%q ' "$@"
-    ssh "$HOST" "sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$(id -u movies)/bus bash -c 'cd ~ && $cmd'"
+    ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$(id -u movies)/bus bash -c 'cd ~ && $cmd'"
 }
 
 cmd="${1:-status}"; shift || true
@@ -35,6 +36,13 @@ case "$cmd" in
             | ssh "$HOST" "tar -C $tmp -xzf -"
         ssh -t "$HOST" "sudo bash $tmp/setup-server.sh $tmp; rc=\$?; rm -rf $tmp; exit \$rc"
         ;;
+    push-image)
+        cd "$DIR/.."
+        podman build --target runtime -t "$IMAGE" -f Containerfile .
+        podman save "$IMAGE" | gzip -1 | ssh "$HOST" "cd / && gunzip | sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman load"
+        as_movies systemctl --user restart movies-app.service
+        echo "Deployed local build."
+        ;;
     update)
         as_movies podman auto-update
         ;;
@@ -48,12 +56,13 @@ case "$cmd" in
     create-user)
         # Password is read from your terminal and piped over SSH (never stored or put on a command line).
         read -rsp "Password for $1: " pw; echo
-        printf '%s\n' "$pw" | ssh "$HOST" "sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm -i --read-only -v movies-data:/data $IMAGE create-user $(printf '%q ' "$@")"
+        printf '%s\n' "$pw" | ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm -i --read-only -v movies-data:/data $IMAGE create-user $(printf '%q ' "$@")"
         ;;
     import)
         file="$1"; shift
-        ssh "$HOST" "cat > /tmp/movies-import.csv && chmod 644 /tmp/movies-import.csv" < "$file"
-        ssh "$HOST" "sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm --read-only -v movies-data:/data -v /tmp/movies-import.csv:/import.csv:ro,z --env-file /home/movies/.config/movies/app.env $IMAGE import /import.csv $(printf '%q ' "$@"); rm -f /tmp/movies-import.csv"
+        # Hand the file to the movies user so SELinux can label it for the container.
+        ssh "$HOST" "cd / && sudo install -o movies -g movies -m 644 /dev/stdin /home/movies/import.csv" < "$file"
+        ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm --read-only -v movies-data:/data -v /home/movies/import.csv:/import.csv:ro,z --env-file /home/movies/.config/movies/app.env $IMAGE import /import.csv $(printf '%q ' "$@"); sudo rm -f /home/movies/import.csv"
         ;;
     backup)
         as_movies movies-backup
