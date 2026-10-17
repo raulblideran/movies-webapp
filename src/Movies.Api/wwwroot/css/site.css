@@ -1887,13 +1887,13 @@ textarea.code {
     gap: 10px;
     justify-content: center;
     flex-wrap: wrap;
-    margin: 0 auto 18px;
-    max-width: 720px;
+    margin: 0 auto 32px;
+    max-width: 1200px;
 }
 
 .store-picker {
     position: relative;
-    flex: 1 1 320px;
+    flex: 1 1 300px;
 }
 
 .store-picker .label {
@@ -1943,9 +1943,10 @@ textarea.code {
     font-weight: 700;
 }
 
+/* Sits in the same row as the store picker; the status line hangs below without moving the row */
 .track-form {
-    max-width: 720px;
-    margin: 0 auto 28px;
+    position: relative;
+    flex: 1.4 1 380px;
 }
 
 .track-form form {
@@ -1954,8 +1955,10 @@ textarea.code {
 }
 
 .track-status {
-    min-height: 20px;
-    margin-top: 6px;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
     font-size: 13px;
     text-align: center;
 }
