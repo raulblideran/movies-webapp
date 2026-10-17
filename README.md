@@ -105,7 +105,7 @@ to `http://localhost:8080`.
   podman quadlets (`deploy/quadlet/`).
 - **Pod:** the app and `cloudflared` share a pod. The app's filesystem is read-only, apart from the
   `movies-data` volume, which holds the DB and key ring.
-- **Updates:** `podman-auto-update` checks GHCR every 10 minutes. GitHub Actions publishes
+- **Updates:** `podman-auto-update` checks GHCR every 2 minutes. GitHub Actions publishes
   `ghcr.io/raulblideran/movies-webapp:latest` on every push to `main`.
 - **Backups:** the SQLite DB is backed up nightly to `/home/movies/backups`, keeping 30 days.
 

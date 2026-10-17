@@ -17,7 +17,7 @@ jobs:
       - run: dotnet test MoviesWebapp.slnx
 
   image:
-    # The server's podman auto-update picks up :latest within ~10 minutes.
+    # The server's podman auto-update picks up :latest within ~2 minutes.
     needs: test
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest

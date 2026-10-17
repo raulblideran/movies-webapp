@@ -3,7 +3,7 @@
 #
 #   ./deploy/vps.sh install          first-time setup / re-apply config (copies deploy files + secrets, runs setup-server.sh)
 #   ./deploy/vps.sh push-image       build the image locally and copy it to the server (no registry needed)
-#   ./deploy/vps.sh update           pull & restart now (instead of waiting for the 10-minute auto-update)
+#   ./deploy/vps.sh update           pull & restart now (instead of waiting for the 2-minute auto-update)
 #   ./deploy/vps.sh status | logs [app|tunnel]
 #   ./deploy/vps.sh create-user <name> [--role Admin|Editor]
 #   ./deploy/vps.sh import <local.csv> [--replace]
