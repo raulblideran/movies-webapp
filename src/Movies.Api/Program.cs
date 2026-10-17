@@ -109,6 +109,7 @@ builder.Services.AddHttpClient<TmdbClient>(c =>
     c.BaseAddress = new Uri("https://api.themoviedb.org/");
     c.Timeout = TimeSpan.FromSeconds(10);
 });
+builder.Services.Configure<CexOptions>(config.GetSection("Cex"));
 builder.Services.AddScoped<CexItemsService>();
 builder.Services.AddHostedService<CexRefreshService>();
 builder.Services.AddHttpClient<CexClient>(c =>

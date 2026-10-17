@@ -13,12 +13,21 @@ public record CexDetails(
     string? Category = null,
     string? ImageUrl = null);
 
+public class CexOptions
+{
+    /// <summary>
+    /// Optional relay for CeX API calls, e.g. the Cloudflare Worker at cex-proxy.….workers.dev
+    /// (called as {ProxyUrl}/?url={target}). CeX blocks some data-centre IPs, including the VPS.
+    /// </summary>
+    public string? ProxyUrl { get; set; }
+}
+
 public record CexStore(int StoreId, string StoreName, double Latitude, double Longitude);
 
 public record CexStoreStock(string StoreName, int Quantity, double DistanceKm);
 
 /// <summary>Server-side CeX lookups (replaces the browser CORS-proxy chain).</summary>
-public class CexClient(HttpClient http, IMemoryCache cache, ILogger<CexClient> logger)
+public class CexClient(HttpClient http, IMemoryCache cache, Microsoft.Extensions.Options.IOptions<CexOptions> options, ILogger<CexClient> logger)
 {
     private static readonly TimeSpan DetailsCacheFor = TimeSpan.FromHours(6);
     private static readonly TimeSpan StoresCacheFor = TimeSpan.FromHours(24);
@@ -106,7 +115,12 @@ public class CexClient(HttpClient http, IMemoryCache cache, ILogger<CexClient> l
     {
         try
         {
-            using var resp = await http.GetAsync(url, ct);
+            var target = new Uri(http.BaseAddress!, url);
+            var proxy = options.Value.ProxyUrl;
+            var requestUri = string.IsNullOrWhiteSpace(proxy)
+                ? target
+                : new Uri($"{proxy.TrimEnd('/')}/?url={Uri.EscapeDataString(target.AbsoluteUri)}");
+            using var resp = await http.GetAsync(requestUri, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 logger.LogWarning("CeX returned {Status} for {Url}", (int)resp.StatusCode, url);
