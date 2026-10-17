@@ -6,6 +6,7 @@
 #   ./deploy/vps.sh update           pull & restart now (instead of waiting for the 2-minute auto-update)
 #   ./deploy/vps.sh status | logs [app|tunnel]
 #   ./deploy/vps.sh create-user <name> [--role Admin|Editor]
+#   ./deploy/vps.sh delete-user <name>
 #   ./deploy/vps.sh import <local.csv> [--replace]
 #   ./deploy/vps.sh backup           run a backup now and download the newest one to ./backups/
 #   ./deploy/vps.sh ssh
@@ -57,6 +58,15 @@ case "$cmd" in
         # Password is read from your terminal and piped over SSH (never stored or put on a command line).
         read -rsp "Password for $1: " pw; echo
         printf '%s\n' "$pw" | ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm -i --read-only -v movies-data:/data $IMAGE create-user $(printf '%q ' "$@")"
+        ;;
+    delete-user)
+        name="${1:?usage: delete-user <name>}"
+        [[ "$name" =~ ^[A-Za-z0-9._@+-]+$ ]] || { echo "Unexpected characters in username" >&2; exit 1; }
+        read -rp "Delete user '$name' from the live site? [y/N] " ok
+        [[ "$ok" == [yY] ]] || exit 1
+        # Identity's tables cascade from AspNetUsers (roles, tokens, recovery codes, logins).
+        sql="PRAGMA foreign_keys=ON; DELETE FROM AspNetUsers WHERE NormalizedUserName = upper('$name'); SELECT changes() || ' user(s) deleted';"
+        ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) bash -c 'cd ~ && podman unshare sqlite3 \$(podman volume inspect movies-data --format {{.Mountpoint}})/movies.db'" <<< "$sql"
         ;;
     import)
         file="$1"; shift
