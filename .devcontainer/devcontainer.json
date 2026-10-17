@@ -1,0 +1,14 @@
+{
+  "name": "movies-webapp",
+  "build": { "dockerfile": "../Containerfile", "context": "..", "target": "dev" },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/src,type=bind,z",
+  "workspaceFolder": "/src",
+  "runArgs": ["--userns=keep-id", "--env-file", "${localWorkspaceFolder}/.env.dev"],
+  "mounts": [
+    "source=movies-nuget,target=/home/dev/.nuget,type=volume",
+    "source=movies-data,target=/data,type=volume"
+  ],
+  "containerEnv": { "ConnectionStrings__Movies": "Data Source=/data/movies.db", "DataProtection__KeysPath": "/data/keys" },
+  "forwardPorts": [5080],
+  "customizations": { "vscode": { "extensions": ["ms-dotnettools.csdevkit"] } }
+}

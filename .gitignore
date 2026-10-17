@@ -1,0 +1,13 @@
+bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+.env.dev
+.vs/
+.vscode/
+.idea/
+*.user
+TestResults/
+data/*.csv
+keys/
