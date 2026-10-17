@@ -44,10 +44,14 @@ as_u systemctl --user enable --now podman-auto-update.timer movies-backup.timer
 if [[ -n "${GHCR_TOKEN:-}" ]]; then
     as_u podman pull ghcr.io/raulblideran/movies-webapp:latest
 fi
+# Stop everything, then start the pod before its containers. Restarting both containers at once
+# empties the pod, podman stops it, and the containers' restarts then fail ("dependency").
+as_u systemctl --user stop cloudflared.service movies-app.service movies-pod.service || true
+as_u systemctl --user start movies-pod.service
 if as_u podman image exists ghcr.io/raulblideran/movies-webapp:latest; then
-    as_u systemctl --user restart movies-app.service cloudflared.service
+    as_u systemctl --user start movies-app.service cloudflared.service
 else
-    as_u systemctl --user restart cloudflared.service
+    as_u systemctl --user start cloudflared.service
     echo "App image not on the server yet: run ./deploy/vps.sh push-image"
 fi
 sleep 5

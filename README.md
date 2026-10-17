@@ -120,6 +120,7 @@ Day to day, from this repo (the server address is in `deploy/secrets/host`):
 ./deploy/vps.sh backup                         # back up and download to ./backups/
 ./deploy/vps.sh cex-add <link> [<link> …]      # track CeX products (or paste links on /cex when signed in)
 ./deploy/vps.sh install                        # re-apply config after editing deploy/ or deploy/secrets/
+./deploy/vps.sh restore <backup.db>            # roll the live DB back to a backup
 ```
 
 Secrets live in `deploy/secrets/` (git-ignored; see the `*.example` files):
@@ -128,25 +129,29 @@ Secrets live in `deploy/secrets/` (git-ignored; see the `*.example` files):
 - `ghcr.env`: a **classic** GitHub token with only `read:packages`. Fine-grained tokens can't read
   GHCR. Without it, auto-update is off and you deploy with `push-image`.
 
-### Rebuilding the server from scratch
+### Moving to a new server (or reinstalling this one)
 
-1. **Reinstall Rocky 10.**
-   - Set a root password (keep it in Bitwarden; it's only for the IONOS console).
-   - In User Data, use `deploy/cloud-init.yaml`. It creates the key-only `raul` user.
-2. **If the server has no IPv4 address after boot,** fix it from the IONOS console:
-   - Run `nmcli d connect ens6`.
-   - IONOS's network config targets `ens3`, but the NIC here is `ens6`.
-   - Then make it permanent over SSH:
-     ```
-     sudo nmcli connection add type ethernet ifname ens6 con-name ens6 ipv4.method auto ipv6.method auto
-     echo "network: {config: disabled}" | sudo tee /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-     ```
-3. **Harden:** `scp deploy/harden-server.sh raul@HOST:/tmp/ && ssh raul@HOST sudo bash /tmp/harden-server.sh`
-   - firewall: SSH only
-   - automatic security updates
-   - Cockpit off
-4. **Deploy:**
-   - `./deploy/vps.sh install`
-   - `./deploy/vps.sh push-image` (only if there's no GHCR token)
-   - `./deploy/vps.sh import <csv>` (or restore a backup)
-   - `./deploy/vps.sh create-user …`
+Works on any Rocky / Alma / RHEL 9-10 server. Everything except the data is installed by cloud-init on first boot.
+
+1. **Build the User Data:** `./deploy/build-cloud-init.sh`. This writes `deploy/secrets/cloud-init.yaml`,
+   which contains secrets and is git-ignored. If you're reinstalling the same server, run
+   `./deploy/vps.sh backup` **first**.
+2. **Create or reinstall the server** with that file as its **User Data** (IONOS: Advanced Options → User Data, type
+   *Cloud Config*). Set a root password and keep it in Bitwarden; it's only for the provider's console.
+3. **Switch over:** `./deploy/migrate.sh <new-ip>`. This:
+   - takes a fresh backup from the current server (or uses the newest file in `./backups/`)
+   - waits for provisioning to finish
+   - restores the database and stops the old server's tunnel
+   - points `deploy/vps.sh` at the new server, and checks the public site
+
+On first boot, `provision.sh` (log: `/var/log/movies-provision.log`):
+- fixes networking (`fix-network.sh`). IONOS's config targets `ens3`, but the NIC is `ens6`.
+- creates the key-only admin user and turns off root and password SSH logins
+- installs packages, the firewall (SSH only) and automatic security updates (`harden-server.sh`)
+- sets up the `movies` user, quadlets, secrets, the registry login and timers, then pulls the app and starts it
+  (`setup-server.sh`)
+
+All of these scripts are idempotent. To re-apply config to a running server, use `./deploy/vps.sh install`.
+
+Signed-in sessions don't carry over to a new server (the cookie key ring isn't migrated), so sign in again
+afterwards. Accounts, 2FA and all data do carry over.

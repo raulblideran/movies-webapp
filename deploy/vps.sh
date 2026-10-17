@@ -12,12 +12,18 @@
 #   ./deploy/vps.sh backup           run a backup now and download the newest one to ./backups/
 #   ./deploy/vps.sh ssh
 #
-# The server address comes from deploy/secrets/host (e.g. "raul@203.0.113.10").
+#   ./deploy/vps.sh restore <backup.db>  replace the live database with a backup (app restarts)
+#
+# The server address comes from deploy/secrets/host (e.g. "raul@203.0.113.10"), or $VPS_HOST.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST_FILE="$DIR/secrets/host"
-[[ -f "$HOST_FILE" ]] || { echo "Put the server address in deploy/secrets/host, e.g. raul@1.2.3.4" >&2; exit 1; }
-HOST="$(tr -d '[:space:]' < "$HOST_FILE")"
+if [[ -n "${VPS_HOST:-}" ]]; then
+    HOST="$VPS_HOST"
+else
+    [[ -f "$HOST_FILE" ]] || { echo "Put the server address in deploy/secrets/host, e.g. raul@1.2.3.4" >&2; exit 1; }
+    HOST="$(tr -d '[:space:]' < "$HOST_FILE")"
+fi
 IMAGE=ghcr.io/raulblideran/movies-webapp:latest
 
 # Run a command as the "movies" service user.
@@ -78,8 +84,25 @@ case "$cmd" in
     cex-add)
         ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm --read-only -v movies-data:/data --env-file /home/movies/.config/movies/app.env $IMAGE cex-add $(printf '%q ' "$@")"
         ;;
+    restore)
+        file="${1:?usage: restore <backup.db>}"
+        [[ "$(head -c 15 "$file")" == "SQLite format 3" ]] || { echo "$file is not a SQLite database" >&2; exit 1; }
+        ssh "$HOST" "cd / && sudo install -o movies -g movies -m 600 /dev/stdin /home/movies/restore.db" < "$file"
+        # The app runs as the image's "app" user (uid 1654); podman unshare maps uids the same way the container does.
+        # The script goes over stdin to avoid nested quoting.
+        ssh "$HOST" 'cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/$(id -u movies) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u movies)/bus bash -s' <<'SCRIPT'
+set -euo pipefail
+cd ~
+systemctl --user stop movies-app.service
+vol="$(podman volume inspect movies-data --format '{{.Mountpoint}}')"
+podman unshare sh -c 'rm -f "$1/movies.db-wal" "$1/movies.db-shm" && cp "$2" "$1/movies.db" && chown 1654:1654 "$1/movies.db"' _ "$vol" "$HOME/restore.db"
+rm -f ~/restore.db
+systemctl --user start movies-app.service
+SCRIPT
+        echo "Restored $file."
+        ;;
     backup)
-        as_movies movies-backup
+        as_movies .local/bin/movies-backup
         mkdir -p backups
         latest="$(ssh "$HOST" "sudo ls -1t /home/movies/backups | head -1")"
         ssh "$HOST" "sudo cat /home/movies/backups/$latest" > "backups/$latest"
