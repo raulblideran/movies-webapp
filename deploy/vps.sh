@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Manage the production server from your machine.
+#
+#   ./deploy/vps.sh install          first-time setup / re-apply config (copies deploy files + secrets, runs setup-server.sh)
+#   ./deploy/vps.sh update           pull & restart now (instead of waiting for the 10-minute auto-update)
+#   ./deploy/vps.sh status | logs [app|tunnel]
+#   ./deploy/vps.sh create-user <name> [--role Admin|Editor]
+#   ./deploy/vps.sh import <local.csv> [--replace]
+#   ./deploy/vps.sh backup           run a backup now and download the newest one to ./backups/
+#   ./deploy/vps.sh ssh
+#
+# The server address comes from deploy/secrets/host (e.g. "raul@203.0.113.10").
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_FILE="$DIR/secrets/host"
+[[ -f "$HOST_FILE" ]] || { echo "Put the server address in deploy/secrets/host, e.g. raul@1.2.3.4" >&2; exit 1; }
+HOST="$(tr -d '[:space:]' < "$HOST_FILE")"
+IMAGE=ghcr.io/raulblideran/movies-webapp:latest
+
+# Run a command as the "movies" service user.
+as_movies() {
+    local cmd; printf -v cmd '%q ' "$@"
+    ssh "$HOST" "sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$(id -u movies)/bus bash -c 'cd ~ && $cmd'"
+}
+
+cmd="${1:-status}"; shift || true
+case "$cmd" in
+    install)
+        for f in app.env cloudflared.env ghcr.env; do
+            [[ -f "$DIR/secrets/$f" ]] || { echo "Missing deploy/secrets/$f (see deploy/secrets/*.example)" >&2; exit 1; }
+        done
+        tmp="$(ssh "$HOST" mktemp -d)"
+        tar -C "$DIR" -czf - quadlet secrets/app.env secrets/cloudflared.env secrets/ghcr.env backup.sh \
+            movies-backup.service movies-backup.timer podman-auto-update.timer.conf setup-server.sh \
+            | ssh "$HOST" "tar -C $tmp -xzf -"
+        ssh -t "$HOST" "sudo bash $tmp/setup-server.sh $tmp; rc=\$?; rm -rf $tmp; exit \$rc"
+        ;;
+    update)
+        as_movies podman auto-update
+        ;;
+    status)
+        as_movies systemctl --user --no-pager status movies-app.service cloudflared.service podman-auto-update.timer movies-backup.timer | grep -E "●|Active:|Trigger:" || true
+        ;;
+    logs)
+        unit=movies-app; [[ "${1:-app}" == tunnel ]] && unit=cloudflared
+        as_movies journalctl --user -u "$unit" -n 100 --no-pager
+        ;;
+    create-user)
+        # Password is read from your terminal and piped over SSH (never stored or put on a command line).
+        read -rsp "Password for $1: " pw; echo
+        printf '%s\n' "$pw" | ssh "$HOST" "sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm -i --read-only -v movies-data:/data $IMAGE create-user $(printf '%q ' "$@")"
+        ;;
+    import)
+        file="$1"; shift
+        ssh "$HOST" "cat > /tmp/movies-import.csv && chmod 644 /tmp/movies-import.csv" < "$file"
+        ssh "$HOST" "sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm --read-only -v movies-data:/data -v /tmp/movies-import.csv:/import.csv:ro,z --env-file /home/movies/.config/movies/app.env $IMAGE import /import.csv $(printf '%q ' "$@"); rm -f /tmp/movies-import.csv"
+        ;;
+    backup)
+        as_movies movies-backup
+        mkdir -p backups
+        latest="$(ssh "$HOST" "sudo ls -1t /home/movies/backups | head -1")"
+        ssh "$HOST" "sudo cat /home/movies/backups/$latest" > "backups/$latest"
+        echo "Downloaded backups/$latest"
+        ;;
+    ssh)
+        exec ssh "$HOST"
+        ;;
+    *)
+        sed -n '2,14p' "$0"; exit 1 ;;
+esac

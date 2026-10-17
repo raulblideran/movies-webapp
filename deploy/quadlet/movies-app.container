@@ -1,0 +1,24 @@
+[Unit]
+Description=Movies web app
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=movies-app
+Image=ghcr.io/raulblideran/movies-webapp:latest
+Pod=movies.pod
+Volume=movies-data.volume:/data
+EnvironmentFile=%h/.config/movies/app.env
+Environment=Proxy__TrustCloudflare=true
+Environment=AllowedHosts=movies.raulblideran.uk;localhost
+AutoUpdate=registry
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

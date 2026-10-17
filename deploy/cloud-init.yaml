@@ -1,0 +1,55 @@
+#cloud-config
+# First-boot setup for the IONOS VPS (Rocky Linux 10).
+# Paste into "Advanced Options → User Data" (Script Type: Cloud Config) when reinstalling.
+#
+# Result: an admin user "raul" who signs in with an SSH key only, root SSH login
+# and passwords disabled, the firewall on with only SSH allowed, and security
+# updates applied automatically.
+
+users:
+  - name: raul
+    groups: [wheel]
+    shell: /bin/bash
+    # Key-only account (no password), so sudo must not prompt for one.
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDV2ZnP+twqB8KGYwQXam4W5yuuIGstRhYKQ8ZEsGsCK raul.blideran@hotmail.com
+
+disable_root: true
+ssh_pwauth: false
+
+package_update: true
+package_upgrade: true
+packages:
+  - podman
+  - firewalld
+  - dnf-automatic
+  - sqlite
+  - tar
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-hardening.conf
+    permissions: "0600"
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PubkeyAuthentication yes
+      MaxAuthTries 3
+      LoginGraceTime 20
+      X11Forwarding no
+      AllowUsers raul
+
+runcmd:
+  # Firewall: SSH only. The site arrives through an outbound Cloudflare Tunnel, so no web ports are opened.
+  - systemctl enable --now firewalld
+  - firewall-cmd --permanent --remove-service=cockpit || true
+  - firewall-cmd --permanent --remove-service=dhcpv6-client || true
+  - firewall-cmd --permanent --add-service=ssh
+  - firewall-cmd --reload
+  # Apply security updates automatically.
+  - sed -i 's/^upgrade_type.*/upgrade_type = security/; s/^apply_updates.*/apply_updates = yes/' /etc/dnf/automatic.conf
+  - systemctl enable --now dnf-automatic.timer
+  - systemctl disable --now cockpit.socket || true
+  - systemctl restart sshd

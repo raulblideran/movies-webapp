@@ -11,3 +11,6 @@ obj/
 TestResults/
 data/*.csv
 keys/
+deploy/secrets/*
+!deploy/secrets/*.example
+backups/

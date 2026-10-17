@@ -1,0 +1,22 @@
+[Unit]
+Description=Cloudflare Tunnel for movies.raulblideran.uk
+After=movies-app.service network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=cloudflared
+Image=docker.io/cloudflare/cloudflared:latest
+Pod=movies.pod
+Exec=tunnel --no-autoupdate run
+EnvironmentFile=%h/.config/movies/cloudflared.env
+AutoUpdate=registry
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,4 @@
+# The app and cloudflared share this pod's network. Nothing is published to the host:
+# the only way in is the outbound Cloudflare Tunnel.
+[Pod]
+PodName=movies

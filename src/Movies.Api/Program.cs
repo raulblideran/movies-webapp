@@ -127,12 +127,29 @@ await Startup.MigrateAndSeedAsync(app.Services);
 if (args.Length > 0 && Cli.IsCommand(args[0]))
     return await Cli.RunAsync(app.Services, args);
 
+// Behind the Cloudflare Tunnel every request arrives from cloudflared, so take the visitor's IP
+// (used by the login rate limiter) and scheme from Cloudflare's headers. Only enable this when
+// the app's port is reachable solely through the tunnel.
+if (config.GetValue("Proxy:TrustCloudflare", false))
+{
+    app.Use((ctx, next) =>
+    {
+        if (ctx.Request.Headers.TryGetValue("CF-Connecting-IP", out var ip)
+            && System.Net.IPAddress.TryParse(ip, out var address))
+            ctx.Connection.RemoteIpAddress = address;
+        if (ctx.Request.Headers["X-Forwarded-Proto"] == "https")
+            ctx.Request.Scheme = "https";
+        return next();
+    });
+}
+
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
+app.MapGet("/healthz", () => Results.Ok("ok"));
 app.MapTitlesEndpoints();
 app.MapExternalEndpoints();
 app.MapAuthEndpoints();

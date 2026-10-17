@@ -1,0 +1,6 @@
+[Unit]
+Description=Back up the movies database
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/movies-backup
