@@ -506,9 +506,34 @@
             </div>
         </div>
 
-        <footer class="text-center text-xs text-gray-500 mt-12 mb-4 space-y-2" id="footer">
-            <div>Designed by Raul · <span id="appVersion">v…</span></div>
-            <div id="adminFooter"></div>
+        <footer
+            id="footer"
+            class="relative mt-16 -mx-5 -mb-5 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-md border-t border-white/10"
+        >
+            <div class="h-[3px] bg-gradient-to-r from-primary via-red-400 to-primary-dark"></div>
+            <div
+                class="px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm"
+            >
+                <div class="flex items-center gap-2 text-gray-300 sm:flex-1">
+                    <span class="text-lg">🎬</span>
+                    <span
+                        >Designed by
+                        <span
+                            class="font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-red-400"
+                            >Raul</span
+                        ></span
+                    >
+                </div>
+                <div id="adminFooter" class="text-xs text-gray-400 text-center"></div>
+                <div class="sm:flex-1 flex sm:justify-end">
+                    <span
+                        id="appVersion"
+                        class="font-mono text-xs px-2.5 py-1 rounded-md bg-black/30 border border-white/10 text-gray-400"
+                        title="Build date (yyMMdd)"
+                        >v{{version}}</span
+                    >
+                </div>
+            </div>
         </footer>
 
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>

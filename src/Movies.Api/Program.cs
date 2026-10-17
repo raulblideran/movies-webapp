@@ -143,18 +143,45 @@ if (config.GetValue("Proxy:TrustCloudflare", false))
     });
 }
 
-app.UseDefaultFiles();
-app.UseStaticFiles();
+// Routing first so the "/" endpoint below (which renders index.html) wins over the static file.
+app.UseRouting();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        // Versioned script URLs (?v=<build>) never change, so they can be cached forever;
+        // anything else is revalidated so a deploy shows up immediately.
+        var versioned = ctx.Context.Request.Query.ContainsKey("v") && !app.Environment.IsDevelopment();
+        ctx.Context.Response.Headers.CacheControl = versioned ? "public, max-age=31536000, immutable" : "no-cache";
+    },
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapGet("/healthz", () => Results.Ok("ok"));
-var buildVersion = typeof(Program).Assembly
+var buildInfo = typeof(Program).Assembly
     .GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
     .OfType<System.Reflection.AssemblyMetadataAttribute>()
-    .FirstOrDefault(a => a.Key == "BuildVersion")?.Value ?? "dev";
+    .ToDictionary(a => a.Key, a => a.Value);
+var buildVersion = buildInfo.GetValueOrDefault("BuildVersion") ?? "dev";
+var buildStamp = buildInfo.GetValueOrDefault("BuildStamp") ?? buildVersion;
 app.MapGet("/api/version", () => Results.Ok(new { version = buildVersion }));
+
+// index.html with the version filled in and cache-busting script URLs.
+string RenderIndex() =>
+    File.ReadAllText(Path.Combine(app.Environment.WebRootPath, "index.html"))
+        .Replace("{{version}}", buildVersion)
+        .Replace("src=\"js/app.js\"", $"src=\"js/app.js?v={buildStamp}\"")
+        .Replace("src=\"js/admin.js\"", $"src=\"js/admin.js?v={buildStamp}\"");
+var indexHtml = app.Environment.IsDevelopment() ? null : RenderIndex();
+IResult Index(HttpContext ctx)
+{
+    ctx.Response.Headers.CacheControl = "no-cache";
+    return Results.Content(indexHtml ?? RenderIndex(), "text/html; charset=utf-8");
+}
+app.MapGet("/", Index);
+app.MapGet("/index.html", Index);
 app.MapTitlesEndpoints();
 app.MapExternalEndpoints();
 app.MapAuthEndpoints();

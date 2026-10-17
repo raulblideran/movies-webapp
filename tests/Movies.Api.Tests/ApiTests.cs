@@ -31,6 +31,17 @@ public class ApiTests : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Index_has_version_and_cache_busted_scripts()
+    {
+        var resp = await _app.CreateClient().GetAsync("/");
+        var html = await resp.Content.ReadAsStringAsync();
+        Assert.Equal("no-cache", resp.Headers.CacheControl?.ToString());
+        Assert.DoesNotContain("{{version}}", html);
+        Assert.Matches(@"v\d{6}</span", html);
+        Assert.Matches(@"js/app\.js\?v=\d{12}", html);
+    }
+
+    [Fact]
     public async Task Wrong_password_is_rejected()
     {
         await _app.CreateUserAsync("wrongpw", "correct-horse-battery", "Editor");
