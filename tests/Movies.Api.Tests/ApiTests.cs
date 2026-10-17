@@ -24,6 +24,13 @@ public class ApiTests : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Version_is_the_build_date()
+    {
+        var v = await _app.CreateClient().GetFromJsonAsync<JsonElement>("/api/version");
+        Assert.Matches(@"^\d{6}$", v.GetProperty("version").GetString());
+    }
+
+    [Fact]
     public async Task Wrong_password_is_rejected()
     {
         await _app.CreateUserAsync("wrongpw", "correct-horse-battery", "Editor");

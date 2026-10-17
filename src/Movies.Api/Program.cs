@@ -150,6 +150,11 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapGet("/healthz", () => Results.Ok("ok"));
+var buildVersion = typeof(Program).Assembly
+    .GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+    .OfType<System.Reflection.AssemblyMetadataAttribute>()
+    .FirstOrDefault(a => a.Key == "BuildVersion")?.Value ?? "dev";
+app.MapGet("/api/version", () => Results.Ok(new { version = buildVersion }));
 app.MapTitlesEndpoints();
 app.MapExternalEndpoints();
 app.MapAuthEndpoints();

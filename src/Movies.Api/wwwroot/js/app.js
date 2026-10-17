@@ -270,7 +270,15 @@ async function refreshData() {
     refreshButton.style.opacity = "1";
 }
 
-window.addEventListener("DOMContentLoaded", () => loadTitles());
+window.addEventListener("DOMContentLoaded", () => {
+    loadTitles();
+    fetch("/api/version")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((v) => {
+            if (v?.version) document.getElementById("appVersion").textContent = `v${v.version}`;
+        })
+        .catch(() => {});
+});
 
 // ---------- stats & filters ----------
 
