@@ -1,0 +1,327 @@
+/* Minecraft: the title screen and inventory. A dirt menu background, a grass-block top bar,
+   stone-grey bevelled buttons, the yellow splash text, and stats as hotbar slots. */
+
+@import url("https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap");
+
+:root[data-theme="minecraft"] {
+    --mc-dirt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill='%23866043' d='M0 0h1v1h-1zM1 0h1v1h-1zM3 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM8 0h1v1h-1zM10 0h1v1h-1zM11 0h1v1h-1zM14 0h1v1h-1zM15 0h1v1h-1zM3 1h1v1h-1zM5 1h1v1h-1zM7 1h1v1h-1zM8 1h1v1h-1zM9 1h1v1h-1zM10 1h1v1h-1zM12 1h1v1h-1zM15 1h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM6 2h1v1h-1zM9 2h1v1h-1zM12 2h1v1h-1zM1 3h1v1h-1zM3 3h1v1h-1zM6 3h1v1h-1zM8 3h1v1h-1zM13 3h1v1h-1zM6 4h1v1h-1zM11 4h1v1h-1zM12 4h1v1h-1zM14 4h1v1h-1zM0 5h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM14 5h1v1h-1zM0 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM9 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM3 7h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM10 7h1v1h-1zM12 7h1v1h-1zM13 7h1v1h-1zM14 7h1v1h-1zM15 7h1v1h-1zM0 8h1v1h-1zM1 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM9 8h1v1h-1zM10 8h1v1h-1zM11 8h1v1h-1zM12 8h1v1h-1zM13 8h1v1h-1zM2 9h1v1h-1zM3 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM7 9h1v1h-1zM8 9h1v1h-1zM11 9h1v1h-1zM13 9h1v1h-1zM2 10h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM8 10h1v1h-1zM9 10h1v1h-1zM0 11h1v1h-1zM2 11h1v1h-1zM3 11h1v1h-1zM4 11h1v1h-1zM5 11h1v1h-1zM6 11h1v1h-1zM13 11h1v1h-1zM14 11h1v1h-1zM15 11h1v1h-1zM0 12h1v1h-1zM1 12h1v1h-1zM8 12h1v1h-1zM14 12h1v1h-1zM0 13h1v1h-1zM3 13h1v1h-1zM7 13h1v1h-1zM8 13h1v1h-1zM9 13h1v1h-1zM12 13h1v1h-1zM0 14h1v1h-1zM2 14h1v1h-1zM3 14h1v1h-1zM11 14h1v1h-1zM12 14h1v1h-1zM13 14h1v1h-1zM14 14h1v1h-1zM0 15h1v1h-1zM2 15h1v1h-1zM4 15h1v1h-1zM13 15h1v1h-1zM15 15h1v1h-1z'/%3E%3Cpath fill='%2379553a' d='M2 0h1v1h-1zM4 0h1v1h-1zM7 0h1v1h-1zM9 0h1v1h-1zM12 0h1v1h-1zM0 1h1v1h-1zM2 1h1v1h-1zM13 1h1v1h-1zM14 1h1v1h-1zM0 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM7 2h1v1h-1zM8 2h1v1h-1zM11 2h1v1h-1zM13 2h1v1h-1zM14 2h1v1h-1zM4 3h1v1h-1zM7 3h1v1h-1zM9 3h1v1h-1zM11 3h1v1h-1zM14 3h1v1h-1zM15 3h1v1h-1zM0 4h1v1h-1zM1 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM8 4h1v1h-1zM13 4h1v1h-1zM15 4h1v1h-1zM9 5h1v1h-1zM10 5h1v1h-1zM15 5h1v1h-1zM7 6h1v1h-1zM8 6h1v1h-1zM11 6h1v1h-1zM13 6h1v1h-1zM15 6h1v1h-1zM0 7h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM11 7h1v1h-1zM8 8h1v1h-1zM0 9h1v1h-1zM1 9h1v1h-1zM10 9h1v1h-1zM12 9h1v1h-1zM14 9h1v1h-1zM1 10h1v1h-1zM6 10h1v1h-1zM1 11h1v1h-1zM7 11h1v1h-1zM9 11h1v1h-1zM2 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM9 12h1v1h-1zM13 12h1v1h-1zM4 13h1v1h-1zM15 13h1v1h-1zM1 14h1v1h-1zM5 14h1v1h-1zM6 14h1v1h-1zM8 14h1v1h-1zM15 14h1v1h-1zM1 15h1v1h-1zM5 15h1v1h-1zM6 15h1v1h-1zM8 15h1v1h-1zM10 15h1v1h-1zM11 15h1v1h-1zM12 15h1v1h-1zM14 15h1v1h-1z'/%3E%3Cpath fill='%23966c4a' d='M13 0h1v1h-1zM6 1h1v1h-1zM11 1h1v1h-1zM10 2h1v1h-1zM15 2h1v1h-1zM0 3h1v1h-1zM5 3h1v1h-1zM10 3h1v1h-1zM12 3h1v1h-1zM2 4h1v1h-1zM7 4h1v1h-1zM10 4h1v1h-1zM3 5h1v1h-1zM7 5h1v1h-1zM12 5h1v1h-1zM13 5h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM7 8h1v1h-1zM14 8h1v1h-1zM6 9h1v1h-1zM0 10h1v1h-1zM5 10h1v1h-1zM7 10h1v1h-1zM10 10h1v1h-1zM12 10h1v1h-1zM13 10h1v1h-1zM14 10h1v1h-1zM15 10h1v1h-1zM4 12h1v1h-1zM7 12h1v1h-1zM11 12h1v1h-1zM12 12h1v1h-1zM15 12h1v1h-1zM1 13h1v1h-1zM6 13h1v1h-1zM11 13h1v1h-1zM13 13h1v1h-1zM9 14h1v1h-1zM10 14h1v1h-1z'/%3E%3Cpath fill='%235d4130' d='M1 1h1v1h-1zM3 4h1v1h-1zM11 5h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM14 6h1v1h-1zM4 7h1v1h-1zM9 9h1v1h-1zM8 11h1v1h-1zM10 11h1v1h-1zM12 11h1v1h-1zM3 12h1v1h-1zM10 12h1v1h-1zM5 13h1v1h-1zM10 13h1v1h-1zM7 14h1v1h-1zM3 15h1v1h-1zM7 15h1v1h-1zM9 15h1v1h-1z'/%3E%3Cpath fill='%23b9855c' d='M4 1h1v1h-1zM2 3h1v1h-1zM9 4h1v1h-1zM15 8h1v1h-1zM15 9h1v1h-1zM11 10h1v1h-1zM11 11h1v1h-1zM2 13h1v1h-1zM14 13h1v1h-1zM4 14h1v1h-1z'/%3E%3C/svg%3E");
+    --mc-grass: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill='%235d9e34' d='M0 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM8 0h1v1h-1zM10 0h1v1h-1zM12 0h1v1h-1zM14 0h1v1h-1zM15 0h1v1h-1zM1 1h1v1h-1zM4 1h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM8 1h1v1h-1zM9 1h1v1h-1zM12 1h1v1h-1zM13 1h1v1h-1zM2 2h1v1h-1zM4 2h1v1h-1zM8 2h1v1h-1zM11 2h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM8 3h1v1h-1zM9 3h1v1h-1zM4 4h1v1h-1zM8 4h1v1h-1zM11 4h1v1h-1z'/%3E%3Cpath fill='%236db33f' d='M1 0h1v1h-1zM2 0h1v1h-1zM4 0h1v1h-1zM7 0h1v1h-1zM11 0h1v1h-1zM0 1h1v1h-1zM3 1h1v1h-1zM11 1h1v1h-1zM14 1h1v1h-1zM15 1h1v1h-1zM1 2h1v1h-1zM5 2h1v1h-1zM7 2h1v1h-1zM12 2h1v1h-1zM14 2h1v1h-1zM0 3h1v1h-1zM5 3h1v1h-1z'/%3E%3Cpath fill='%234f8a2c' d='M3 0h1v1h-1zM9 0h1v1h-1zM2 1h1v1h-1zM5 1h1v1h-1zM10 1h1v1h-1zM0 2h1v1h-1zM3 2h1v1h-1zM6 2h1v1h-1zM13 2h1v1h-1zM1 3h1v1h-1zM11 3h1v1h-1zM14 3h1v1h-1zM15 3h1v1h-1zM1 4h1v1h-1z'/%3E%3Cpath fill='%237cc546' d='M13 0h1v1h-1zM9 2h1v1h-1zM15 2h1v1h-1zM5 4h1v1h-1z'/%3E%3Cpath fill='%23966c4a' d='M10 2h1v1h-1zM10 3h1v1h-1zM12 3h1v1h-1zM2 4h1v1h-1zM7 4h1v1h-1zM10 4h1v1h-1zM3 5h1v1h-1zM7 5h1v1h-1zM12 5h1v1h-1zM13 5h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM7 8h1v1h-1zM14 8h1v1h-1zM6 9h1v1h-1zM0 10h1v1h-1zM5 10h1v1h-1zM7 10h1v1h-1zM10 10h1v1h-1zM12 10h1v1h-1zM13 10h1v1h-1zM14 10h1v1h-1zM15 10h1v1h-1zM4 12h1v1h-1zM7 12h1v1h-1zM11 12h1v1h-1zM12 12h1v1h-1zM15 12h1v1h-1zM1 13h1v1h-1zM6 13h1v1h-1zM11 13h1v1h-1zM13 13h1v1h-1zM9 14h1v1h-1zM10 14h1v1h-1z'/%3E%3Cpath fill='%23866043' d='M6 3h1v1h-1zM13 3h1v1h-1zM6 4h1v1h-1zM12 4h1v1h-1zM14 4h1v1h-1zM0 5h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM14 5h1v1h-1zM0 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM9 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM3 7h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM10 7h1v1h-1zM12 7h1v1h-1zM13 7h1v1h-1zM14 7h1v1h-1zM15 7h1v1h-1zM0 8h1v1h-1zM1 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM9 8h1v1h-1zM10 8h1v1h-1zM11 8h1v1h-1zM12 8h1v1h-1zM13 8h1v1h-1zM2 9h1v1h-1zM3 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM7 9h1v1h-1zM8 9h1v1h-1zM11 9h1v1h-1zM13 9h1v1h-1zM2 10h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM8 10h1v1h-1zM9 10h1v1h-1zM0 11h1v1h-1zM2 11h1v1h-1zM3 11h1v1h-1zM4 11h1v1h-1zM5 11h1v1h-1zM6 11h1v1h-1zM13 11h1v1h-1zM14 11h1v1h-1zM15 11h1v1h-1zM0 12h1v1h-1zM1 12h1v1h-1zM8 12h1v1h-1zM14 12h1v1h-1zM0 13h1v1h-1zM3 13h1v1h-1zM7 13h1v1h-1zM8 13h1v1h-1zM9 13h1v1h-1zM12 13h1v1h-1zM0 14h1v1h-1zM2 14h1v1h-1zM3 14h1v1h-1zM11 14h1v1h-1zM12 14h1v1h-1zM13 14h1v1h-1zM14 14h1v1h-1zM0 15h1v1h-1zM2 15h1v1h-1zM4 15h1v1h-1zM13 15h1v1h-1zM15 15h1v1h-1z'/%3E%3Cpath fill='%2379553a' d='M7 3h1v1h-1zM0 4h1v1h-1zM13 4h1v1h-1zM15 4h1v1h-1zM9 5h1v1h-1zM10 5h1v1h-1zM15 5h1v1h-1zM7 6h1v1h-1zM8 6h1v1h-1zM11 6h1v1h-1zM13 6h1v1h-1zM15 6h1v1h-1zM0 7h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM11 7h1v1h-1zM8 8h1v1h-1zM0 9h1v1h-1zM1 9h1v1h-1zM10 9h1v1h-1zM12 9h1v1h-1zM14 9h1v1h-1zM1 10h1v1h-1zM6 10h1v1h-1zM1 11h1v1h-1zM7 11h1v1h-1zM9 11h1v1h-1zM2 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM9 12h1v1h-1zM13 12h1v1h-1zM4 13h1v1h-1zM15 13h1v1h-1zM1 14h1v1h-1zM5 14h1v1h-1zM6 14h1v1h-1zM8 14h1v1h-1zM15 14h1v1h-1zM1 15h1v1h-1zM5 15h1v1h-1zM6 15h1v1h-1zM8 15h1v1h-1zM10 15h1v1h-1zM11 15h1v1h-1zM12 15h1v1h-1zM14 15h1v1h-1z'/%3E%3Cpath fill='%235d4130' d='M3 4h1v1h-1zM11 5h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM14 6h1v1h-1zM4 7h1v1h-1zM9 9h1v1h-1zM8 11h1v1h-1zM10 11h1v1h-1zM12 11h1v1h-1zM3 12h1v1h-1zM10 12h1v1h-1zM5 13h1v1h-1zM10 13h1v1h-1zM7 14h1v1h-1zM3 15h1v1h-1zM7 15h1v1h-1zM9 15h1v1h-1z'/%3E%3Cpath fill='%23b9855c' d='M9 4h1v1h-1zM15 8h1v1h-1zM15 9h1v1h-1zM11 10h1v1h-1zM11 11h1v1h-1zM2 13h1v1h-1zM14 13h1v1h-1zM4 14h1v1h-1z'/%3E%3C/svg%3E");
+    --mc-stone: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill='%237f7f7f' d='M0 0h1v1h-1zM2 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM8 0h1v1h-1zM9 0h1v1h-1zM15 0h1v1h-1zM5 1h1v1h-1zM8 1h1v1h-1zM9 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM7 2h1v1h-1zM11 2h1v1h-1zM13 2h1v1h-1zM14 2h1v1h-1zM7 3h1v1h-1zM13 3h1v1h-1zM0 4h1v1h-1zM1 4h1v1h-1zM4 4h1v1h-1zM7 4h1v1h-1zM8 4h1v1h-1zM11 4h1v1h-1zM13 4h1v1h-1zM15 4h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM7 5h1v1h-1zM8 5h1v1h-1zM11 5h1v1h-1zM12 5h1v1h-1zM14 5h1v1h-1zM1 6h1v1h-1zM12 6h1v1h-1zM13 6h1v1h-1zM1 7h1v1h-1zM4 7h1v1h-1zM7 7h1v1h-1zM11 7h1v1h-1zM14 7h1v1h-1zM15 7h1v1h-1zM2 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1zM10 8h1v1h-1zM11 8h1v1h-1zM13 8h1v1h-1zM0 9h1v1h-1zM1 9h1v1h-1zM3 9h1v1h-1zM4 9h1v1h-1zM7 9h1v1h-1zM8 9h1v1h-1zM9 9h1v1h-1zM13 9h1v1h-1zM14 9h1v1h-1zM2 10h1v1h-1zM3 10h1v1h-1zM5 10h1v1h-1zM8 10h1v1h-1zM9 10h1v1h-1zM13 10h1v1h-1zM14 10h1v1h-1zM15 10h1v1h-1zM1 11h1v1h-1zM2 11h1v1h-1zM7 11h1v1h-1zM8 11h1v1h-1zM15 11h1v1h-1zM4 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM7 12h1v1h-1zM9 12h1v1h-1zM11 12h1v1h-1zM2 13h1v1h-1zM4 13h1v1h-1zM5 13h1v1h-1zM11 13h1v1h-1zM12 13h1v1h-1zM0 14h1v1h-1zM1 14h1v1h-1zM4 14h1v1h-1zM9 14h1v1h-1zM12 14h1v1h-1zM13 14h1v1h-1zM14 14h1v1h-1zM3 15h1v1h-1zM4 15h1v1h-1zM5 15h1v1h-1zM6 15h1v1h-1zM7 15h1v1h-1zM10 15h1v1h-1zM12 15h1v1h-1zM13 15h1v1h-1zM14 15h1v1h-1z'/%3E%3Cpath fill='%23747474' d='M1 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM11 0h1v1h-1zM13 0h1v1h-1zM14 0h1v1h-1zM0 1h1v1h-1zM2 1h1v1h-1zM7 1h1v1h-1zM11 1h1v1h-1zM2 2h1v1h-1zM9 2h1v1h-1zM10 2h1v1h-1zM12 2h1v1h-1zM15 2h1v1h-1zM0 3h1v1h-1zM11 3h1v1h-1zM15 3h1v1h-1zM6 4h1v1h-1zM12 4h1v1h-1zM2 5h1v1h-1zM6 5h1v1h-1zM9 5h1v1h-1zM10 5h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM9 6h1v1h-1zM10 6h1v1h-1zM15 6h1v1h-1zM0 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM9 8h1v1h-1zM14 8h1v1h-1zM5 9h1v1h-1zM11 9h1v1h-1zM1 10h1v1h-1zM4 10h1v1h-1zM11 10h1v1h-1zM3 11h1v1h-1zM4 11h1v1h-1zM5 11h1v1h-1zM12 11h1v1h-1zM3 12h1v1h-1zM8 12h1v1h-1zM1 13h1v1h-1zM7 13h1v1h-1zM8 13h1v1h-1zM10 13h1v1h-1zM14 13h1v1h-1zM2 14h1v1h-1zM10 14h1v1h-1zM15 14h1v1h-1zM0 15h1v1h-1zM1 15h1v1h-1zM11 15h1v1h-1zM15 15h1v1h-1z'/%3E%3Cpath fill='%23686868' d='M7 0h1v1h-1zM12 0h1v1h-1zM1 1h1v1h-1zM10 1h1v1h-1zM13 1h1v1h-1zM15 1h1v1h-1zM4 2h1v1h-1zM1 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM8 3h1v1h-1zM10 3h1v1h-1zM14 3h1v1h-1zM2 4h1v1h-1zM10 4h1v1h-1zM0 5h1v1h-1zM13 5h1v1h-1zM0 6h1v1h-1zM10 9h1v1h-1zM12 9h1v1h-1zM0 10h1v1h-1zM7 10h1v1h-1zM6 11h1v1h-1zM10 11h1v1h-1zM14 11h1v1h-1zM1 12h1v1h-1zM12 12h1v1h-1zM14 12h1v1h-1zM15 12h1v1h-1zM0 13h1v1h-1zM13 13h1v1h-1zM6 14h1v1h-1zM11 14h1v1h-1zM9 15h1v1h-1z'/%3E%3Cpath fill='%239a9a9a' d='M10 0h1v1h-1zM3 2h1v1h-1zM8 2h1v1h-1zM5 3h1v1h-1zM9 3h1v1h-1zM3 4h1v1h-1zM1 5h1v1h-1zM3 5h1v1h-1zM15 5h1v1h-1zM8 6h1v1h-1zM14 6h1v1h-1zM1 8h1v1h-1zM9 11h1v1h-1zM11 11h1v1h-1zM13 11h1v1h-1zM9 13h1v1h-1zM8 15h1v1h-1z'/%3E%3Cpath fill='%238f8f8f' d='M3 1h1v1h-1zM4 1h1v1h-1zM6 1h1v1h-1zM12 1h1v1h-1zM14 1h1v1h-1zM1 2h1v1h-1zM2 3h1v1h-1zM6 3h1v1h-1zM12 3h1v1h-1zM5 4h1v1h-1zM9 4h1v1h-1zM14 4h1v1h-1zM11 6h1v1h-1zM10 7h1v1h-1zM12 7h1v1h-1zM13 7h1v1h-1zM0 8h1v1h-1zM12 8h1v1h-1zM15 8h1v1h-1zM2 9h1v1h-1zM6 9h1v1h-1zM15 9h1v1h-1zM6 10h1v1h-1zM10 10h1v1h-1zM12 10h1v1h-1zM0 11h1v1h-1zM0 12h1v1h-1zM2 12h1v1h-1zM10 12h1v1h-1zM13 12h1v1h-1zM3 13h1v1h-1zM6 13h1v1h-1zM15 13h1v1h-1zM3 14h1v1h-1zM5 14h1v1h-1zM7 14h1v1h-1zM8 14h1v1h-1zM2 15h1v1h-1z'/%3E%3C/svg%3E");
+    --bg: #1f160e;
+    --bg-2: #1f160e;
+    --surface: #313131;
+    --surface-2: #1e1e1e;
+    --raised: #3c3c3c;
+    --ink: #ffffff;
+    --ink-2: #d0d0d0;
+    --ink-3: #a6a6a6;
+    --line: rgba(255, 255, 255, 0.14);
+    --line-strong: #000000;
+    --accent: #80d531;
+    --accent-ink: #132003;
+    --accent-2: #d63a2f;
+    --gold: #ffff55;
+    --gold-ink: #3f3f15;
+    --ok: #80ff20;
+    --warn: #ffff55;
+    --danger: #ff5555;
+    --tag-film: #55ffff;
+    --tag-series: #55ff55;
+    --tag-bogdan: #ff55ff;
+    --tag-physical: #ffaa00;
+    --tag-rewatch: #80ff20;
+    --poster-bg: #1e1e1e;
+    --overlay: rgba(0, 0, 0, 0.75);
+    --focus: #ffff55;
+    --hero-shade: linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.45) 65%, rgba(31, 22, 14, 0.96) 100%);
+
+    --font-display: "Pixelify Sans", monospace;
+    --font-body: "Pixelify Sans", system-ui, sans-serif;
+    --display-weight: 700;
+    --display-case: none;
+    --display-tracking: 0.01em;
+
+    --radius: 0px;
+    --radius-sm: 0px;
+    --radius-pill: 0px;
+    --shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* The options-menu dirt background, darkened */
+[data-theme="minecraft"] body {
+    background: linear-gradient(rgba(20, 13, 7, 0.78), rgba(20, 13, 7, 0.78)), var(--mc-dirt) 0 0 / 64px 64px;
+    image-rendering: pixelated;
+}
+
+[data-theme="minecraft"] img {
+    image-rendering: auto;
+}
+
+/* A row of grass blocks */
+[data-theme="minecraft"] .topbar {
+    min-height: 56px;
+    background: var(--mc-grass) 0 0 / 56px 56px repeat-x;
+    border-bottom: 3px solid #000;
+    backdrop-filter: none;
+    text-shadow: 2px 2px 0 #000;
+}
+
+[data-theme="minecraft"] .topbar-nav a,
+[data-theme="minecraft"] .topbar .link,
+[data-theme="minecraft"] .account {
+    color: #fff;
+}
+
+[data-theme="minecraft"] .topbar-nav a[aria-current="page"] {
+    color: #ffff55;
+    background: rgba(0, 0, 0, 0.55);
+    text-shadow: 2px 2px 0 #3f3f15;
+}
+
+/* ---------- bevelled stone buttons (the title-screen buttons) ---------- */
+
+[data-theme="minecraft"] .btn,
+[data-theme="minecraft"] .chip,
+[data-theme="minecraft"] .theme-button {
+    border: 2px solid #000;
+    background: var(--mc-stone) 0 0 / 48px 48px;
+    color: #fff;
+    text-shadow: 2px 2px 0 #3f3f3f;
+    box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.45), inset -2px -3px 0 rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="minecraft"] .btn:hover:not(:disabled),
+[data-theme="minecraft"] .chip:hover,
+[data-theme="minecraft"] .theme-button:hover {
+    border-color: #fff;
+    color: #ffffa0;
+    background: linear-gradient(rgba(120, 140, 255, 0.35), rgba(120, 140, 255, 0.35)), var(--mc-stone) 0 0 / 48px 48px;
+}
+
+[data-theme="minecraft"] .btn-primary,
+[data-theme="minecraft"] .chip[aria-pressed="true"] {
+    background: linear-gradient(rgba(70, 150, 30, 0.75), rgba(70, 150, 30, 0.75)), var(--mc-stone) 0 0 / 48px 48px;
+    color: #fff;
+}
+
+[data-theme="minecraft"] .btn-danger {
+    background: linear-gradient(rgba(170, 30, 30, 0.7), rgba(170, 30, 30, 0.7)), var(--mc-stone) 0 0 / 48px 48px;
+    color: #fff;
+}
+
+/* Text fields: the black boxes with a grey frame */
+[data-theme="minecraft"] .input {
+    background: #000;
+    border: 2px solid #a0a0a0;
+    color: #fff;
+}
+
+[data-theme="minecraft"] .input:focus {
+    border-color: #fff;
+    box-shadow: none;
+}
+
+/* ---------- hero: title screen ---------- */
+
+[data-theme="minecraft"] .marquee,
+[data-theme="minecraft"] .marquee-board {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    animation: none;
+    width: min(980px, 100%);
+}
+
+[data-theme="minecraft"] .marquee-board {
+    position: relative;
+}
+
+[data-theme="minecraft"] .hero-title {
+    font-weight: 700;
+    font-size: clamp(40px, 7vw, 92px);
+    line-height: 1;
+    background: var(--mc-stone) 0 0 / 40px 40px;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: none;
+    filter: drop-shadow(0 5px 0 #4a4a4a) drop-shadow(0 4px 0 #262626) drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+}
+
+/* The yellow splash text, tilted and pulsing like the title screen */
+[data-theme="minecraft"] .hero-tagline {
+    position: absolute;
+    right: 2%;
+    top: 47%;
+    z-index: 2;
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(16px, 2.2vw, 26px);
+    letter-spacing: 0;
+    text-transform: none;
+    color: #ffff55;
+    text-shadow: 3px 3px 0 #3f3f15;
+    transform: rotate(-18deg);
+    animation: mc-splash 1.1s ease-in-out infinite;
+}
+
+@keyframes mc-splash {
+    50% {
+        transform: rotate(-18deg) scale(1.09);
+    }
+}
+
+/* Stats as hotbar slots: label at the top, the count bottom-right like a stack of items */
+[data-theme="minecraft"] .hero-stats {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0;
+    margin-top: 36px;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 3px solid #000;
+    box-shadow: inset 0 0 0 2px #8b8b8b;
+}
+
+[data-theme="minecraft"] .stat {
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0;
+    width: 112px;
+    height: 84px;
+    margin: 2px;
+    padding: 6px 8px;
+    background: rgba(139, 139, 139, 0.35);
+    border: 2px solid;
+    border-color: #373737 #ffffff #ffffff #373737;
+    text-transform: none;
+}
+
+[data-theme="minecraft"] .stat dt {
+    order: 1;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #d0d0d0;
+    text-align: left;
+    text-shadow: 2px 2px 0 #000;
+}
+
+[data-theme="minecraft"] .stat dd {
+    order: 2;
+    align-self: flex-end;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 3px 3px 0 #3f3f3f;
+}
+
+@media (max-width: 640px) {
+    [data-theme="minecraft"] .hero-tagline {
+        position: static;
+        display: inline-block;
+        margin: 0 0 18px;
+        transform: rotate(-6deg);
+        animation: none;
+    }
+    [data-theme="minecraft"] .stat {
+        width: 96px;
+        height: 72px;
+    }
+    [data-theme="minecraft"] .stat dt {
+        font-size: 12px;
+        white-space: nowrap;
+    }
+    [data-theme="minecraft"] .stat dd {
+        font-size: 26px;
+    }
+}
+
+/* ---------- pieces ---------- */
+
+[data-theme="minecraft"] .toolbar::before {
+    background: rgba(0, 0, 0, 0.7);
+    border-bottom: 3px solid #000;
+}
+
+[data-theme="minecraft"] .card-poster,
+[data-theme="minecraft"] .product-image {
+    border: 3px solid;
+    border-color: #373737 #ffffff #ffffff #373737;
+    box-shadow: none;
+}
+
+[data-theme="minecraft"] .card:hover .card-poster,
+[data-theme="minecraft"] .product:hover .product-image {
+    box-shadow: 0 0 0 3px #fff;
+}
+
+/* Ratings in the XP-level green */
+[data-theme="minecraft"] .rating {
+    -webkit-mask: none;
+    mask: none;
+    top: 4px;
+    right: 4px;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #80ff20;
+    font-family: var(--font-display);
+    font-weight: 700;
+    text-shadow: 2px 2px 0 #1e3d06;
+}
+
+[data-theme="minecraft"] .rating-gold {
+    color: #ffff55;
+    text-shadow: 2px 2px 0 #3f3f15;
+}
+
+[data-theme="minecraft"] .tag {
+    background: rgba(0, 0, 0, 0.45);
+    border-width: 2px;
+}
+
+[data-theme="minecraft"] .panel {
+    background: #313131;
+    border: 3px solid #000;
+    box-shadow: inset 3px 3px 0 #555, inset -3px -3px 0 #1a1a1a, 6px 6px 0 rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="minecraft"] .modal-title,
+[data-theme="minecraft"] .panel-heading,
+[data-theme="minecraft"] .empty h2 {
+    color: #fff;
+    text-shadow: 3px 3px 0 #3f3f3f;
+}
+
+[data-theme="minecraft"] .close,
+[data-theme="minecraft"] .modal-nav {
+    border: 2px solid #000;
+    border-radius: 0;
+    background: var(--mc-stone) 0 0 / 48px 48px;
+    box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.45), inset -2px -3px 0 rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="minecraft"] .milestone {
+    background: #ffff55;
+    color: #3f3f15;
+}
+
+[data-theme="minecraft"] .leader {
+    border-radius: 0;
+    border: 4px solid #fff;
+}
+
+[data-theme="minecraft"] .footer {
+    border-top: 3px solid #000;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="minecraft"] .footer strong {
+    color: #ffff55;
+}

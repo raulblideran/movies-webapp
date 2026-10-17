@@ -1,0 +1,188 @@
+/* Shrek 1-4: the swamp, and the storybook it opens with. Ogre green, swamp mud, a hand-painted
+   wooden sign for the tagline, and ratings as onions (they have layers). */
+
+@import url("https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Nunito:ital,wght@0,400;0,600;0,800;0,900;1,400&display=swap");
+
+:root[data-theme="shrek"] {
+    --bg: #161d0d;
+    --bg-2: #2b3a17;
+    --surface: #212b12;
+    --surface-2: #121809;
+    --raised: #2c3918;
+    --ink: #f1ead2;
+    --ink-2: #d4cba8;
+    --ink-3: #a39b78;
+    --line: rgba(241, 234, 210, 0.14);
+    --line-strong: rgba(164, 198, 57, 0.5);
+    --accent: #a4c639;
+    --accent-ink: #1a2208;
+    --accent-2: #c0442a;
+    --gold: #f2c14e;
+    --gold-ink: #2a1c00;
+    --ok: #b6dc5a;
+    --warn: #f2c14e;
+    --danger: #ff7a5c;
+    --tag-film: #c9e265;
+    --tag-series: #8fd3c4;
+    --tag-bogdan: #e9a4c8;
+    --tag-physical: #e0a96a;
+    --tag-rewatch: #b6dc5a;
+    --poster-bg: #121809;
+    --overlay: rgba(12, 16, 6, 0.86);
+    --focus: #f2c14e;
+    --hero-shade: linear-gradient(180deg, rgba(22, 29, 13, 0.2) 0%, rgba(22, 29, 13, 0.55) 62%, rgba(22, 29, 13, 0.97) 100%);
+
+    --font-display: "Uncial Antiqua", Georgia, serif;
+    --font-body: "Nunito", system-ui, sans-serif;
+    --display-weight: 400;
+    --display-case: none;
+    --display-tracking: 0;
+
+    --radius: 10px;
+    --radius-sm: 6px;
+}
+
+[data-theme="shrek"] .topbar {
+    background: rgba(18, 24, 9, 0.85);
+    border-bottom: 1px solid rgba(164, 198, 57, 0.35);
+}
+
+/* ---------- hero ---------- */
+
+[data-theme="shrek"] .hero {
+    overflow: hidden;
+}
+
+[data-theme="shrek"] .marquee,
+[data-theme="shrek"] .marquee-board {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    animation: none;
+    width: min(960px, 100%);
+}
+
+/* The tagline painted on a wooden sign, like the one outside the swamp */
+[data-theme="shrek"] .hero-tagline {
+    display: inline-block;
+    position: relative;
+    margin-bottom: 22px;
+    padding: 8px 22px 9px;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 20px;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    color: #f6efd6;
+    text-shadow: 0 1px 0 #2a1608;
+    background:
+        radial-gradient(circle at 10px 50%, #2a1608 0 2.5px, transparent 3.5px),
+        radial-gradient(circle at calc(100% - 10px) 50%, #2a1608 0 2.5px, transparent 3.5px),
+        repeating-linear-gradient(176deg, transparent 0 6px, rgba(0, 0, 0, 0.12) 6px 7px),
+        linear-gradient(180deg, #8a5a32, #6b4423 60%, #573519);
+    border-radius: 3px 6px 4px 5px;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+    transform: rotate(-3deg);
+}
+
+[data-theme="shrek"] .hero-title {
+    font-weight: 400;
+    font-size: clamp(42px, 7.4vw, 94px);
+    line-height: 1.02;
+    color: #c9e265;
+    text-shadow: 0 4px 0 #2e3d0d, 0 0 2px #000, 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="shrek"] .hero-stats {
+    margin-top: 26px;
+    gap: 6px 32px;
+}
+
+[data-theme="shrek"] .stat {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    text-transform: none;
+}
+
+[data-theme="shrek"] .stat dd {
+    font-family: var(--font-display);
+    font-size: 36px;
+    color: #f6efd6;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+
+[data-theme="shrek"] .stat dt {
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: #c9e265;
+    text-shadow: 0 1px 6px #000;
+}
+
+/* ---------- pieces ---------- */
+
+[data-theme="shrek"] .toolbar::before {
+    background: rgba(22, 29, 13, 0.92);
+}
+
+[data-theme="shrek"] .btn-primary {
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Ratings as onions: purple and cream layers */
+[data-theme="shrek"] .rating {
+    -webkit-mask: none;
+    mask: none;
+    display: inline-grid;
+    place-items: center;
+    min-width: 46px;
+    height: 46px;
+    padding: 0;
+    border-radius: 50% 50% 46% 46% / 56% 56% 44% 44%;
+    background: repeating-radial-gradient(circle at 50% 62%, #f4e6f4 0 4px, #c79ad6 4px 6px);
+    color: #3a1446;
+    font-family: var(--font-display);
+    font-size: 17px;
+    line-height: 1;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="shrek"] .rating small {
+    display: none;
+}
+
+[data-theme="shrek"] .rating-gold {
+    background: repeating-radial-gradient(circle at 50% 62%, #fff6cf 0 4px, #f2c14e 4px 6px);
+    color: #3a2400;
+}
+
+[data-theme="shrek"] .rating-large {
+    min-width: 76px;
+    height: 76px;
+    font-size: 28px;
+}
+
+[data-theme="shrek"] .card:hover .card-poster,
+[data-theme="shrek"] .product:hover .product-image {
+    box-shadow: 0 0 0 3px #a4c639, 0 18px 36px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="shrek"] .modal-title,
+[data-theme="shrek"] .panel-heading,
+[data-theme="shrek"] .empty h2 {
+    color: #c9e265;
+}
+
+[data-theme="shrek"] .modal-facts dd.wide {
+    border-left-color: #8a5a32;
+}
+
+[data-theme="shrek"] .leader {
+    border-color: #a4c639;
+}
+
+[data-theme="shrek"] .footer strong {
+    color: #c9e265;
+}

@@ -460,9 +460,13 @@ function factsHtml(row, { skip = [] } = {}) {
         .join("");
 }
 
+// The cards currently on screen, in order: the title modal's previous/next step through these.
+let shownRows = [];
+
 function displayCards(data) {
     const grid = document.getElementById("cardsGrid");
     grid.innerHTML = "";
+    shownRows = data;
 
     if (data.length === 0) {
         grid.innerHTML = allData.length
@@ -546,6 +550,7 @@ async function openModal(row) {
     modalBody.scrollTop = 0;
     document.body.style.overflow = "hidden";
 
+    updateModalNav();
     window.Admin?.onModalOpened(row);
 
     // CeX pricing loads after the modal is visible
@@ -577,6 +582,50 @@ async function openModal(row) {
     }
 }
 
+// ---------- modal: previous / next ----------
+
+const modalIndex = () => (modalRow ? shownRows.findIndex((r) => r.id === modalRow.id) : -1);
+
+function updateModalNav() {
+    const i = modalIndex();
+    const prev = document.getElementById("modalPrev");
+    const next = document.getElementById("modalNext");
+    prev.disabled = i <= 0;
+    next.disabled = i < 0 || i >= shownRows.length - 1;
+    prev.title = prev.disabled ? "" : `Previous: ${shownRows[i - 1].name}`;
+    next.title = next.disabled ? "" : `Next: ${shownRows[i + 1].name}`;
+    document.getElementById("modalCount").textContent = i >= 0 ? `${i + 1} of ${shownRows.length}` : "";
+}
+
+function stepModal(step) {
+    const i = modalIndex();
+    const target = i >= 0 ? shownRows[i + step] : null;
+    if (!target) return;
+    openModal(target);
+    // keep the grid behind in step, so closing lands on the title you ended up on
+    document.getElementById("cardsGrid").children[i + step]?.scrollIntoView({ block: "center" });
+}
+
+document.getElementById("modalPrev").onclick = () => stepModal(-1);
+document.getElementById("modalNext").onclick = () => stepModal(1);
+
+// Swipe left/right on touch screens
+(function () {
+    let x0 = null;
+    let y0 = null;
+    const panel = document.getElementById("modalPanel");
+    panel.addEventListener("touchstart", (e) => {
+        [x0, y0] = [e.touches[0].clientX, e.touches[0].clientY];
+    }, { passive: true });
+    panel.addEventListener("touchend", (e) => {
+        if (x0 == null) return;
+        const dx = e.changedTouches[0].clientX - x0;
+        const dy = e.changedTouches[0].clientY - y0;
+        x0 = null;
+        if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) stepModal(dx < 0 ? 1 : -1);
+    }, { passive: true });
+})();
+
 function closeModal() {
     modalRow = null;
     const modal = document.getElementById("modal");
@@ -590,8 +639,14 @@ document.getElementById("modal").onclick = function (event) {
 };
 
 document.addEventListener("keydown", function (event) {
-    // Admin dialogs handle their own Escape.
-    if (event.key === "Escape" && !document.querySelector("[data-admin-dialog]:not(.hidden)")) closeModal();
+    // Admin dialogs handle their own keys.
+    if (document.querySelector("[data-admin-dialog]:not(.hidden)")) return;
+    if (event.key === "Escape") closeModal();
+    const typing = event.target.closest?.("input, textarea, select, [contenteditable]");
+    if (modalRow && !typing && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+        event.preventDefault();
+        stepModal(event.key === "ArrowLeft" ? -1 : 1);
+    }
 });
 
 // Used by admin.js

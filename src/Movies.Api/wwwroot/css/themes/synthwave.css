@@ -1,0 +1,245 @@
+/* Synthwave: an 80s night drive. A striped sun sinking behind a neon grid floor, chrome
+   lettering, and a hot-pink neon script. The only theme without a film, so the art is all CSS. */
+
+@import url("https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,400;0,600;0,800;1,800;1,900&family=Yellowtail&display=swap");
+
+:root[data-theme="synthwave"] {
+    --bg: #0b0218;
+    --bg-2: #1d0638;
+    --surface: #170630;
+    --surface-2: #0e0320;
+    --raised: #240a48;
+    --ink: #f7ecff;
+    --ink-2: #d2bdf0;
+    --ink-3: #a58cc8;
+    --line: rgba(255, 60, 172, 0.22);
+    --line-strong: rgba(0, 229, 255, 0.55);
+    --accent: #00e5ff;
+    --accent-ink: #0b0218;
+    --accent-2: #ff3cac;
+    --gold: #ffb347;
+    --gold-ink: #2a0f00;
+    --ok: #4dffb5;
+    --warn: #ffd166;
+    --danger: #ff4d7d;
+    --tag-film: #00e5ff;
+    --tag-series: #b18cff;
+    --tag-bogdan: #ff3cac;
+    --tag-physical: #ffb347;
+    --tag-rewatch: #4dffb5;
+    --poster-bg: #0e0320;
+    --overlay: rgba(8, 1, 18, 0.86);
+    --focus: #ff3cac;
+
+    --font-display: "Exo 2", system-ui, sans-serif;
+    --font-body: "Exo 2", system-ui, sans-serif;
+    --display-weight: 800;
+    --display-case: uppercase;
+    --display-tracking: 0.02em;
+
+    --radius: 4px;
+    --radius-sm: 3px;
+    --shadow: 0 0 0 1px rgba(255, 60, 172, 0.35), 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="synthwave"] body {
+    background: #0b0218;
+}
+
+[data-theme="synthwave"] .topbar {
+    background: rgba(11, 2, 24, 0.85);
+    border-bottom: 0;
+    box-shadow: 0 1px 0 #ff3cac, 0 2px 14px rgba(255, 60, 172, 0.5);
+}
+
+/* ---------- hero: sunset over the grid ---------- */
+
+[data-theme="synthwave"] .hero {
+    overflow: hidden;
+    background: linear-gradient(180deg, #0b0218 0%, #2b0b4f 35%, #7a1a7a 55%, #ff3cac 64%, #0b0218 64.2%);
+}
+
+[data-theme="synthwave"] .sw-sun {
+    position: absolute;
+    left: 50%;
+    bottom: 36%;
+    width: min(460px, 70vw);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    transform: translate(-50%, 50%);
+    background: linear-gradient(180deg, #ffe66d 0%, #ffb347 35%, #ff3cac 75%, #b4179b 100%);
+    box-shadow: 0 0 80px rgba(255, 60, 172, 0.55);
+    /* the classic horizontal cuts across the lower half */
+    -webkit-mask: linear-gradient(#000 0 50%, transparent 50%),
+        repeating-linear-gradient(180deg, #000 0 14px, transparent 14px 20px);
+    mask: linear-gradient(#000 0 50%, transparent 50%), repeating-linear-gradient(180deg, #000 0 14px, transparent 14px 20px);
+    animation: sw-sun 2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes sw-sun {
+    from {
+        transform: translate(-50%, 85%);
+        opacity: 0.3;
+    }
+}
+
+[data-theme="synthwave"] .sw-grid {
+    position: absolute;
+    left: -60%;
+    right: -60%;
+    bottom: 0;
+    height: 36%;
+    background:
+        repeating-linear-gradient(90deg, rgba(255, 60, 172, 0.9) 0 2px, transparent 2px 70px),
+        repeating-linear-gradient(180deg, rgba(255, 60, 172, 0.9) 0 2px, transparent 2px 46px),
+        #0b0218;
+    transform: perspective(240px) rotateX(55deg);
+    transform-origin: top center;
+    -webkit-mask: linear-gradient(transparent 0, #000 22%);
+    mask: linear-gradient(transparent 0, #000 22%);
+    animation: sw-drive 1.6s linear infinite;
+}
+
+@keyframes sw-drive {
+    to {
+        background-position: 0 0, 0 46px, 0 0;
+    }
+}
+
+[data-theme="synthwave"] .marquee,
+[data-theme="synthwave"] .marquee-board {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    animation: none;
+    width: min(980px, 100%);
+}
+
+[data-theme="synthwave"] .marquee-board {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Chrome title */
+[data-theme="synthwave"] .hero-title {
+    order: 1;
+    font-weight: 900;
+    font-style: italic;
+    font-size: clamp(42px, 7.4vw, 96px);
+    line-height: 0.95;
+    letter-spacing: 0.01em;
+    background: linear-gradient(180deg, #ffffff 0%, #bfe6ff 30%, #4f6fd6 49%, #1b0b3a 50%, #ff7ad9 54%, #ffe3f6 85%, #ffffff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.55);
+    text-shadow: none;
+    filter: drop-shadow(0 3px 0 #1b0b3a) drop-shadow(0 0 18px rgba(255, 60, 172, 0.55));
+}
+
+/* Neon script under it */
+[data-theme="synthwave"] .hero-tagline {
+    order: 2;
+    margin: -0.25em 0 0;
+    font-family: "Yellowtail", cursive;
+    font-weight: 400;
+    font-size: clamp(34px, 4.6vw, 58px);
+    letter-spacing: 0;
+    text-transform: none;
+    color: #ffd6f2;
+    text-shadow: 0 0 4px #ff3cac, 0 0 12px #ff3cac, 0 0 28px #ff3cac;
+    transform: rotate(-5deg);
+}
+
+[data-theme="synthwave"] .hero-stats {
+    order: 3;
+    margin-top: 26px;
+    gap: 10px;
+}
+
+[data-theme="synthwave"] .stat {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    min-width: 104px;
+    padding: 8px 14px;
+    border: 2px solid #00e5ff;
+    border-radius: 4px;
+    background: rgba(11, 2, 24, 0.72);
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.6), inset 0 0 10px rgba(0, 229, 255, 0.35);
+}
+
+[data-theme="synthwave"] .stat dd {
+    font-weight: 800;
+    font-size: 30px;
+    color: #fff;
+    text-shadow: 0 0 8px #00e5ff;
+}
+
+[data-theme="synthwave"] .stat dt {
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    color: #ff8fd8;
+}
+
+/* ---------- pieces ---------- */
+
+[data-theme="synthwave"] .toolbar::before {
+    background: rgba(11, 2, 24, 0.9);
+    border-bottom: 1px solid rgba(255, 60, 172, 0.5);
+}
+
+[data-theme="synthwave"] .btn-primary,
+[data-theme="synthwave"] .chip[aria-pressed="true"] {
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.55);
+}
+
+[data-theme="synthwave"] .card:hover .card-poster,
+[data-theme="synthwave"] .product:hover .product-image {
+    box-shadow: 0 0 0 2px #ff3cac, 0 0 26px rgba(255, 60, 172, 0.6);
+}
+
+[data-theme="synthwave"] .rating {
+    -webkit-mask: none;
+    mask: none;
+    border-radius: 3px;
+    background: #ff3cac;
+    color: #fff;
+    font-style: italic;
+    box-shadow: 0 0 12px rgba(255, 60, 172, 0.8);
+}
+
+[data-theme="synthwave"] .rating-gold {
+    background: linear-gradient(180deg, #ffe66d, #ffb347);
+    color: #2a0f00;
+    box-shadow: 0 0 14px rgba(255, 179, 71, 0.9);
+}
+
+[data-theme="synthwave"] .modal-title,
+[data-theme="synthwave"] .panel-heading,
+[data-theme="synthwave"] .empty h2 {
+    font-style: italic;
+    color: #fff;
+    text-shadow: 0 0 14px rgba(0, 229, 255, 0.6);
+}
+
+[data-theme="synthwave"] .leader {
+    border-color: #ff3cac;
+    box-shadow: 0 0 20px rgba(255, 60, 172, 0.6);
+}
+
+[data-theme="synthwave"] .footer {
+    border-top: 1px solid rgba(255, 60, 172, 0.5);
+}
+
+[data-theme="synthwave"] .footer strong {
+    color: #ff3cac;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-theme="synthwave"] .sw-grid {
+        animation: none;
+    }
+}

@@ -275,7 +275,12 @@ code,
     position: absolute;
     right: 0;
     top: calc(100% + 8px);
-    width: 300px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px;
+    width: min(600px, calc(100vw - 32px));
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
     padding: 6px;
     margin: 0;
     list-style: none;
@@ -284,6 +289,16 @@ code,
     background: var(--surface-2);
     box-shadow: var(--shadow);
     z-index: 60;
+}
+
+.theme-menu.hidden {
+    display: none;
+}
+
+@media (max-width: 560px) {
+    .theme-menu {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .theme-menu button {
@@ -1177,9 +1192,9 @@ textarea.code {
 }
 
 .panel-title {
-    max-width: 1000px;
+    max-width: 1180px;
     display: grid;
-    grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
     overflow: hidden;
     padding: 0;
 }
@@ -1255,6 +1270,94 @@ textarea.code {
 .close:hover {
     border-color: var(--accent);
     color: var(--accent);
+}
+
+/* Previous / next arrows either side of the title modal */
+#modal {
+    padding: 20px 80px 44px;
+}
+
+#modal .panel-title,
+#modal .panel-title .modal-poster,
+#modal .panel-title .modal-body {
+    max-height: calc(100vh - 68px);
+}
+
+.modal-nav {
+    position: fixed;
+    top: 50%;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+    transform: translateY(-50%);
+}
+
+.modal-nav svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.modal-nav:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.modal-nav:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.modal-prev {
+    left: 16px;
+}
+
+.modal-next {
+    right: 16px;
+}
+
+.modal-count {
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+    #modal {
+        padding: 12px 12px 76px;
+    }
+    .modal-nav {
+        top: auto;
+        bottom: 12px;
+        transform: none;
+        width: 48px;
+        height: 48px;
+    }
+    .modal-count {
+        bottom: 26px;
+    }
+    #modal .panel-title {
+        max-height: calc(100vh - 92px);
+    }
+    #modal .panel-title .modal-body {
+        max-height: none;
+    }
 }
 
 @keyframes fade-in {

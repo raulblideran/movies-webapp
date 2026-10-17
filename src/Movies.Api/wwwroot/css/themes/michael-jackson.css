@@ -1,0 +1,226 @@
+/* Michael Jackson: the Billie Jean light-up pavement. Stage black, a white sequinned glove,
+   the red of the Thriller and Beat It jackets; the stats are lit floor tiles. */
+
+@import url("https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:ital,wght@0,400;0,600;0,800;1,800&display=swap");
+
+:root[data-theme="michael-jackson"] {
+    --bg: #070707;
+    --bg-2: #141414;
+    --surface: #121212;
+    --surface-2: #0a0a0a;
+    --raised: #1c1c1c;
+    --ink: #fafafa;
+    --ink-2: #d2d2d2;
+    --ink-3: #9a9a9a;
+    --line: rgba(255, 255, 255, 0.13);
+    --line-strong: rgba(255, 255, 255, 0.4);
+    --accent: #ffffff;
+    --accent-ink: #000000;
+    --accent-2: #d4202c;
+    --gold: #ffd76a;
+    --gold-ink: #2a1c00;
+    --ok: #7fe0a0;
+    --warn: #ffd76a;
+    --danger: #ff4d57;
+    --tag-film: #ffffff;
+    --tag-series: #cfe3ff;
+    --tag-bogdan: #ff6b74;
+    --tag-physical: #ffd76a;
+    --tag-rewatch: #a5f0c0;
+    --poster-bg: #0a0a0a;
+    --overlay: rgba(0, 0, 0, 0.88);
+    --focus: #ffd76a;
+    --hero-shade: linear-gradient(180deg, rgba(7, 7, 7, 0.35) 0%, rgba(7, 7, 7, 0.6) 60%, rgba(7, 7, 7, 0.97) 100%);
+
+    --font-display: "Anton", Impact, sans-serif;
+    --font-body: "Work Sans", system-ui, sans-serif;
+    --display-weight: 400;
+    --display-case: uppercase;
+    --display-tracking: 0.02em;
+
+    --radius: 2px;
+    --radius-sm: 2px;
+}
+
+[data-theme="michael-jackson"] .topbar {
+    background: rgba(0, 0, 0, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="michael-jackson"] .topbar-nav a[aria-current="page"] {
+    background: #fff;
+    color: #000;
+}
+
+/* ---------- hero ---------- */
+
+[data-theme="michael-jackson"] .hero {
+    overflow: hidden;
+    padding-bottom: 120px;
+}
+
+[data-theme="michael-jackson"] .marquee,
+[data-theme="michael-jackson"] .marquee-board {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    animation: none;
+    width: min(980px, 100%);
+}
+
+[data-theme="michael-jackson"] .hero-tagline {
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-style: italic;
+    font-size: 20px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #ff3b46;
+    text-shadow: 0 2px 0 #000, 0 0 16px rgba(212, 32, 44, 0.6);
+    margin-bottom: 6px;
+}
+
+[data-theme="michael-jackson"] .hero-title {
+    font-weight: 400;
+    font-size: clamp(48px, 8.4vw, 112px);
+    line-height: 0.95;
+    letter-spacing: 0.02em;
+    color: #fff;
+    /* a sequinned glint */
+    text-shadow: 0 0 1px #fff, 0 0 18px rgba(255, 255, 255, 0.45), 0 4px 0 #000;
+}
+
+/* Stats as lit pavement tiles */
+[data-theme="michael-jackson"] .hero-stats {
+    gap: 8px;
+    margin-top: 30px;
+}
+
+[data-theme="michael-jackson"] .stat {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    min-width: 110px;
+    padding: 10px 14px;
+    background: radial-gradient(circle at 50% 45%, #fffdf3, #ffeeb0 60%, #f2c95e);
+    box-shadow: 0 0 26px rgba(255, 230, 150, 0.6), inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+    animation: mj-light 0.5s ease-out calc(0.25s + var(--n, 0) * 0.18s) both;
+}
+
+[data-theme="michael-jackson"] .stat:nth-child(2) {
+    --n: 1;
+}
+[data-theme="michael-jackson"] .stat:nth-child(3) {
+    --n: 2;
+}
+[data-theme="michael-jackson"] .stat:nth-child(4) {
+    --n: 3;
+}
+[data-theme="michael-jackson"] .stat:nth-child(5) {
+    --n: 4;
+}
+
+@keyframes mj-light {
+    from {
+        background: #1a1a1a;
+        box-shadow: none;
+        color: #444;
+    }
+}
+
+[data-theme="michael-jackson"] .stat dd {
+    font-family: var(--font-display);
+    font-size: 36px;
+    letter-spacing: 0.03em;
+    color: #111;
+}
+
+[data-theme="michael-jackson"] .stat dt {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: #4a3a10;
+}
+
+/* The pavement under the hero: tiles light up as if someone is walking across them */
+[data-theme="michael-jackson"] .mj-floor {
+    position: absolute;
+    left: 50%;
+    bottom: -20px;
+    width: min(1300px, 160vw);
+    height: 220px;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    transform: translateX(-50%) perspective(420px) rotateX(58deg);
+    transform-origin: bottom center;
+}
+
+[data-theme="michael-jackson"] .mj-floor i {
+    background: #161616;
+    box-shadow: inset 0 0 0 1px #2a2a2a;
+    animation: mj-step 7s ease-in-out calc(var(--i) * 0.25s + mod(var(--i) * 3, 7) * 0.4s) infinite;
+}
+
+@keyframes mj-step {
+    0%,
+    12%,
+    100% {
+        background: #161616;
+        box-shadow: inset 0 0 0 1px #2a2a2a;
+    }
+    4% {
+        background: #fff4c8;
+        box-shadow: 0 0 30px rgba(255, 230, 150, 0.8);
+    }
+}
+
+/* ---------- pieces ---------- */
+
+[data-theme="michael-jackson"] .toolbar::before {
+    background: rgba(7, 7, 7, 0.92);
+}
+
+[data-theme="michael-jackson"] .card:hover .card-poster,
+[data-theme="michael-jackson"] .product:hover .product-image {
+    box-shadow: 0 0 0 2px #fff, 0 22px 40px -10px rgba(255, 230, 150, 0.55);
+}
+
+[data-theme="michael-jackson"] .rating {
+    -webkit-mask: none;
+    mask: none;
+    background: #fff;
+    color: #000;
+    font-family: var(--font-display);
+    font-weight: 400;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="michael-jackson"] .rating-gold {
+    background: radial-gradient(circle at 50% 45%, #fffdf3, #ffd76a 70%);
+    color: #2a1c00;
+    box-shadow: 0 0 18px rgba(255, 215, 106, 0.85);
+}
+
+[data-theme="michael-jackson"] .btn-danger {
+    color: #ff6b74;
+}
+
+[data-theme="michael-jackson"] .modal-facts dd.wide {
+    border-left-color: #d4202c;
+}
+
+[data-theme="michael-jackson"] .leader {
+    border-color: #fff;
+}
+
+[data-theme="michael-jackson"] .footer strong {
+    color: #ff3b46;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-theme="michael-jackson"] .mj-floor i {
+        animation: none;
+    }
+}

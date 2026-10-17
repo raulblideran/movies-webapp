@@ -112,6 +112,111 @@
                 still("Terrifier 3", "/xlkclSE4aq7r3JsFIJRgs21zUew.jpg"),
             ],
         },
+        {
+            id: "minecraft",
+            name: "Minecraft",
+            note: "Dirt, stone and a splash of yellow",
+            swatch: "linear-gradient(180deg,#5d9e34 0 35%,#7a5536 35%)",
+            color: "#3b2a1d",
+            tagline: "Also try the movie!",
+            art: "",
+            photos: [
+                still("A Minecraft Movie", "/4MWc9Ur80Wo0B1fVVTnV0CoSh6A.jpg"),
+                still("A Minecraft Movie", "/37XMhY36NjVAZxyicQoqjRNKZgU.jpg"),
+                still("A Minecraft Movie", "/7llloavh3phHfk4Jcc1DI6x3Ykp.jpg"),
+                still("A Minecraft Movie", "/lEkq2xPYtvEGx2iKkClN3p5uxFQ.jpg"),
+            ],
+        },
+        {
+            id: "synthwave",
+            name: "Synthwave",
+            note: "80s neon on a night drive",
+            swatch: "linear-gradient(180deg,#ff3cac 0 45%,#2b0b4f 45%)",
+            thumbStyle: "background:linear-gradient(180deg,#1a0633 0 30%,#ff3cac 30% 38%,#1a0633 38% 44%,#ffb347 44% 52%,#0b0218 52%),repeating-linear-gradient(90deg,transparent 0 10px,#ff3cac 10px 11px)",
+            color: "#12021f",
+            tagline: "Press play",
+            art: `<div class="sw-sun"></div><div class="sw-grid"></div>`,
+            photos: [],
+        },
+        {
+            id: "hocus-pocus",
+            name: "Hocus Pocus",
+            note: "The Sanderson sisters, 1993 and 2022",
+            swatch: "linear-gradient(135deg,#7ac74f 0 33%,#8e2b3a 33% 66%,#6a3aa2 66%)",
+            color: "#140d24",
+            tagline: "It's just a bunch of hocus pocus",
+            art: `<div class="hp-candles">${Array.from({ length: 5 }, (_, i) => `<i style="--i:${i}"><b></b></i>`).join("")}</div>`,
+            photos: [
+                still("Hocus Pocus", "/c4Fl1cWiXcq4uJdOQudQClFjhho.jpg", "70% 40%"),
+                still("Hocus Pocus 2", "/rieC3nBDV7VkSkYZW1se3fN3ilC.jpg"),
+                still("Hocus Pocus", "/hGRz3buKI31IF8g8wZfawtAwjHr.jpg"),
+                still("Hocus Pocus 2", "/ml8YBTJq7UkALfI022FWscCQuQW.jpg"),
+            ],
+        },
+        {
+            id: "michael-jackson",
+            name: "Michael Jackson",
+            note: "The Billie Jean light-up floor",
+            swatch: "conic-gradient(#fff 0 25%,#000 0 50%,#ffd76a 0 75%,#000 0)",
+            color: "#070707",
+            tagline: "Who's bad?",
+            art: `<div class="mj-floor">${Array.from({ length: 28 }, (_, i) => `<i style="--i:${i}"></i>`).join("")}</div>`,
+            photos: [
+                still("Michael", "/xBT0oNq6rsTFv4SxG5uGRIEOrq6.jpg"),
+                still("Michael", "/q4rkoLp1k5jReEkt21rqMt0oOzO.jpg"),
+                still("Moonwalker", "/zfjctqn7bQaiqRrQeefUm9UQL38.jpg"),
+                still("This Is It", "/vOEGRBIQhITwOKBje1DXMuo9bJe.jpg"),
+                still("This Is It", "/5628NbgqDl6wgQ3XNfYbFE7qxnV.jpg"),
+            ],
+        },
+        {
+            id: "shrek",
+            name: "Shrek",
+            note: "Far Far Away, by way of the swamp",
+            swatch: "radial-gradient(circle at 50% 60%,#a4c639 0 45%,#4a3520 47%)",
+            color: "#1b2410",
+            tagline: "Ogres are like onions",
+            art: "",
+            photos: [
+                still("Shrek", "/bNTHSd3UqqLzIVwbDOGPnx3ScfF.jpg"),
+                still("Shrek 2", "/wD44moEofk0EZyFxLQItuwdGsvV.jpg"),
+                still("Shrek 2", "/iaNoLnnpQb5SNxGc4bkQmdCvEdG.jpg"),
+                still("Shrek Forever After", "/zdPqze9Ul0bKwgjnkJccRNoblSX.jpg"),
+                still("Shrek", "/sRvXNDItGlWCqtO3j6wks52FmbD.jpg"),
+            ],
+        },
+        {
+            id: "sonic",
+            name: "Sonic",
+            note: "The films, rings and all",
+            swatch: "radial-gradient(circle,#1e5bd8 0 40%,#ffd21f 42% 56%,#1e5bd8 58%)",
+            color: "#0d1f4a",
+            tagline: "Gotta go fast",
+            art: `<div class="sn-rings">${Array.from({ length: 7 }, (_, i) => `<i style="--i:${i}"></i>`).join("")}</div><div class="sn-checker"></div>`,
+            photos: [
+                still("Sonic the Hedgehog", "/9V81UUI5MlRYgDCfK5E8iqi0eYM.jpg"),
+                still("Sonic the Hedgehog 2", "/lrP1TQf3stZveNEyviUUcSh8HLA.jpg"),
+                still("Sonic the Hedgehog 3", "/noPEm6Vu9Lm6QUdTGLOyRgk4M6s.jpg"),
+                still("Sonic the Hedgehog", "/uNufPcKfoflGwErIz12d0fPP8gl.jpg"),
+            ],
+        },
+        {
+            id: "silent-film",
+            name: "Silent era",
+            note: "1920s black and white, all shadows",
+            swatch: "linear-gradient(135deg,#f2f2f2 0 50%,#000 50%)",
+            color: "#000000",
+            tagline: "Ladies and gentlemen, please be silent",
+            art: `<div class="sf-blinds"></div><div class="sf-scratches"><i></i><i></i></div>`,
+            photos: [
+                still("Metropolis", "/r8pUcom5Mw8igtBpj3AHSAUvH0R.jpg"),
+                still("Metropolis", "/rnN9yJfwso6JA64wIPqK1m6K6e1.jpg"),
+                still("Nosferatu", "/u06SympEEMb7pLhR9W3tvydHT9L.jpg", "30% 30%"),
+                still("Nosferatu", "/4ZqNwp5BiQ2hK0dMjqMYRQeVJZ9.jpg"),
+                still("The Cabinet of Dr. Caligari", "/mk2m1sOMEFeaS1iCwcEksqoVLYW.jpg"),
+                still("Safety Last!", "/xQV1wNUu0W5hPR8rEvQYobpedJK.jpg", "75% 30%"),
+            ],
+        },
     ];
 
     const byId = (id) => THEMES.find((t) => t.id === id);
@@ -130,14 +235,15 @@
 
     function applyArt(theme) {
         const photo = theme.photos[Math.floor(Math.random() * theme.photos.length)];
-        const photoHtml = `<img class="hero-photo" src="${photo.src}"${photo.srcset ? ` srcset="${photo.srcset}" sizes="100vw"` : ""}${photo.pos ? ` style="object-position:${photo.pos}"` : ""} alt="" decoding="async"><div class="hero-shade"></div>`;
+        const photoHtml = !photo ? "" : `<img class="hero-photo" src="${photo.src}"${photo.srcset ? ` srcset="${photo.srcset}" sizes="100vw"` : ""}${photo.pos ? ` style="object-position:${photo.pos}"` : ""} alt="" decoding="async"><div class="hero-shade"></div>`;
         document.querySelectorAll(".hero-art").forEach((el) => (el.innerHTML = photoHtml + theme.art));
         const tagline = document.getElementById("heroTagline");
         if (tagline) tagline.textContent = theme.tagline;
         const credit = document.getElementById("photoCredit");
         if (credit)
-            credit.innerHTML =
-                photo.credit ??
+            credit.innerHTML = !photo
+                ? ""
+                : photo.credit ??
                 `Still from ${photo.film} via <a class="link" href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a>`;
         document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme.color);
     }
@@ -186,7 +292,7 @@
                     ${THEMES.map(
                         (t) => `
                         <button type="button" role="menuitemradio" aria-checked="${t.id === current}" data-theme-id="${t.id}">
-                            <img class="theme-thumb" src="${t.photos[0].thumb}" alt="" loading="lazy">
+                            ${t.photos.length ? `<img class="theme-thumb" src="${t.photos[0].thumb}" alt="" loading="lazy">` : `<span class="theme-thumb" style="${t.thumbStyle ?? `background:${t.swatch}`}"></span>`}
                             <span><span class="theme-name">${t.name}</span><span class="theme-note">${t.note}</span></span>
                         </button>`,
                     ).join("")}

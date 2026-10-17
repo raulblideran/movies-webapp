@@ -1,0 +1,265 @@
+/* Sonic (the films): speed blue, gold rings, red sneakers, and the Green Hill checkerboard.
+   The stats read like the game's HUD and the ratings sit inside rings. */
+
+@import url("https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:ital,wght@0,400;0,600;0,800;1,900&display=swap");
+
+:root[data-theme="sonic"] {
+    --bg: #0b1b45;
+    --bg-2: #15327a;
+    --surface: #11265c;
+    --surface-2: #0a1838;
+    --raised: #1a3478;
+    --ink: #ffffff;
+    --ink-2: #cad8ff;
+    --ink-3: #93a7d9;
+    --line: rgba(255, 255, 255, 0.14);
+    --line-strong: rgba(255, 210, 31, 0.5);
+    --accent: #ffd21f;
+    --accent-ink: #0b1b45;
+    --accent-2: #e0242f;
+    --gold: #ffd21f;
+    --gold-ink: #3a2a00;
+    --ok: #6be36b;
+    --warn: #ffd21f;
+    --danger: #ff5a5f;
+    --tag-film: #7fc4ff;
+    --tag-series: #6be3d0;
+    --tag-bogdan: #ff9ad0;
+    --tag-physical: #ffb347;
+    --tag-rewatch: #6be36b;
+    --poster-bg: #0a1838;
+    --overlay: rgba(6, 14, 36, 0.86);
+    --focus: #ffd21f;
+    --hero-shade: linear-gradient(180deg, rgba(11, 27, 69, 0.2) 0%, rgba(11, 27, 69, 0.5) 60%, rgba(11, 27, 69, 0.96) 100%);
+
+    --font-display: "Bungee", Impact, sans-serif;
+    --font-body: "Rubik", system-ui, sans-serif;
+    --display-weight: 400;
+    --display-case: uppercase;
+    --display-tracking: 0.01em;
+
+    --radius: 8px;
+    --radius-sm: 6px;
+}
+
+[data-theme="sonic"] .topbar {
+    background: #1e5bd8;
+    border-bottom: 4px solid #ffd21f;
+}
+
+[data-theme="sonic"] .topbar-nav a,
+[data-theme="sonic"] .topbar .link,
+[data-theme="sonic"] .account {
+    color: #fff;
+}
+
+[data-theme="sonic"] .topbar-nav a[aria-current="page"] {
+    background: #ffd21f;
+    color: #0b1b45;
+}
+
+[data-theme="sonic"] .theme-button {
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- hero ---------- */
+
+[data-theme="sonic"] .hero {
+    overflow: hidden;
+    padding-bottom: 76px;
+}
+
+/* Green Hill: a strip of grass over the brown checkerboard */
+[data-theme="sonic"] .sn-checker {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 46px;
+    background:
+        linear-gradient(#52b331 0 9px, #2f7d1c 9px 12px, transparent 12px),
+        repeating-conic-gradient(#c06a24 0 25%, #7a3c12 0 50%) 0 12px / 34px 34px;
+    box-shadow: 0 -2px 0 #8be35c;
+}
+
+/* Rings, spinning like they do in the games */
+[data-theme="sonic"] .sn-rings {
+    position: absolute;
+    right: 6%;
+    top: 16%;
+    display: flex;
+    gap: 14px;
+    transform: rotate(-8deg);
+}
+
+[data-theme="sonic"] .sn-rings i {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 6px solid #ffd21f;
+    border-left-color: #fff3a0;
+    border-bottom-color: #c99600;
+    box-shadow: 0 0 10px rgba(255, 210, 31, 0.7);
+    animation: sn-spin 0.9s linear calc(var(--i) * -0.12s) infinite;
+}
+
+@keyframes sn-spin {
+    50% {
+        transform: scaleX(0.15);
+    }
+}
+
+[data-theme="sonic"] .marquee,
+[data-theme="sonic"] .marquee-board {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    animation: none;
+    width: min(980px, 100%);
+}
+
+[data-theme="sonic"] .hero-tagline {
+    font-family: var(--font-display);
+    font-size: 18px;
+    letter-spacing: 0.08em;
+    color: #ffd21f;
+    text-shadow: 2px 2px 0 #0b1b45, -1px -1px 0 #0b1b45;
+    transform: skewX(-10deg);
+    margin-bottom: 10px;
+}
+
+[data-theme="sonic"] .hero-title {
+    font-weight: 400;
+    font-size: clamp(38px, 6.8vw, 86px);
+    line-height: 1;
+    color: #fff;
+    -webkit-text-stroke: 2px #0b1b45;
+    text-shadow: 5px 5px 0 #1e5bd8, 8px 8px 0 #0b1b45;
+    transform: skewX(-8deg);
+}
+
+/* The HUD: yellow labels with a dark outline, white numbers */
+[data-theme="sonic"] .hero-stats {
+    margin-top: 30px;
+    gap: 8px 30px;
+}
+
+[data-theme="sonic"] .stat {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
+}
+
+[data-theme="sonic"] .stat dt {
+    order: 1;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 18px;
+    letter-spacing: 0.04em;
+    color: #ffd21f;
+    text-shadow: 2px 2px 0 #0b1b45, -1px -1px 0 #0b1b45, 1px -1px 0 #0b1b45, -1px 1px 0 #0b1b45;
+}
+
+[data-theme="sonic"] .stat dd {
+    order: 2;
+    font-family: var(--font-display);
+    font-size: 30px;
+    color: #fff;
+    text-shadow: 2px 2px 0 #0b1b45, -1px -1px 0 #0b1b45, 1px -1px 0 #0b1b45, -1px 1px 0 #0b1b45;
+}
+
+@media (max-width: 640px) {
+    [data-theme="sonic"] .sn-rings {
+        top: 8%;
+        gap: 8px;
+    }
+    [data-theme="sonic"] .sn-rings i {
+        width: 20px;
+        height: 20px;
+        border-width: 4px;
+    }
+}
+
+/* ---------- pieces ---------- */
+
+[data-theme="sonic"] .toolbar::before {
+    background: rgba(11, 27, 69, 0.92);
+    border-bottom: 3px solid #1e5bd8;
+}
+
+/* Ratings inside a gold ring */
+[data-theme="sonic"] .rating {
+    -webkit-mask: none;
+    mask: none;
+    display: inline-grid;
+    place-items: center;
+    min-width: 46px;
+    height: 46px;
+    padding: 0;
+    border-radius: 50%;
+    border: 5px solid #ffd21f;
+    border-left-color: #fff3a0;
+    border-bottom-color: #c99600;
+    background: rgba(11, 27, 69, 0.85);
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 15px;
+    line-height: 1;
+    box-shadow: 0 0 10px rgba(255, 210, 31, 0.6);
+}
+
+[data-theme="sonic"] .rating small {
+    display: none;
+}
+
+[data-theme="sonic"] .rating-gold {
+    background: #e0242f;
+}
+
+[data-theme="sonic"] .rating-large {
+    min-width: 76px;
+    height: 76px;
+    border-width: 8px;
+    font-size: 26px;
+}
+
+[data-theme="sonic"] .card:hover .card-poster,
+[data-theme="sonic"] .product:hover .product-image {
+    transform: translateY(-6px) skewX(-2deg);
+    box-shadow: 0 0 0 3px #ffd21f, -14px 10px 0 -6px rgba(30, 91, 216, 0.6);
+}
+
+[data-theme="sonic"] .btn-primary {
+    box-shadow: inset 0 -3px 0 #c99600;
+}
+
+[data-theme="sonic"] .modal-title,
+[data-theme="sonic"] .panel-heading,
+[data-theme="sonic"] .empty h2 {
+    color: #fff;
+    text-shadow: 3px 3px 0 #1e5bd8;
+}
+
+[data-theme="sonic"] .modal-facts dd.wide {
+    border-left-color: #e0242f;
+}
+
+[data-theme="sonic"] .leader {
+    border: 8px solid #ffd21f;
+}
+
+[data-theme="sonic"] .footer {
+    border-top: 4px solid #ffd21f;
+    background: #1e5bd8;
+    color: #dbe6ff;
+}
+
+[data-theme="sonic"] .footer strong {
+    color: #ffd21f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-theme="sonic"] .sn-rings i {
+        animation: none;
+    }
+}
