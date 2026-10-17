@@ -118,6 +118,7 @@ Day to day, from this repo (the server address is in `deploy/secrets/host`):
 ./deploy/vps.sh push-image                     # deploy a local build right now
 ./deploy/vps.sh update                         # pull the latest GHCR image right now
 ./deploy/vps.sh backup                         # back up and download to ./backups/
+./deploy/vps.sh cex-add <link> [<link> …]      # track CeX products (or paste links on /cex when signed in)
 ./deploy/vps.sh install                        # re-apply config after editing deploy/ or deploy/secrets/
 ```
 

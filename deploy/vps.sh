@@ -8,6 +8,7 @@
 #   ./deploy/vps.sh create-user <name> [--role Admin|Editor]
 #   ./deploy/vps.sh delete-user <name>
 #   ./deploy/vps.sh import <local.csv> [--replace]
+#   ./deploy/vps.sh cex-add <cex-link> [<cex-link> …]   track CeX products on /cex
 #   ./deploy/vps.sh backup           run a backup now and download the newest one to ./backups/
 #   ./deploy/vps.sh ssh
 #
@@ -73,6 +74,9 @@ case "$cmd" in
         # Hand the file to the movies user so SELinux can label it for the container.
         ssh "$HOST" "cd / && sudo install -o movies -g movies -m 644 /dev/stdin /home/movies/import.csv" < "$file"
         ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm --read-only -v movies-data:/data -v /home/movies/import.csv:/import.csv:ro,z --env-file /home/movies/.config/movies/app.env $IMAGE import /import.csv $(printf '%q ' "$@"); sudo rm -f /home/movies/import.csv"
+        ;;
+    cex-add)
+        ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm --read-only -v movies-data:/data --env-file /home/movies/.config/movies/app.env $IMAGE cex-add $(printf '%q ' "$@")"
         ;;
     backup)
         as_movies movies-backup

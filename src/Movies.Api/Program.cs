@@ -109,6 +109,8 @@ builder.Services.AddHttpClient<TmdbClient>(c =>
     c.BaseAddress = new Uri("https://api.themoviedb.org/");
     c.Timeout = TimeSpan.FromSeconds(10);
 });
+builder.Services.AddScoped<CexItemsService>();
+builder.Services.AddHostedService<CexRefreshService>();
 builder.Services.AddHttpClient<CexClient>(c =>
 {
     c.BaseAddress = new Uri("https://wss2.cex.uk.webuy.io/");
@@ -168,24 +170,29 @@ var buildVersion = buildInfo.GetValueOrDefault("BuildVersion") ?? "dev";
 var buildStamp = buildInfo.GetValueOrDefault("BuildStamp") ?? buildVersion;
 app.MapGet("/api/version", () => Results.Ok(new { version = buildVersion }));
 
-// index.html with the version filled in and cache-busting script URLs.
-string RenderIndex() =>
-    File.ReadAllText(Path.Combine(app.Environment.WebRootPath, "index.html"))
-        .Replace("{{version}}", buildVersion)
-        .Replace("src=\"js/app.js\"", $"src=\"js/app.js?v={buildStamp}\"")
-        .Replace("src=\"js/admin.js\"", $"src=\"js/admin.js?v={buildStamp}\"");
-var indexHtml = app.Environment.IsDevelopment() ? null : RenderIndex();
-IResult Index(HttpContext ctx)
+// Pages are rendered from wwwroot with the version filled in and cache-busting script URLs.
+string RenderPage(string file) =>
+    System.Text.RegularExpressions.Regex.Replace(
+            File.ReadAllText(Path.Combine(app.Environment.WebRootPath, file)),
+            @"src=""(js/[\w.-]+\.js)""",
+            m => $"src=\"{m.Groups[1].Value}?v={buildStamp}\"")
+        .Replace("{{version}}", buildVersion);
+var renderedPages = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
+IResult Page(HttpContext ctx, string file)
 {
     ctx.Response.Headers.CacheControl = "no-cache";
-    return Results.Content(indexHtml ?? RenderIndex(), "text/html; charset=utf-8");
+    var html = app.Environment.IsDevelopment() ? RenderPage(file) : renderedPages.GetOrAdd(file, RenderPage);
+    return Results.Content(html, "text/html; charset=utf-8");
 }
-app.MapGet("/", Index);
-app.MapGet("/index.html", Index);
+app.MapGet("/", (HttpContext ctx) => Page(ctx, "index.html"));
+app.MapGet("/index.html", (HttpContext ctx) => Page(ctx, "index.html"));
+app.MapGet("/cex", (HttpContext ctx) => Page(ctx, "cex.html"));
+app.MapGet("/cex.html", (HttpContext ctx) => Page(ctx, "cex.html"));
 app.MapTitlesEndpoints();
 app.MapExternalEndpoints();
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
+app.MapCexTrackerEndpoints();
 
 await app.RunAsync();
 return 0;

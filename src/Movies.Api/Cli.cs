@@ -13,7 +13,7 @@ namespace Movies.Api;
 /// </summary>
 public static class Cli
 {
-    public static bool IsCommand(string arg) => arg is "import" or "create-user";
+    public static bool IsCommand(string arg) => arg is "import" or "create-user" or "cex-add";
 
     public static async Task<int> RunAsync(IServiceProvider services, string[] args)
     {
@@ -25,6 +25,7 @@ public static class Cli
             {
                 "import" => await ImportAsync(sp, args[1..]),
                 "create-user" => await CreateUserAsync(sp, args[1..]),
+                "cex-add" => await CexAddAsync(sp, args[1..]),
                 _ => 1,
             };
         }
@@ -130,6 +131,29 @@ public static class Cli
         await users.AddToRoleAsync(user, role);
         Console.WriteLine($"Created {role} '{userName}'. Sign in on the site and you'll be asked to set up MFA.");
         return 0;
+    }
+
+    /// <summary>cex-add &lt;link&gt; [&lt;link&gt; …]: track CeX products on the stock tracker page.</summary>
+    private static async Task<int> CexAddAsync(IServiceProvider sp, string[] links)
+    {
+        if (links.Length == 0) throw new CliException("Usage: cex-add <cex-link> [<cex-link> …]");
+        var service = sp.GetRequiredService<CexItemsService>();
+        var failed = 0;
+        foreach (var link in links)
+        {
+            var result = await service.AddAsync(link, null);
+            Console.WriteLine(result switch
+            {
+                CexItemsService.Added a => $"  + {a.Item.Title} (£{a.Item.SellPrice})",
+                CexItemsService.Duplicate d => $"  = already tracked: {d.Existing.Title}",
+                CexItemsService.NotFound n => $"  ! CeX doesn't know {n.Sku}",
+                CexItemsService.Invalid i => $"  ! {link}: {i.Message}",
+                _ => "  ?",
+            });
+            if (result is CexItemsService.NotFound or CexItemsService.Invalid) failed++;
+            await Task.Delay(300);
+        }
+        return failed == 0 ? 0 : 1;
     }
 
     private static string ReadPassword(string prompt)

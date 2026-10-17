@@ -30,6 +30,7 @@ public class TestApp : WebApplicationFactory<Program>
         builder.UseSetting("DataProtection:KeysPath", _keysDir);
         builder.UseSetting("Tmdb:ApiKey", "");
         builder.UseSetting("Auth:RequireMfa", "true");
+        builder.UseSetting("Cex:BackgroundRefresh", "false");
     }
 
     public async Task CreateUserAsync(string userName, string password, string role)

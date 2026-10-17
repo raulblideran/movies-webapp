@@ -6,7 +6,13 @@ public enum TitleType
     Series,
 }
 
-public class Title
+public interface ITimestamped
+{
+    DateTime CreatedAt { get; set; }
+    DateTime UpdatedAt { get; set; }
+}
+
+public class Title : ITimestamped
 {
     public int Id { get; set; }
     public required string Name { get; set; }
