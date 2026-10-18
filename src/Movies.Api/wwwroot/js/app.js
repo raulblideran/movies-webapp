@@ -546,27 +546,7 @@ function watchLogHtml(row) {
     </section>`;
 }
 
-function copyHtml(row) {
-    const paid = (row.pricePaid || 0) > 0;
-    const formats = row.physicalFormats.length > 0;
-    const cex = row.cexLinks.length > 0;
-    if (!paid && !formats && !cex) return "";
-    return `
-    <section class="modal-section">
-        <h3>Your copy</h3>
-        <dl class="copy-facts">
-            ${formats ? `<div><dt>Format</dt><dd>${row.physicalFormats.map(escapeHtml).join(", ")}</dd></div>` : ""}
-            ${paid ? `<div><dt>Paid</dt><dd class="price-paid">${money(row.pricePaid)}</dd></div>` : ""}
-        </dl>
-        ${cex ? `
-        <table class="cex-table">
-            <caption>CeX prices today</caption>
-            <thead><tr><th scope="col">Edition</th><th scope="col">Sells for</th><th scope="col">Cash</th><th scope="col">Voucher</th></tr></thead>
-            <tbody id="cexPricing"><tr><td colspan="4" class="muted pulse">Checking CeX prices…</td></tr></tbody>
-        </table>` : ""}
-    </section>`;
-}
-
+// The stub: the verdict, then what your copy cost and what CeX would give for it.
 function stubHtml(row) {
     const facts = [];
     if (row.watchCount) facts.push(["Seen", row.watchCount === 1 ? "once" : `${row.watchCount} times`]);
@@ -575,12 +555,36 @@ function stubHtml(row) {
         if (row.seasons != null) facts.push(["Seasons", String(row.seasons)]);
         if (row.episodesTotal != null) facts.push(["Episodes", String(row.episodesTotal)]);
     }
+    const paid = (row.pricePaid || 0) > 0;
+    const formats = row.physicalFormats.length > 0;
+    const cex = row.cexLinks.length > 0;
     return `
-    <aside class="stub" aria-label="Verdict">
+    <aside class="stub" aria-label="Verdict and value">
         ${ratingHtml(row, true) || `<p class="stub-unrated">Not rated yet</p>`}
         ${facts.length ? `<dl class="stub-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>` : ""}
+        ${paid || formats || cex ? `
+        <section class="stub-copy" aria-label="Your copy">
+            ${paid ? `<p class="stub-paid">You paid <span class="price-paid">${money(row.pricePaid)}</span></p>` : ""}
+            ${formats ? `<p class="stub-formats">${row.physicalFormats.map(escapeHtml).join(", ")}</p>` : ""}
+            ${cex ? `<h3>At CeX today</h3><div id="cexPricing" class="stub-cex"><p class="muted pulse">Checking prices…</p></div>` : ""}
+        </section>` : ""}
     </aside>`;
 }
+
+// The poster is never cropped, so when the ticket is taller than the poster, the poster column
+// widens (up to a limit) until the poster fills the height instead of leaving a gap under it.
+function fitPoster() {
+    const ticket = document.querySelector("#modalScroll .ticket");
+    const poster = ticket?.querySelector(".modal-poster");
+    if (!poster) return;
+    ticket.style.removeProperty("--poster-w");
+    if (matchMedia("(max-width: 760px)").matches) return;
+    for (let i = 0; i < 3; i++) {
+        if (ticket.offsetHeight - poster.offsetHeight <= 1) break;
+        ticket.style.setProperty("--poster-w", `${Math.min(480, Math.ceil((ticket.offsetHeight * 2) / 3))}px`);
+    }
+}
+window.addEventListener("resize", () => modalRow && fitPoster());
 
 async function openModal(row) {
     modalRow = row;
@@ -608,7 +612,6 @@ async function openModal(row) {
         <div class="ticket-body">
             ${watchLogHtml(row)}
             ${row.comments ? `<blockquote class="modal-note">${escapeHtml(row.comments)}</blockquote>` : ""}
-            ${copyHtml(row)}
         </div>
     </div>`;
 
@@ -616,6 +619,7 @@ async function openModal(row) {
     modal.classList.remove("hidden");
     if (!wasOpen) panel.querySelector(".close").focus();
     scroll.scrollTop = 0;
+    fitPoster();
     document.body.style.overflow = "hidden";
 
     updateModalNav();
@@ -631,16 +635,19 @@ async function openModal(row) {
             if (modalRow !== row) return; // modal was closed or switched meanwhile
             rows += details
                 ? `
-                <tr>
-                    <th scope="row"><a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="link">${escapeHtml(details.boxName)}</a></th>
-                    <td>£${details.sellPrice}</td>
-                    <td class="is-cash">£${details.cashPrice}</td>
-                    <td class="is-voucher">£${details.exchangePrice}</td>
-                </tr>`
-                : `<tr><td colspan="4" class="status-bad">CeX didn't return prices for <a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="link">${escapeHtml(sku)}</a>.</td></tr>`;
+                <div class="cex-entry">
+                    <a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="link" title="${escapeHtml(details.boxName)}">${escapeHtml(details.boxName)}</a>
+                    <dl>
+                        <div><dt>Sells for</dt><dd>£${details.sellPrice}</dd></div>
+                        <div class="is-cash"><dt>Cash</dt><dd>£${details.cashPrice}</dd></div>
+                        <div class="is-voucher"><dt>Voucher</dt><dd>£${details.exchangePrice}</dd></div>
+                    </dl>
+                </div>`
+                : `<p class="status-bad">CeX didn't return prices for <a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="link">${escapeHtml(sku)}</a>.</p>`;
         }
         document.getElementById("cexPricing").innerHTML =
-            rows || `<tr><td colspan="4" class="status-bad">None of the CeX links has a product id. Fix them in Edit.</td></tr>`;
+            rows || `<p class="status-bad">None of the CeX links has a product id. Fix them in Edit.</p>`;
+        fitPoster();
     }
 }
 

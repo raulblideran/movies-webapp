@@ -9,7 +9,7 @@
     let uid = 0;
 
     function enhance(select) {
-        if (select.dataset.themed) return;
+        if ("themed" in select.dataset) return;
         select.dataset.themed = "";
         const button = document.createElement("button");
         button.type = "button";

@@ -1245,7 +1245,7 @@ textarea.code {
    perforated stub on the right holds the verdict (the theme's own rating badge, times seen,
    rewatch). Everything is drawn from theme tokens, so each theme restyles it. */
 .panel-title {
-    --stub-w: 196px;
+    --stub-w: 264px;
     --poster-w: min(380px, calc((100vh - 68px) * 2 / 3));
     --notch: 13px;
     /* the notches where the stub tears off, cut out of the top and bottom edges */
@@ -1333,8 +1333,8 @@ textarea.code {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 22px;
-    padding: 76px 20px 32px;
+    gap: 16px;
+    padding: 60px 22px 24px;
     border-left: 2px dashed var(--line-strong);
     background: color-mix(in srgb, var(--poster-bg) 55%, var(--surface));
     text-align: center;
@@ -1351,9 +1351,10 @@ textarea.code {
 
 .stub-facts {
     display: grid;
-    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 8px;
     width: 100%;
-    padding-top: 20px;
+    padding-top: 16px;
     border-top: 1px solid var(--line);
 }
 
@@ -1472,80 +1473,92 @@ textarea.code {
     max-width: 62ch;
 }
 
-.copy-facts {
+.stub-copy {
     display: flex;
-    flex-wrap: wrap;
-    gap: 12px 40px;
-    margin: 0;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
 }
 
-.copy-facts dt {
+.stub-paid {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
     font-size: 13px;
     color: var(--ink-3);
 }
 
-.copy-facts dd {
-    margin: 2px 0 0;
-    font-size: 17px;
-}
-
-.copy-facts .price-paid {
+.stub-paid .price-paid {
     font-size: 26px;
     line-height: 1.1;
 }
 
-.cex-table {
-    width: 100%;
-    margin-top: 18px;
-    border-collapse: collapse;
-    font-size: 15px;
-    font-variant-numeric: tabular-nums;
+.stub-formats {
+    font-size: 14px;
+    color: var(--ink-2);
 }
 
-.cex-table caption {
-    margin-bottom: 6px;
-    text-align: left;
+.stub-copy h3 {
+    margin-top: 8px;
     font-size: 13px;
+    font-weight: 400;
     color: var(--ink-3);
 }
 
-.cex-table th,
-.cex-table td {
-    padding: 9px 0 9px 16px;
-    border-bottom: 1px solid var(--line);
-    text-align: right;
+.stub-cex {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-size: 14px;
+}
+
+.cex-entry > .link {
+    display: block;
+    margin-bottom: 6px;
+    overflow: hidden;
+    font-size: 13px;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.cex-table thead th {
-    padding-top: 0;
-    font-size: 13px;
-    font-weight: 600;
+.cex-entry dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+}
+
+.cex-entry dl > div {
+    padding: 6px 2px;
+}
+
+.cex-entry dl > div + div {
+    border-left: 1px solid var(--line);
+}
+
+.cex-entry dt {
+    font-size: 11px;
     color: var(--ink-3);
 }
 
-.cex-table th:first-child,
-.cex-table td[colspan] {
-    width: 100%;
-    padding-left: 0;
-    text-align: left;
-    white-space: normal;
+.cex-entry dd {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    font-size: 19px;
+    font-variant-numeric: tabular-nums;
 }
 
-.cex-table tbody th {
-    font-weight: 400;
-}
-
-.cex-table .is-cash {
+.cex-entry .is-cash dd {
     color: var(--ok);
 }
 
-.cex-table .is-voucher {
+.cex-entry .is-voucher dd {
     color: var(--warn);
-}
-
-.cex-table tbody tr:last-child > * {
-    border-bottom: 0;
 }
 
 /* Phones: the stub becomes a strip across the ticket, torn along the top and bottom. */
@@ -1594,6 +1607,9 @@ textarea.code {
     .stub-facts dd {
         font-size: 22px;
     }
+    .stub-copy {
+        flex-basis: 100%;
+    }
     .ticket-body {
         padding: 24px 20px 28px;
     }
@@ -1615,10 +1631,6 @@ textarea.code {
     .watch-log li:last-child::before {
         bottom: auto;
         height: 8px;
-    }
-    .cex-table th,
-    .cex-table td {
-        padding-left: 10px;
     }
 }
 
@@ -2063,8 +2075,13 @@ textarea.code {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* Name takes three of the four columns used by the rows below, so Type lines up with them */
 .row-name {
-    grid-template-columns: minmax(0, 1fr) 140px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.row-name > :first-child {
+    grid-column: span 3;
 }
 
 @media (max-width: 640px) {
@@ -2074,6 +2091,9 @@ textarea.code {
     }
     .row-name {
         grid-template-columns: minmax(0, 1fr);
+    }
+    .row-name > :first-child {
+        grid-column: auto;
     }
 }
 
