@@ -732,6 +732,55 @@ select.input option {
     color: var(--ink);
 }
 
+/* Themed dropdown (js/select.js): the native select is kept for its value but hidden. */
+.select-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    clip-path: inset(50%);
+}
+
+.select-button {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    padding-right: 34px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-2) 50%),
+        linear-gradient(-45deg, transparent 50%, var(--ink-2) 50%);
+    background-position: right 17px center, right 12px center;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+}
+
+.select-button[aria-expanded="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.select-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.suggest.select-list {
+    position: fixed;
+    right: auto;
+    z-index: 1300;
+    max-width: calc(100vw - 16px);
+    font-family: var(--font-body);
+}
+
+.suggest li.is-active:not([aria-selected="true"]) {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
 textarea.input {
     resize: vertical;
 }
