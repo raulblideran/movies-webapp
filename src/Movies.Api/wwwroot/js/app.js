@@ -595,9 +595,9 @@ async function openModal(row) {
     ].join("");
 
     scroll.innerHTML = `
-    <div class="ticket">
-        <header class="ticket-head${row.posterUrl ? "" : " no-poster"}">
-            ${row.posterUrl ? `<img class="modal-poster" src="${escapeHtml(row.posterUrl)}" alt="Poster for ${escapeHtml(row.name)}">` : ""}
+    <div class="ticket${row.posterUrl ? "" : " no-poster"}">
+        ${row.posterUrl ? `<div class="ticket-poster"><img class="modal-poster" src="${escapeHtml(row.posterUrl)}" alt="Poster for ${escapeHtml(row.name)}"></div>` : ""}
+        <header class="ticket-head">
             <div class="ticket-head-text">
                 <div class="tags">${tags}</div>
                 <h2 class="modal-title" id="modalTitle">${escapeHtml(row.name)}${row.releaseYear ? ` <span class="modal-year">${row.releaseYear}</span>` : ""}</h2>
@@ -611,8 +611,6 @@ async function openModal(row) {
             ${copyHtml(row)}
         </div>
     </div>`;
-    // the band behind the header is the poster, blurred
-    scroll.querySelector(".ticket-head").style.setProperty("--backdrop", row.posterUrl ? `url(${JSON.stringify(row.posterUrl)})` : "none");
 
     const wasOpen = !modal.classList.contains("hidden");
     modal.classList.remove("hidden");

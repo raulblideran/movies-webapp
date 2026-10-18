@@ -1246,10 +1246,11 @@ textarea.code {
    rewatch). Everything is drawn from theme tokens, so each theme restyles it. */
 .panel-title {
     --stub-w: 196px;
+    --poster-w: min(380px, calc((100vh - 68px) * 2 / 3));
     --notch: 13px;
     /* the notches where the stub tears off, cut out of the top and bottom edges */
     --notch-x: calc(100% - var(--stub-w) - 1px);
-    max-width: 1000px;
+    max-width: 1220px;
     display: flex;
     overflow: hidden;
     padding: 0;
@@ -1269,59 +1270,38 @@ textarea.code {
     scrollbar-color: var(--line-strong) transparent;
 }
 
+/* poster | details | stub. The poster is as large as the screen height allows, always 2:3. */
 .ticket {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--stub-w);
+    grid-template-columns: var(--poster-w) minmax(0, 1fr) var(--stub-w);
     grid-template-rows: auto 1fr;
     min-height: 100%;
 }
 
-/* ---- header: poster, tags, title, actions over the blurred poster ---- */
-
-.ticket-head {
-    position: relative;
-    isolation: isolate;
-    display: flex;
-    align-items: flex-end;
-    gap: 28px;
-    padding: 32px 32px 28px;
-    overflow: hidden;
+.ticket.no-poster {
+    grid-template-columns: minmax(0, 1fr) var(--stub-w);
 }
 
-.ticket-head::before {
-    content: "";
-    position: absolute;
-    inset: -40px -40px 0;
-    z-index: -2;
-    background: var(--backdrop) center 30% / cover no-repeat;
-    filter: blur(28px) saturate(1.2);
-    opacity: 0.55;
-    /* fade out into whatever background the theme gives the panel */
-    -webkit-mask-image: linear-gradient(180deg, #000 35%, transparent);
-    mask-image: linear-gradient(180deg, #000 35%, transparent);
+.ticket-poster {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    background: var(--poster-bg);
 }
 
-.ticket-head::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent 85%);
-}
-
-.ticket-head .modal-poster {
-    flex: none;
-    width: 168px;
+.ticket-poster .modal-poster {
+    display: block;
+    width: 100%;
     aspect-ratio: 2 / 3;
     object-fit: cover;
-    border-radius: var(--radius-sm);
-    background: var(--poster-bg);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--line);
+}
+
+.ticket-head {
+    grid-column: -3;
+    padding: 36px 32px 0;
 }
 
 .ticket-head-text {
     min-width: 0;
-    padding-bottom: 2px;
 }
 
 .ticket-head .modal-title {
@@ -1348,7 +1328,7 @@ textarea.code {
 /* ---- the stub ---- */
 
 .stub {
-    grid-column: 2;
+    grid-column: -2;
     grid-row: 1 / span 2;
     display: flex;
     flex-direction: column;
@@ -1394,10 +1374,11 @@ textarea.code {
 /* ---- body: watch history, note, your copy ---- */
 
 .ticket-body {
+    grid-column: -3;
     display: flex;
     flex-direction: column;
     gap: 30px;
-    padding: 8px 32px 36px;
+    padding: 30px 32px 36px;
 }
 
 .ticket-body:empty {
@@ -1573,17 +1554,24 @@ textarea.code {
         -webkit-mask: none;
         mask: none;
     }
-    .ticket {
+    .ticket,
+    .ticket.no-poster {
         grid-template-columns: minmax(0, 1fr);
     }
-    .ticket-head {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 18px;
-        padding: 24px 20px 20px;
+    .ticket-poster,
+    .ticket-head,
+    .ticket-body {
+        grid-column: 1;
+        grid-row: auto;
     }
-    .ticket-head .modal-poster {
-        width: 120px;
+    .ticket-poster .modal-poster {
+        width: auto;
+        max-width: 100%;
+        max-height: 60vh;
+        margin: 0 auto;
+    }
+    .ticket-head {
+        padding: 22px 20px 20px;
     }
     .stub {
         grid-column: 1;
