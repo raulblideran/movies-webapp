@@ -1241,19 +1241,27 @@ textarea.code {
     max-width: 920px;
 }
 
-/* Title modal: a sidebar with the poster (always 2:3) and the money (price paid, CeX prices), and
-   the details beside it. The panel scrolls as one piece, so a long CeX list just makes the sidebar
-   longer instead of squeezing or stretching anything. */
+/* Title modal: a kept cinema ticket. The ticket holds the film and your history with it; a
+   perforated stub on the right holds the verdict (the theme's own rating badge, times seen,
+   rewatch). Everything is drawn from theme tokens, so each theme restyles it. */
 .panel-title {
-    max-width: 1080px;
+    --stub-w: 196px;
+    --notch: 13px;
+    /* the notches where the stub tears off, cut out of the top and bottom edges */
+    --notch-x: calc(100% - var(--stub-w) - 1px);
+    max-width: 1000px;
     display: flex;
     overflow: hidden;
     padding: 0;
+    -webkit-mask:
+        radial-gradient(circle var(--notch) at var(--notch-x) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+        radial-gradient(circle var(--notch) at var(--notch-x) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
+    mask:
+        radial-gradient(circle var(--notch) at var(--notch-x) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+        radial-gradient(circle var(--notch) at var(--notch-x) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
 }
 
 .modal-scroll {
-    display: grid;
-    grid-template-columns: 340px minmax(0, 1fr);
     width: 100%;
     max-height: inherit;
     overflow-y: auto;
@@ -1261,148 +1269,368 @@ textarea.code {
     scrollbar-color: var(--line-strong) transparent;
 }
 
-.modal-aside {
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid var(--line);
-    background: var(--poster-bg);
+.ticket {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--stub-w);
+    grid-template-rows: auto 1fr;
+    min-height: 100%;
 }
 
-.panel-title .modal-poster {
-    display: block;
-    width: 100%;
-    height: auto;
+/* ---- header: poster, tags, title, actions over the blurred poster ---- */
+
+.ticket-head {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: flex-end;
+    gap: 28px;
+    padding: 32px 32px 28px;
+    overflow: hidden;
+}
+
+.ticket-head::before {
+    content: "";
+    position: absolute;
+    inset: -40px -40px 0;
+    z-index: -2;
+    background: var(--backdrop) center 30% / cover no-repeat;
+    filter: blur(28px) saturate(1.2);
+    opacity: 0.55;
+    /* fade out into whatever background the theme gives the panel */
+    -webkit-mask-image: linear-gradient(180deg, #000 35%, transparent);
+    mask-image: linear-gradient(180deg, #000 35%, transparent);
+}
+
+.ticket-head::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent 85%);
+}
+
+.ticket-head .modal-poster {
+    flex: none;
+    width: 168px;
     aspect-ratio: 2 / 3;
     object-fit: cover;
+    border-radius: var(--radius-sm);
     background: var(--poster-bg);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--line);
 }
 
-.modal-value {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    padding: 20px;
+.ticket-head-text {
+    min-width: 0;
+    padding-bottom: 2px;
 }
 
-.modal-value:empty {
-    display: none;
+.ticket-head .modal-title {
+    padding-right: 0;
+    margin: 12px 0 0;
 }
 
-.value-paid {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 14px;
-    font-weight: 700;
+.modal-year {
+    font-family: var(--font-body);
+    font-size: 0.42em;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--ink-2);
-}
-
-.value-paid .price-paid {
-    font-size: 28px;
-}
-
-.value-heading {
-    padding-top: 14px;
-    border-top: 1px solid var(--line);
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--ink-2);
-}
-
-.value-paid + .value-heading {
-    margin-top: 0;
-}
-
-.modal-value > .value-heading:first-child {
-    padding-top: 0;
-    border-top: 0;
-}
-
-#cexPricing {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    font-size: 14px;
-}
-
-.cex-entry-name {
-    display: block;
-    margin-bottom: 6px;
-    overflow: hidden;
-    font-size: 13px;
-    color: var(--ink-2);
-    text-decoration: none;
-    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.cex-entry-name:hover {
-    color: var(--accent);
+.ticket-head .modal-actions {
+    margin: 20px 0 0;
+    padding: 0;
+    border: 0;
 }
 
-.prices.prices-compact {
-    gap: 6px;
-    margin: 0;
+/* ---- the stub ---- */
+
+.stub {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    padding: 76px 20px 32px;
+    border-left: 2px dashed var(--line-strong);
+    background: color-mix(in srgb, var(--poster-bg) 55%, var(--surface));
+    text-align: center;
 }
 
-.prices-compact > div {
-    padding: 6px 8px;
+.stub .rating {
+    font-size: 30px;
 }
 
-.prices-compact dt {
-    font-size: 11px;
+.stub-unrated {
+    font-size: 15px;
+    color: var(--ink-3);
 }
 
-.prices-compact dd {
-    font-size: 19px;
+.stub-facts {
+    display: grid;
+    gap: 14px;
+    width: 100%;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
 }
 
-.panel-title .modal-body {
-    min-width: 0;
-    padding: 32px;
+.stub-facts dt {
+    font-size: 13px;
+    color: var(--ink-3);
 }
 
-.panel-title.no-poster .modal-aside {
-    justify-content: center;
+.stub-facts dd {
+    margin: 2px 0 0;
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    font-size: 26px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
 }
 
-.panel-title.no-aside {
-    max-width: 720px;
+/* ---- body: watch history, note, your copy ---- */
+
+.ticket-body {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    padding: 8px 32px 36px;
 }
 
-.panel-title.no-aside .modal-scroll {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.panel-title.no-aside .modal-aside {
+.ticket-body:empty {
     display: none;
 }
 
-/* Phones: one column, in reading order: poster, details, then the money. */
+.modal-section h3 {
+    margin-bottom: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink-2);
+}
+
+/* A line through the dates, in order. Labels sit under each point. */
+.watch-log {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.watch-log li {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 22px 12px 0 0;
+}
+
+/* the line, then the point */
+.watch-log li::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--line-strong);
+}
+
+.watch-log li:last-child::before {
+    right: auto;
+    width: 12px;
+}
+
+.watch-log li:only-child::before {
+    display: none;
+}
+
+.watch-log li::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--surface);
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.watch-log li.is-bogdan::after {
+    background: var(--tag-bogdan);
+    box-shadow: 0 0 0 2px var(--tag-bogdan);
+}
+
+.watch-log time {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.watch-log span {
+    font-size: 14px;
+    color: var(--ink-3);
+}
+
+.modal-note {
+    margin: 0;
+    padding: 14px 18px;
+    border-left: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    font-size: 18px;
+    font-style: italic;
+    line-height: 1.5;
+    color: var(--ink);
+    max-width: 62ch;
+}
+
+.copy-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 40px;
+    margin: 0;
+}
+
+.copy-facts dt {
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.copy-facts dd {
+    margin: 2px 0 0;
+    font-size: 17px;
+}
+
+.copy-facts .price-paid {
+    font-size: 26px;
+    line-height: 1.1;
+}
+
+.cex-table {
+    width: 100%;
+    margin-top: 18px;
+    border-collapse: collapse;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+}
+
+.cex-table caption {
+    margin-bottom: 6px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.cex-table th,
+.cex-table td {
+    padding: 9px 0 9px 16px;
+    border-bottom: 1px solid var(--line);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.cex-table thead th {
+    padding-top: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-3);
+}
+
+.cex-table th:first-child,
+.cex-table td[colspan] {
+    width: 100%;
+    padding-left: 0;
+    text-align: left;
+    white-space: normal;
+}
+
+.cex-table tbody th {
+    font-weight: 400;
+}
+
+.cex-table .is-cash {
+    color: var(--ok);
+}
+
+.cex-table .is-voucher {
+    color: var(--warn);
+}
+
+.cex-table tbody tr:last-child > * {
+    border-bottom: 0;
+}
+
+/* Phones: the stub becomes a strip across the ticket, torn along the top and bottom. */
 @media (max-width: 760px) {
-    .modal-scroll {
+    .panel-title {
+        -webkit-mask: none;
+        mask: none;
+    }
+    .ticket {
         grid-template-columns: minmax(0, 1fr);
     }
-    .modal-aside {
-        display: contents;
+    .ticket-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 18px;
+        padding: 24px 20px 20px;
     }
-    .panel-title .modal-poster {
+    .ticket-head .modal-poster {
+        width: 120px;
+    }
+    .stub {
+        grid-column: 1;
+        grid-row: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 14px 24px;
+        padding: 18px 20px;
+        border-left: 0;
+        border-block: 2px dashed var(--line-strong);
+    }
+    .stub-facts {
+        display: flex;
+        gap: 20px;
         width: auto;
-        max-width: 100%;
-        max-height: 60vh;
-        margin: 0 auto;
+        padding: 0;
+        border: 0;
     }
-    .panel-title .modal-body {
-        padding: 24px 20px 8px;
+    .stub-facts dd {
+        font-size: 22px;
     }
-    .modal-value {
-        order: 2;
-        margin: 0 20px 20px;
-        padding: 16px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        background: var(--surface-2);
+    .ticket-body {
+        padding: 24px 20px 28px;
+    }
+    .watch-log {
+        grid-auto-flow: row;
+    }
+    .watch-log li {
+        padding: 0 0 18px 28px;
+    }
+    .watch-log li::before,
+    .watch-log li:last-child::before {
+        top: 0;
+        bottom: 0;
+        left: 6px;
+        right: auto;
+        width: 2px;
+        height: auto;
+    }
+    .watch-log li:last-child::before {
+        bottom: auto;
+        height: 8px;
+    }
+    .cex-table th,
+    .cex-table td {
+        padding-left: 10px;
     }
 }
 

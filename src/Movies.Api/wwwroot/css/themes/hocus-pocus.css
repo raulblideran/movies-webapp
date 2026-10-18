@@ -225,7 +225,8 @@
     color: #c8f59a;
 }
 
-[data-theme="hocus-pocus"] .modal-facts dd.wide {
+[data-theme="hocus-pocus"] .modal-facts dd.wide,
+[data-theme="hocus-pocus"] .modal-note {
     font-family: var(--font-body);
 }
 

@@ -274,7 +274,8 @@
     border-width: 2px;
 }
 
-[data-theme="terrifier"] .modal-facts dd.wide {
+[data-theme="terrifier"] .modal-facts dd.wide,
+[data-theme="terrifier"] .modal-note {
     border-left-color: #d4101c;
 }
 

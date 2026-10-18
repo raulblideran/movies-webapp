@@ -207,7 +207,8 @@
     color: #ff6b74;
 }
 
-[data-theme="michael-jackson"] .modal-facts dd.wide {
+[data-theme="michael-jackson"] .modal-facts dd.wide,
+[data-theme="michael-jackson"] .modal-note {
     border-left-color: #d4202c;
 }
 

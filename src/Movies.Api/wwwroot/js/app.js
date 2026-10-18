@@ -515,45 +515,109 @@ function displayCards(data) {
 
 let modalRow = null;
 
+// "2020-04-15" -> "15 Apr 2020"
+const longDateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+function formatLongDate(iso) {
+    const [y, m, d] = iso.split("-").map(Number);
+    return longDateFormat.format(new Date(y, m - 1, d));
+}
+
+// First watch, the watch with Bogdan and the latest watch, in date order. A date shared by two
+// of them is one point on the line.
+function watchLogHtml(row) {
+    const points = new Map();
+    const add = (iso, label) => iso && points.set(iso, [...(points.get(iso) ?? []), label]);
+    add(row.firstWatch, row.watchCount > 1 ? "First watch" : "Watched");
+    if (row.latestWatch !== row.firstWatch) add(row.latestWatch, "Latest watch");
+    add(row.dateWithBogdan, "With Bogdan");
+    if (points.size === 0) return "";
+    const items = [...points]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([iso, labels]) => `
+            <li${labels.includes("With Bogdan") ? ' class="is-bogdan"' : ""}>
+                <time datetime="${iso}">${formatLongDate(iso)}</time>
+                <span>${labels.join(", ")}</span>
+            </li>`)
+        .join("");
+    return `
+    <section class="modal-section">
+        <h3>Watch history</h3>
+        <ol class="watch-log">${items}</ol>
+    </section>`;
+}
+
+function copyHtml(row) {
+    const paid = (row.pricePaid || 0) > 0;
+    const formats = row.physicalFormats.length > 0;
+    const cex = row.cexLinks.length > 0;
+    if (!paid && !formats && !cex) return "";
+    return `
+    <section class="modal-section">
+        <h3>Your copy</h3>
+        <dl class="copy-facts">
+            ${formats ? `<div><dt>Format</dt><dd>${row.physicalFormats.map(escapeHtml).join(", ")}</dd></div>` : ""}
+            ${paid ? `<div><dt>Paid</dt><dd class="price-paid">${money(row.pricePaid)}</dd></div>` : ""}
+        </dl>
+        ${cex ? `
+        <table class="cex-table">
+            <caption>CeX prices today</caption>
+            <thead><tr><th scope="col">Edition</th><th scope="col">Sells for</th><th scope="col">Cash</th><th scope="col">Voucher</th></tr></thead>
+            <tbody id="cexPricing"><tr><td colspan="4" class="muted pulse">Checking CeX prices…</td></tr></tbody>
+        </table>` : ""}
+    </section>`;
+}
+
+function stubHtml(row) {
+    const facts = [];
+    if (row.watchCount) facts.push(["Seen", row.watchCount === 1 ? "once" : `${row.watchCount} times`]);
+    if (row.rewatchPotential != null) facts.push(["Rewatch", `${row.rewatchPotential}/10`]);
+    if (row.type === "Series") {
+        if (row.seasons != null) facts.push(["Seasons", String(row.seasons)]);
+        if (row.episodesTotal != null) facts.push(["Episodes", String(row.episodesTotal)]);
+    }
+    return `
+    <aside class="stub" aria-label="Verdict">
+        ${ratingHtml(row, true) || `<p class="stub-unrated">Not rated yet</p>`}
+        ${facts.length ? `<dl class="stub-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>` : ""}
+    </aside>`;
+}
+
 async function openModal(row) {
     modalRow = row;
     const modal = document.getElementById("modal");
-    const modalBody = document.getElementById("modalBody");
-    const modalPoster = document.getElementById("modalPoster");
-
-    modalBody.innerHTML = `
-    <div id="modalAdminBar"></div>
-    <div class="tags tags-large">${tagsHtml(row, { formats: true })}</div>
-    <h2 class="modal-title" id="modalTitle">${escapeHtml(row.name)}</h2>
-    ${ratingHtml(row, true)}
-    <dl class="facts modal-facts">${factsHtml(row, { skip: ["Price (£)"] })}</dl>
-    `;
-
-    // Money lives under the poster, so a long CeX list never stretches the details column.
-    const paid = (row.pricePaid || 0) > 0;
-    const value = document.getElementById("modalValue");
-    value.innerHTML = paid || row.cexLinks.length > 0
-        ? `
-        ${paid ? `<div class="value-paid"><span>Price paid</span><span class="price-paid">${money(row.pricePaid)}</span></div>` : ""}
-        ${row.cexLinks.length > 0 ? `<h3 class="value-heading">Worth at CeX</h3><div id="cexPricing" class="muted pulse">Checking CeX prices…</div>` : ""}`
-        : "";
-
-    if (row.posterUrl) {
-        modalPoster.src = row.posterUrl;
-        modalPoster.alt = row.name;
-        modalPoster.classList.remove("hidden");
-    } else {
-        modalPoster.removeAttribute("src");
-        modalPoster.classList.add("hidden");
-    }
+    const scroll = document.getElementById("modalScroll");
     const panel = document.getElementById("modalPanel");
-    panel.classList.toggle("no-poster", !row.posterUrl);
-    panel.classList.toggle("no-aside", !row.posterUrl && !value.innerHTML);
+
+    const tags = [
+        `<span class="tag tag-${row.type === "Film" ? "film" : "series"}">${escapeHtml(row.type)}</span>`,
+        ...row.genres.map((g) => `<span class="tag">${escapeHtml(g)}</span>`),
+        row.withBogdan ? `<span class="tag tag-bogdan">With Bogdan</span>` : "",
+    ].join("");
+
+    scroll.innerHTML = `
+    <div class="ticket">
+        <header class="ticket-head${row.posterUrl ? "" : " no-poster"}">
+            ${row.posterUrl ? `<img class="modal-poster" src="${escapeHtml(row.posterUrl)}" alt="Poster for ${escapeHtml(row.name)}">` : ""}
+            <div class="ticket-head-text">
+                <div class="tags">${tags}</div>
+                <h2 class="modal-title" id="modalTitle">${escapeHtml(row.name)}${row.releaseYear ? ` <span class="modal-year">${row.releaseYear}</span>` : ""}</h2>
+                <div id="modalAdminBar"></div>
+            </div>
+        </header>
+        ${stubHtml(row)}
+        <div class="ticket-body">
+            ${watchLogHtml(row)}
+            ${row.comments ? `<blockquote class="modal-note">${escapeHtml(row.comments)}</blockquote>` : ""}
+            ${copyHtml(row)}
+        </div>
+    </div>`;
+    // the band behind the header is the poster, blurred
+    scroll.querySelector(".ticket-head").style.setProperty("--backdrop", row.posterUrl ? `url(${JSON.stringify(row.posterUrl)})` : "none");
 
     const wasOpen = !modal.classList.contains("hidden");
     modal.classList.remove("hidden");
     if (!wasOpen) panel.querySelector(".close").focus();
-    document.getElementById("modalScroll").scrollTop = 0;
+    scroll.scrollTop = 0;
     document.body.style.overflow = "hidden";
 
     updateModalNav();
@@ -561,29 +625,24 @@ async function openModal(row) {
 
     // CeX pricing loads after the modal is visible
     if (row.cexLinks.length > 0) {
-        const pricingEl = document.getElementById("cexPricing");
-        let resultsHtml = "";
+        let rows = "";
         for (const link of row.cexLinks) {
             const sku = extractCexSku(link);
             if (!sku) continue;
             const details = await fetchCexDetails(sku);
             if (modalRow !== row) return; // modal was closed or switched meanwhile
-            if (!details) {
-                resultsHtml += `<p class="status-bad">Couldn't get CeX prices for ${escapeHtml(sku)}.</p>`;
-                continue;
-            }
-            resultsHtml += `
-            <div class="cex-entry">
-                <a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="cex-entry-name" title="View on CeX">${escapeHtml(details.boxName)} <span aria-hidden="true">↗</span></a>
-                <dl class="prices prices-compact">
-                    <div><dt>Sells for</dt><dd>£${details.sellPrice}</dd></div>
-                    <div class="is-cash"><dt>Cash</dt><dd>£${details.cashPrice}</dd></div>
-                    <div class="is-voucher"><dt>Voucher</dt><dd>£${details.exchangePrice}</dd></div>
-                </dl>
-            </div>`;
+            rows += details
+                ? `
+                <tr>
+                    <th scope="row"><a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="link">${escapeHtml(details.boxName)}</a></th>
+                    <td>£${details.sellPrice}</td>
+                    <td class="is-cash">£${details.cashPrice}</td>
+                    <td class="is-voucher">£${details.exchangePrice}</td>
+                </tr>`
+                : `<tr><td colspan="4" class="status-bad">CeX didn't return prices for <a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="link">${escapeHtml(sku)}</a>.</td></tr>`;
         }
-        pricingEl.classList.remove("pulse", "muted");
-        pricingEl.innerHTML = resultsHtml || `<p class="status-bad">Couldn't reach CeX. Try again later.</p>`;
+        document.getElementById("cexPricing").innerHTML =
+            rows || `<tr><td colspan="4" class="status-bad">None of the CeX links has a product id. Fix them in Edit.</td></tr>`;
     }
 }
 

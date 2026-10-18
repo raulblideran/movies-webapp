@@ -240,7 +240,8 @@
     text-shadow: 3px 3px 0 #1e5bd8;
 }
 
-[data-theme="sonic"] .modal-facts dd.wide {
+[data-theme="sonic"] .modal-facts dd.wide,
+[data-theme="sonic"] .modal-note {
     border-left-color: #e0242f;
 }
 
