@@ -999,6 +999,37 @@ textarea.code {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 20px 12px;
     }
+    /* The collection: three covers a row. The cards keep cover, rating, title and year; the rest
+       is one tap away in the title sheet. */
+    #cardsGrid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px 10px;
+    }
+    #cardsGrid .card-body {
+        padding-top: 6px;
+    }
+    #cardsGrid .card-title {
+        display: -webkit-box;
+        margin: 0;
+        overflow: hidden;
+        font-size: 13px;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+    #cardsGrid .tags,
+    #cardsGrid .facts {
+        display: none;
+    }
+    #cardsGrid .card .rating {
+        top: 5px;
+        right: 5px;
+        padding: 2px 7px;
+        font-size: 13px;
+    }
+    #cardsGrid .card-poster .no-poster {
+        padding: 8px;
+        font-size: 15px;
+    }
 }
 
 .card {
@@ -1580,8 +1611,9 @@ textarea.code {
     color: var(--warn);
 }
 
-/* Phones: a full-screen sheet. Poster and title share the first row, the actions run full
-   width under them, the stub becomes a strip torn along its top and bottom, then the history. */
+/* Phones: a full-screen sheet. The cover sits beside the title with the verdict (rating, seen,
+   rewatch) under it; the actions run full width; then, torn off along dashed lines, what your copy
+   cost and is worth, and the history. */
 @media (max-width: 760px) {
     .panel-title {
         -webkit-mask: none;
@@ -1590,11 +1622,17 @@ textarea.code {
     .ticket,
     .ticket.no-poster {
         grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
-        grid-template-rows: none;
+        /* the free space beside the cover goes above the title, so the text sits at its foot */
+        grid-template-rows: 1fr auto auto;
+        min-height: 0;
+    }
+    /* the stub's parts join the grid directly */
+    .stub {
+        display: contents;
     }
     .ticket-poster {
         grid-column: 1;
-        grid-row: 1;
+        grid-row: 1 / span 3;
         align-self: start;
         background: none;
         padding: 16px 0 0 16px;
@@ -1603,27 +1641,54 @@ textarea.code {
         border-radius: var(--radius-sm);
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--line);
     }
-    .ticket-head {
+    .ticket-head,
+    .stub > :first-child,
+    .stub-facts {
         grid-column: 2;
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+    .ticket-head {
         grid-row: 1;
         align-self: end;
-        padding: 16px 16px 2px;
+        margin: 0;
+        padding: 16px 16px 0;
     }
-    .ticket.no-poster .ticket-head {
+    .stub > :first-child {
+        grid-row: 2;
+        justify-self: start;
+        margin-top: 12px;
+    }
+    .stub > .rating {
+        font-size: 24px;
+        padding: 4px 14px;
+    }
+    .stub-facts {
+        grid-row: 3;
+        align-self: end;
+        grid-template-columns: repeat(2, minmax(0, max-content));
+        gap: 8px clamp(10px, 4vw, 20px);
+        width: auto;
+        margin-top: 12px;
+        padding: 0;
+        border: 0;
+        text-align: left;
+    }
+    .stub-facts dd {
+        font-size: clamp(17px, 5vw, 20px);
+    }
+    .ticket.no-poster .ticket-head,
+    .ticket.no-poster .stub > :first-child,
+    .ticket.no-poster .stub-facts {
         grid-column: 1 / -1;
-        padding: 20px 16px 0;
     }
     .ticket-head .modal-title {
         margin-top: 10px;
         font-size: clamp(24px, 7vw, 34px);
         overflow-wrap: anywhere;
     }
-    .ticket-head .tags-large .tag,
-    .ticket-head .tag {
-        font-size: 12px;
-    }
     .ticket-actions,
-    .stub,
+    .stub-copy,
     .ticket-body {
         grid-column: 1 / -1;
         grid-row: auto;
@@ -1637,29 +1702,14 @@ textarea.code {
     .ticket-actions .split {
         flex: 0 0 auto;
     }
-    .stub {
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: space-around;
-        align-items: center;
-        gap: 14px 16px;
+    .stub-copy,
+    .ticket-body {
         margin-top: 18px;
-        padding: 18px 16px;
-        border-left: 0;
-        border-block: 2px dashed var(--line-strong);
-    }
-    .stub-facts {
-        display: flex;
-        gap: 18px;
-        width: auto;
-        padding: 0;
-        border: 0;
-    }
-    .stub-facts dd {
-        font-size: 22px;
+        border-top: 2px dashed var(--line-strong);
     }
     .stub-copy {
-        flex-basis: 100%;
+        padding: 16px;
+        text-align: center;
     }
     .ticket-body {
         gap: 24px;
