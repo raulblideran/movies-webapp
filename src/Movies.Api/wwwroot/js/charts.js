@@ -34,6 +34,10 @@
         return `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`;
     }
 
+    const fit = (text, px) => {
+        const n = Math.max(6, Math.floor(px / 6.6));
+        return text.length > n ? text.slice(0, n - 1) + "…" : text;
+    };
     const widthOf = (el) => Math.max(260, Math.floor(el.clientWidth || el.getBoundingClientRect().width || 320));
     const svg = (w, h, body, label) =>
         `<svg class="viz-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label)}">${body}</svg>`;
@@ -106,7 +110,7 @@
         items.forEach((it, i) => {
             const y = i * row + 4;
             const w = top > 0 ? (it.value / top) * pw : 0;
-            const name = it.label.length > 24 ? it.label.slice(0, 23) + "…" : it.label;
+            const name = fit(it.label, labelW - 12);
             body += `<g class="viz-item"><text class="viz-label" x="${labelW - 8}" y="${y + 12}" dy="0.32em" text-anchor="end">${esc(name)}</text>`;
             body += `<path class="viz-mark" d="${hbar(labelW, y + 3, Math.max(w, 2), 18)}" style="fill:${it.color ?? color}"/>`;
             body += `<text class="viz-value" x="${labelW + Math.max(w, 2) + 6}" y="${y + 12}" dy="0.32em">${esc(it.valueLabel ?? valueFmt(it.value))}</text>`;
@@ -253,20 +257,26 @@
 
     // ---------- scatter / bubble ----------
     // points: [{ x, y, label, color?, n? }]; bubbles: points share a spot and n sizes the dot
-    function scatter(el, { points, xDomain, yDomain, xLabel = "", yLabel = "", height = 260, label = "", xFmt = fmt, yFmt = fmt, xTicks, yTicks, jitter = 0, bubbles = false, xSqrt = false }) {
+    function scatter(el, { points, xDomain, yDomain, xLabel = "", yLabel = "", height = 260, label = "", xFmt = fmt, yFmt = fmt, xTicks, yTicks, jitter = 0, bubbles = false, xSqrt = false, ySqrt = false, diagonal = false }) {
         const W = widthOf(el), H = height;
         const m = { t: 14, r: 14, b: 40, l: 40 };
         const pw = W - m.l - m.r, ph = H - m.t - m.b;
         const [x0, x1] = xDomain, [y0, y1] = yDomain;
         const sx = xSqrt ? (v) => Math.sqrt(Math.max(0, v)) : (v) => v;
         const x = (v) => m.l + ((sx(v) - sx(x0)) / (sx(x1) - sx(x0))) * pw;
-        const y = (v) => m.t + ph - ((v - y0) / (y1 - y0)) * ph;
+        const sy = ySqrt ? (v) => Math.sqrt(Math.max(0, v)) : (v) => v;
+        const y = (v) => m.t + ph - ((sy(v) - sy(y0)) / (sy(y1) - sy(y0))) * ph;
         let body = "";
         for (const v of yTicks) body += `<line class="viz-gridline" x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/><text class="viz-tick" x="${m.l - 6}" y="${y(v)}" dy="0.32em" text-anchor="end">${esc(yFmt(v))}</text>`;
         for (const v of xTicks) body += `<text class="viz-tick" x="${x(v)}" y="${m.t + ph + 16}" text-anchor="middle">${esc(xFmt(v))}</text>`;
         body += `<line class="viz-axis" x1="${m.l}" x2="${W - m.r}" y1="${m.t + ph}" y2="${m.t + ph}"/>`;
         body += `<text class="viz-axis-title" x="${m.l + pw / 2}" y="${H - 4}" text-anchor="middle">${esc(xLabel)}</text>`;
         body += `<text class="viz-axis-title" transform="translate(11 ${m.t + ph / 2}) rotate(-90)" text-anchor="middle">${esc(yLabel)}</text>`;
+        if (diagonal) {
+            // y = x, e.g. "got back what you paid"
+            const lo = Math.max(x0, y0), hi = Math.min(x1, y1);
+            body += `<line class="viz-ref" x1="${x(lo)}" y1="${y(lo)}" x2="${x(hi)}" y2="${y(hi)}"/><text class="viz-axis-title" x="${x(hi) - 4}" y="${y(hi) + 14}" text-anchor="end">${esc(diagonal === true ? "y = x" : diagonal)}</text>`;
+        }
         const maxN = Math.max(1, ...points.map((p) => p.n ?? 1));
         // deterministic jitter so redraws don't shuffle the dots
         const jit = (i, k) => (((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1) - 0.5) * 2 * jitter;
@@ -275,6 +285,80 @@
             const rr = bubbles ? 4 + Math.sqrt((p.n ?? 1) / maxN) * 14 : 4;
             body += `<g class="viz-item"><circle class="viz-mark viz-dot${bubbles ? " is-bubble" : ""}" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rr.toFixed(1)}" style="fill:${p.color ?? "var(--viz-main)"}"/>`;
             body += `<circle class="viz-hit" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${Math.max(12, rr + 2)}" ${tip(p.tipV ?? `${xLabel} ${xFmt(p.x)} · ${yLabel} ${yFmt(p.y)}`, p.label)}/></g>`;
+        });
+        el.innerHTML = svg(W, H, body, label);
+    }
+
+
+    // ---------- several lines on one axis ----------
+    // points: [{ label, tick?, tickLabel? }]; series: [{ name, color, values: [n|null, …] }]
+    function lines(el, { points, series, height = 240, valueFmt = fmt, label = "", yMin = 0 }) {
+        const W = widthOf(el), H = height;
+        const m = { t: 18, r: 14, b: 26, l: 44 };
+        const pw = W - m.l - m.r, ph = H - m.t - m.b;
+        const vs = series.flatMap((s) => s.values).filter((v) => v != null);
+        const t = ticks(Math.max(...vs, 0) - yMin);
+        const top = yMin + t.top;
+        const y = (v) => m.t + ph - ((v - yMin) / (top - yMin)) * ph;
+        const x = (i) => m.l + (points.length < 2 ? pw / 2 : (i / (points.length - 1)) * pw);
+        let body = yAxis({ list: t.list.map((v) => v + yMin) }, m.l, W - m.r, y, valueFmt);
+        for (const s of series) {
+            const pts = s.values.map((v, i) => (v == null ? null : [x(i), y(v)])).filter(Boolean);
+            if (pts.length > 1) body += `<path class="viz-line" d="${pts.map(([a, b], i) => `${i ? "L" : "M"}${a.toFixed(1)},${b.toFixed(1)}`).join("")}" style="stroke:${s.color}"/>`;
+            const lastI = s.values.map((v, i) => (v == null ? -1 : i)).filter((i) => i >= 0).pop();
+            if (lastI != null) body += `<circle class="viz-dot" cx="${x(lastI)}" cy="${y(s.values[lastI])}" r="4" style="fill:${s.color}"/>`;
+            if (pts.length === 1 && points.length > 1) body += `<circle class="viz-dot" cx="${pts[0][0]}" cy="${pts[0][1]}" r="4" style="fill:${s.color}"/>`;
+        }
+        const room = Math.max(1, Math.floor(pw / 56));
+        const cand = points.map((p, i) => i).filter((i) => points[i].tick ?? true);
+        const every = Math.max(1, Math.ceil(cand.length / room));
+        cand.forEach((i, k) => {
+            if (k % every === 0) body += `<text class="viz-tick" x="${x(i)}" y="${H - 8}" text-anchor="middle">${esc(points[i].tickLabel ?? points[i].label)}</text>`;
+        });
+        body += `<line class="viz-axis" x1="${m.l}" x2="${W - m.r}" y1="${y(yMin)}" y2="${y(yMin)}"/>`;
+        body += `<g class="viz-cross" visibility="hidden"><line class="viz-crossline" y1="${m.t}" y2="${m.t + ph}"/></g>`;
+        body += `<rect class="viz-hover" x="${m.l - 8}" y="${m.t}" width="${pw + 16}" height="${ph}" fill="transparent"/>`;
+        el.innerHTML = svg(W, H, body, label);
+
+        const hover = el.querySelector(".viz-hover"), cross = el.querySelector(".viz-cross"), ln = cross.firstChild;
+        hover.addEventListener("pointermove", (e) => {
+            const r = hover.getBoundingClientRect();
+            const i = Math.max(0, Math.min(points.length - 1, Math.round(((e.clientX - r.left - 8) / (r.width - 16)) * (points.length - 1))));
+            ln.setAttribute("x1", x(i));
+            ln.setAttribute("x2", x(i));
+            cross.setAttribute("visibility", "visible");
+            // one readout listing every series at this x
+            Tip.show(e, points[i].full ?? points[i].label, series.map((s) => `${s.name}: ${s.values[i] == null ? "–" : valueFmt(s.values[i])}`).join("\n"));
+        });
+        hover.addEventListener("pointerleave", () => {
+            cross.setAttribute("visibility", "hidden");
+            Tip.hide();
+        });
+    }
+
+    // ---------- diverging bars around zero (gains right, losses left) ----------
+    // items: [{ label, value, valueLabel?, tip?, full? }]
+    function divbars(el, { items, valueFmt = fmt, label = "" }) {
+        const W = widthOf(el);
+        const row = 28, labelW = Math.min(170, Math.round(W * 0.36));
+        const valueW = Math.max(44, ...items.map((it) => String(it.valueLabel ?? valueFmt(it.value)).length * 7 + 10));
+        const span = Math.max(...items.map((i) => Math.abs(i.value)), 0) || 1;
+        const pw = W - labelW - 2 * valueW;
+        const hasNeg = items.some((i) => i.value < 0), hasPos = items.some((i) => i.value > 0);
+        // zero sits in the middle only when both signs are present
+        const zero = labelW + valueW + (hasNeg && hasPos ? pw / 2 : hasNeg ? pw : 0);
+        const scale = (hasNeg && hasPos ? pw / 2 : pw) / span;
+        const H = items.length * row + 4;
+        let body = `<line class="viz-axis" x1="${zero}" x2="${zero}" y1="0" y2="${H}"/>`;
+        items.forEach((it, i) => {
+            const y = i * row + 4, w = Math.max(2, Math.abs(it.value) * scale);
+            const name = fit(it.label, labelW - 12);
+            const pos = it.value >= 0;
+            const d = pos ? hbar(zero, y + 3, w, 18) : `M${zero},${y + 3}H${zero - w + 4}Q${zero - w},${y + 3} ${zero - w},${y + 7}V${y + 17}Q${zero - w},${y + 21} ${zero - w + 4},${y + 21}H${zero}Z`;
+            body += `<g class="viz-item"><text class="viz-label" x="${labelW - 8}" y="${y + 12}" dy="0.32em" text-anchor="end">${esc(name)}</text>`;
+            body += `<path class="viz-mark" d="${d}" style="fill:${pos ? "var(--viz-pos)" : "var(--viz-neg)"}"/>`;
+            body += `<text class="viz-value" x="${pos ? zero + w + 6 : zero - w - 6}" y="${y + 12}" dy="0.32em" text-anchor="${pos ? "start" : "end"}">${esc(it.valueLabel ?? valueFmt(it.value))}</text>`;
+            body += `<rect class="viz-hit" x="0" y="${y}" width="${W}" height="${row}" ${tip(it.tip ?? it.valueLabel ?? valueFmt(it.value), it.full ?? it.label)}/></g>`;
         });
         el.innerHTML = svg(W, H, body, label);
     }
@@ -323,5 +407,5 @@
         return { show, hide };
     })();
 
-    window.Charts = { columns, hbars, line, donut, heatmap, scatter, legend, table, fmt, esc };
+    window.Charts = { columns, hbars, line, lines, divbars, donut, heatmap, scatter, legend, table, fmt, esc };
 })();

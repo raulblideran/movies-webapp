@@ -40,6 +40,8 @@
     --viz-hi: var(--accent-2); /* the one mark a chart calls out */
     --viz-seq: var(--accent); /* heatmap ramp, mixed into the surface */
     --viz-other: color-mix(in oklab, var(--ink-3) 75%, var(--surface));
+    --viz-pos: var(--ok); /* gains */
+    --viz-neg: var(--danger); /* losses */
     /* laid over the hero photo so the marquee and text stay legible */
     --hero-shade: linear-gradient(180deg, rgba(36, 5, 9, 0.62) 0%, rgba(36, 5, 9, 0.78) 65%, rgba(36, 5, 9, 0.95) 100%);
 
@@ -3038,6 +3040,40 @@ textarea.code {
 
 /* ---------- stats page (stats.html, js/charts.js) ---------- */
 
+.stats-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 0 0 8px;
+    border-bottom: 1px solid var(--line);
+}
+
+.stats-tabs [role="tab"] {
+    margin-bottom: -1px;
+    padding: 10px 18px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--ink-2);
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    text-transform: var(--display-case);
+    letter-spacing: var(--display-tracking);
+    font-size: 18px;
+}
+
+.stats-tabs [role="tab"]:hover {
+    color: var(--ink);
+}
+
+.stats-tabs [role="tab"][aria-selected="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--accent);
+}
+
+[role="tabpanel"] > .stats-root:first-child {
+    padding-top: 16px;
+}
+
 .stats-filters {
     display: flex;
     flex-wrap: wrap;
@@ -3068,7 +3104,7 @@ textarea.code {
 
 .kpis {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr));
     gap: 12px;
     margin: 0 0 36px;
 }
@@ -3087,6 +3123,7 @@ textarea.code {
 
 .kpi dd {
     margin: 2px 0 0;
+    white-space: nowrap;
     font-size: 30px;
     font-weight: 700;
     line-height: 1.15;
@@ -3250,6 +3287,11 @@ textarea.code {
 
 .viz-dot.is-bubble {
     fill-opacity: 0.85;
+}
+
+.viz-ref {
+    stroke: var(--ink-3);
+    stroke-width: 1;
 }
 
 .viz-crossline {
@@ -3491,10 +3533,40 @@ textarea.code {
 
 .viz-tip span {
     color: var(--ink-2);
+    white-space: pre-line;
 }
 
 .viz-tip span:empty {
     display: none;
+}
+
+/* CeX tab: the full item table */
+.cex-table {
+    font-size: 14px;
+}
+
+.cex-table-wrap {
+    max-height: 560px;
+    margin-top: 0;
+}
+
+.cex-table th[scope="row"] {
+    white-space: normal;
+    min-width: 220px;
+}
+
+.cex-table-titles {
+    display: block;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
+.cex-table .is-up {
+    color: var(--ok);
+}
+
+.cex-table .is-down {
+    color: var(--danger);
 }
 
 /* records */

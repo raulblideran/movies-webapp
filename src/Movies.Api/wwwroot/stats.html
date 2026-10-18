@@ -57,8 +57,17 @@
         </header>
 
         <main class="page stats-page">
-            <div class="stats-filters" id="statsFilters" aria-label="Filter the stats"></div>
-            <div id="statsRoot" class="stats-root"></div>
+            <div class="stats-tabs" role="tablist" aria-label="Stats">
+                <button type="button" role="tab" id="tab-collection" data-tab="collection" aria-controls="panel-collection" aria-selected="true">Collection</button>
+                <button type="button" role="tab" id="tab-cex" data-tab="cex" aria-controls="panel-cex" aria-selected="false" tabindex="-1">CeX value</button>
+            </div>
+            <div role="tabpanel" id="panel-collection" aria-labelledby="tab-collection">
+                <div class="stats-filters" id="statsFilters" aria-label="Filter the stats"></div>
+                <div id="statsRoot" class="stats-root"></div>
+            </div>
+            <div role="tabpanel" id="panel-cex" aria-labelledby="tab-cex" hidden>
+                <div id="cexRoot" class="stats-root"></div>
+            </div>
         </main>
 
         <div id="loadingOverlay" class="loading">
@@ -80,5 +89,6 @@
         <script src="js/auth.js"></script>
         <script src="js/charts.js"></script>
         <script src="js/stats.js"></script>
+        <script src="js/stats-cex.js"></script>
     </body>
 </html>

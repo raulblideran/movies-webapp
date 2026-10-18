@@ -1,5 +1,7 @@
 // Stats page: everything is worked out in the browser from /api/titles. Charts come from js/charts.js
 // and take their colours from the theme, so only filters and resizes trigger a redraw.
+// The page has tabs; this file owns the Collection tab and the tab switching, and shares its building
+// blocks as window.StatsKit with the other tabs (js/stats-cex.js).
 
 (function () {
     const { columns, hbars, line, donut, heatmap, scatter, legend, table, fmt, esc } = window.Charts;
@@ -37,7 +39,10 @@
     let all = [];
     let genreInfo = { name: new Map(), color: new Map(), top: [] };
     const filter = { type: "all", from: null, to: null };
-    let draws = [];
+    // Each tab keeps the chart draw calls for its panel; only the visible tab is drawn (hidden panels have no width).
+    const tabs = { collection: { draws: [], render: () => render() } };
+    let target = tabs.collection.draws;
+    let current = "collection";
     let seq = 0;
 
     // ---------- shaping the data ----------
@@ -114,7 +119,7 @@
 
     function card(title, sub, draw, { size = "", rows = null, head = null, note = "", extra = "" } = {}) {
         const id = `viz${++seq}`;
-        if (draw) draws.push(() => {
+        if (draw) target.push(() => {
             const el = document.getElementById(id);
             if (el) draw(el);
         });
@@ -173,10 +178,14 @@
             ["Years of watching", years.length ? fmt(Math.max(...years) - Math.min(...years) + 1) : "–", years.length ? `${Math.min(...years)}–${Math.max(...years)}` : ""],
             ["Titles a month", fmt(months.size ? sum([...months.values()]) / ((Math.max(...months.keys()) - Math.min(...months.keys())) + 1) : null, 1), "average since the first"],
         ];
-        return `<dl class="kpis">${tiles
+        return kpiTiles(tiles);
+    }
+
+    // [label, value, sub] → tile grid
+    const kpiTiles = (tiles) =>
+        `<dl class="kpis">${tiles
             .map(([label, value, sub]) => `<div class="kpi"><dt>${esc(label)}</dt><dd>${esc(value)}</dd><p>${esc(sub)}</p></div>`)
             .join("")}</dl>`;
-    }
 
     function timeSection(F) {
         const W = F.filter((r) => r.fy != null);
@@ -499,7 +508,7 @@
             }),
         ]);
         // The paired histograms share one card (and one y scale), so they are drawn here rather than by card().
-        draws.push(() => {
+        target.push(() => {
             const b = document.querySelector('[data-pair="b"]'), a = document.querySelector('[data-pair="a"]');
             const opts = { yMax, valueFmt: (v) => `${fmt(v)}%`, height: 180, highlight: (it, i) => (i === 11 ? HI : undefined) };
             if (b) columns(b, { items: dB, label: "Rating distribution with Bogdan", ...opts });
@@ -663,21 +672,23 @@
 
     // ---------- render ----------
 
+    // [[value, label], …] into the marquee
+    const setHero = (stats) =>
+        (document.getElementById("stats").innerHTML = stats.map(([v, l]) => `<div class="stat"><dt>${esc(l)}</dt><dd>${esc(v)}</dd></div>`).join(""));
+
     function heroStats(F) {
         const rated = F.filter((r) => r.r10 != null).map((r) => r.r10);
-        const stats = [
+        setHero([
             [fmt(F.length), "titles"],
             [fmt(sum(F.map((r) => r.watchCount))), "watches"],
             [rated.length ? mean(rated).toFixed(2) : "–", "avg rating"],
             [fmt(new Set(F.flatMap((r) => r.gkeys)).size), "genres"],
-        ];
-        document.getElementById("stats").innerHTML = stats.map(([v, l]) => `<div class="stat"><dt>${l}</dt><dd>${v}</dd></div>`).join("");
+        ]);
     }
 
     function render() {
         const F = filtered();
-        draws = [];
-        seq = 0;
+        target = tabs.collection.draws = [];
         heroStats(F);
         const count = document.getElementById("statsCount");
         if (count) count.textContent = F.length === all.length ? `All ${plural(all.length, "title")}` : `${fmt(F.length)} of ${plural(all.length, "title")}`;
@@ -687,7 +698,49 @@
         drawAll();
     }
 
-    const drawAll = () => draws.forEach((d) => d());
+    const drawAll = () => tabs[current].draws.forEach((d) => d());
+
+    // ---------- tabs ----------
+
+    // Start drawing a tab's charts into a fresh list (called by a tab's render before it builds cards).
+    function beginTab(name) {
+        tabs[name].draws = [];
+        target = tabs[name].draws;
+    }
+
+    function showTab(name, { push = true } = {}) {
+        if (!tabs[name]) name = "collection";
+        current = name;
+        document.querySelectorAll("[data-tab]").forEach((b) => {
+            const on = b.dataset.tab === name;
+            b.setAttribute("aria-selected", String(on));
+            b.tabIndex = on ? 0 : -1;
+            document.getElementById(b.getAttribute("aria-controls")).hidden = !on;
+        });
+        if (push) history.replaceState(null, "", name === "collection" ? location.pathname + location.search : `#${name}`);
+        if (!tabs[name].rendered) {
+            tabs[name].rendered = true;
+            tabs[name].render();
+        } else {
+            tabs[name].hero?.();
+            drawAll();
+        }
+        if (name === "collection") heroStats(filtered());
+    }
+
+    function initTabs() {
+        const buttons = [...document.querySelectorAll("[data-tab]")];
+        buttons.forEach((b, i) => {
+            b.addEventListener("click", () => showTab(b.dataset.tab));
+            b.addEventListener("keydown", (e) => {
+                const next = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : null;
+                if (next == null) return;
+                const t = buttons[(next + buttons.length) % buttons.length];
+                t.focus();
+                showTab(t.dataset.tab);
+            });
+        });
+    }
 
     // Redraw at the new width when the layout changes size (charts are drawn in pixels, not stretched).
     let lastWidth = 0, pending;
@@ -697,7 +750,7 @@
         lastWidth = w;
         clearTimeout(pending);
         pending = setTimeout(drawAll, 120);
-    }).observe(document.getElementById("statsRoot"));
+    }).observe(document.querySelector(".stats-page"));
 
     async function load() {
         const overlay = document.getElementById("loadingOverlay");
@@ -707,13 +760,25 @@
             all = (await resp.json()).map(shape);
             buildGenres();
             renderFilters();
+            tabs.collection.rendered = true;
             render();
+            initTabs();
+            const wanted = location.hash.slice(1);
+            if (tabs[wanted] && wanted !== "collection") showTab(wanted, { push: false });
         } catch (e) {
             document.getElementById("statsRoot").innerHTML = `<div class="empty"><h2>Couldn't load the collection</h2><p class="muted">${esc(e.message)}</p></div>`;
         } finally {
             overlay.classList.add("hidden");
         }
     }
+
+    window.StatsKit = {
+        card, section, empty, guard, kpiTiles, setHero, beginTab, slot, OTHER, MAIN, HI, MONTHS,
+        gbp, pct, sum, mean, median, plural, countBy, yearSpan,
+        titles: () => all,
+        addTab: (name, tab) => (tabs[name] = { draws: [], ...tab }),
+        redraw: () => drawAll(),
+    };
 
     load();
 })();

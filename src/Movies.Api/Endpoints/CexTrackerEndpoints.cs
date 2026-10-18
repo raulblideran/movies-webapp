@@ -33,6 +33,19 @@ public static class CexTrackerEndpoints
                 : Results.Problem("CeX is not responding.", statusCode: 502);
         }).RequireRateLimiting("cex");
 
+        // Daily price history of the collection's own CeX products (see CexHistoryService), oldest first.
+        app.MapGet("/api/cex/history", async (MoviesDbContext db) =>
+        {
+            var rows = await db.CexPriceSnapshots.AsNoTracking().OrderBy(s => s.Date).ToListAsync();
+            return rows.GroupBy(s => s.Sku).Select(g => new
+            {
+                Sku = g.Key,
+                g.Last().BoxName,
+                g.Last().Category,
+                Points = g.Select(s => new { s.Date, Sell = s.SellPrice, Cash = s.CashPrice, Exchange = s.ExchangePrice }),
+            });
+        });
+
         var items = app.MapGroup("/api/cex-items");
 
         items.MapGet("/", async (MoviesDbContext db) =>

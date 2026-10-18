@@ -9,6 +9,7 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
 {
     public DbSet<Title> Titles => Set<Title>();
     public DbSet<CexItem> CexItems => Set<CexItem>();
+    public DbSet<CexPriceSnapshot> CexPriceSnapshots => Set<CexPriceSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -38,6 +39,17 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
             e.Property(c => c.CashPrice).HasPrecision(10, 2);
             e.Property(c => c.ExchangePrice).HasPrecision(10, 2);
             e.HasIndex(c => c.Sku).IsUnique();
+        });
+
+        builder.Entity<CexPriceSnapshot>(e =>
+        {
+            e.Property(s => s.Sku).HasMaxLength(40);
+            e.Property(s => s.BoxName).HasMaxLength(300);
+            e.Property(s => s.Category).HasMaxLength(100);
+            e.Property(s => s.SellPrice).HasPrecision(10, 2);
+            e.Property(s => s.CashPrice).HasPrecision(10, 2);
+            e.Property(s => s.ExchangePrice).HasPrecision(10, 2);
+            e.HasIndex(s => new { s.Sku, s.Date }).IsUnique();
         });
     }
 

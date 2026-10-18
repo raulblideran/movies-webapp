@@ -112,6 +112,8 @@ builder.Services.AddHttpClient<TmdbClient>(c =>
 builder.Services.Configure<CexOptions>(config.GetSection("Cex"));
 builder.Services.AddScoped<CexItemsService>();
 builder.Services.AddHostedService<CexRefreshService>();
+builder.Services.AddScoped<CexHistoryService>();
+builder.Services.AddHostedService<CexHistoryRefreshService>();
 builder.Services.AddHttpClient<CexClient>(c =>
 {
     c.BaseAddress = new Uri("https://wss2.cex.uk.webuy.io/");
