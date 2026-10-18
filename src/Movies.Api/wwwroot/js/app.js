@@ -521,7 +521,7 @@ async function openModal(row) {
     const modalBody = document.getElementById("modalBody");
     const modalPoster = document.getElementById("modalPoster");
 
-    let html = `
+    modalBody.innerHTML = `
     <div id="modalAdminBar"></div>
     <div class="tags tags-large">${tagsHtml(row, { formats: true })}</div>
     <h2 class="modal-title" id="modalTitle">${escapeHtml(row.name)}</h2>
@@ -529,23 +529,14 @@ async function openModal(row) {
     <dl class="facts modal-facts">${factsHtml(row, { skip: ["Price (£)"] })}</dl>
     `;
 
-    if ((row.pricePaid || 0) > 0) {
-        html += `
-        <section class="section">
-            <h3>Price paid</h3>
-            <div class="price-paid">${money(row.pricePaid)}</div>
-        </section>`;
-    }
-
-    if (row.cexLinks.length > 0) {
-        html += `
-        <section class="section" id="cexSection">
-            <h3>What it's worth at CeX</h3>
-            <div id="cexPricing" class="muted pulse">Checking CeX prices…</div>
-        </section>`;
-    }
-
-    modalBody.innerHTML = html;
+    // Money lives under the poster, so a long CeX list never stretches the details column.
+    const paid = (row.pricePaid || 0) > 0;
+    const value = document.getElementById("modalValue");
+    value.innerHTML = paid || row.cexLinks.length > 0
+        ? `
+        ${paid ? `<div class="value-paid"><span>Price paid</span><span class="price-paid">${money(row.pricePaid)}</span></div>` : ""}
+        ${row.cexLinks.length > 0 ? `<h3 class="value-heading">Worth at CeX</h3><div id="cexPricing" class="muted pulse">Checking CeX prices…</div>` : ""}`
+        : "";
 
     if (row.posterUrl) {
         modalPoster.src = row.posterUrl;
@@ -555,12 +546,14 @@ async function openModal(row) {
         modalPoster.removeAttribute("src");
         modalPoster.classList.add("hidden");
     }
-    document.getElementById("modalPanel").classList.toggle("no-poster", !row.posterUrl);
+    const panel = document.getElementById("modalPanel");
+    panel.classList.toggle("no-poster", !row.posterUrl);
+    panel.classList.toggle("no-aside", !row.posterUrl && !value.innerHTML);
 
     const wasOpen = !modal.classList.contains("hidden");
     modal.classList.remove("hidden");
-    if (!wasOpen) modalBody.parentElement.querySelector(".close").focus();
-    modalBody.scrollTop = 0;
+    if (!wasOpen) panel.querySelector(".close").focus();
+    document.getElementById("modalScroll").scrollTop = 0;
     document.body.style.overflow = "hidden";
 
     updateModalNav();
@@ -580,14 +573,13 @@ async function openModal(row) {
                 continue;
             }
             resultsHtml += `
-            <dl class="prices">
-                <div><dt>CeX sells for</dt><dd>£${details.sellPrice}</dd></div>
-                <div class="is-cash"><dt>Cash payout</dt><dd>£${details.cashPrice}</dd></div>
-                <div class="is-voucher"><dt>Voucher</dt><dd>£${details.exchangePrice}</dd></div>
-            </dl>
-            <div class="price-source">
-                <span>${escapeHtml(details.boxName)}</span>
-                <a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="link">View on CeX</a>
+            <div class="cex-entry">
+                <a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="cex-entry-name" title="View on CeX">${escapeHtml(details.boxName)} <span aria-hidden="true">↗</span></a>
+                <dl class="prices prices-compact">
+                    <div><dt>Sells for</dt><dd>£${details.sellPrice}</dd></div>
+                    <div class="is-cash"><dt>Cash</dt><dd>£${details.cashPrice}</dd></div>
+                    <div class="is-voucher"><dt>Voucher</dt><dd>£${details.exchangePrice}</dd></div>
+                </dl>
             </div>`;
         }
         pricingEl.classList.remove("pulse", "muted");

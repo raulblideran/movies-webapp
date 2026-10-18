@@ -1241,17 +1241,31 @@ textarea.code {
     max-width: 920px;
 }
 
-/* The poster column is sized so a 2:3 poster always fits the panel's height: the poster is never
-   stretched to the text column's height (which made object-fit crop and "zoom" it). */
+/* Title modal: a sidebar with the poster (always 2:3) and the money (price paid, CeX prices), and
+   the details beside it. The panel scrolls as one piece, so a long CeX list just makes the sidebar
+   longer instead of squeezing or stretching anything. */
 .panel-title {
-    --poster-w: min(460px, calc((100vh - 68px) * 2 / 3));
-    max-width: 1180px;
-    display: grid;
-    grid-template-columns: minmax(0, var(--poster-w)) minmax(0, 1fr);
-    align-items: start;
+    max-width: 1080px;
+    display: flex;
     overflow: hidden;
     padding: 0;
-    background: linear-gradient(90deg, var(--poster-bg) var(--poster-w), var(--surface) var(--poster-w));
+}
+
+.modal-scroll {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    width: 100%;
+    max-height: inherit;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+}
+
+.modal-aside {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--line);
+    background: var(--poster-bg);
 }
 
 .panel-title .modal-poster {
@@ -1263,25 +1277,115 @@ textarea.code {
     background: var(--poster-bg);
 }
 
+.modal-value {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+}
+
+.modal-value:empty {
+    display: none;
+}
+
+.value-paid {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-2);
+}
+
+.value-paid .price-paid {
+    font-size: 28px;
+}
+
+.value-heading {
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-2);
+}
+
+.value-paid + .value-heading {
+    margin-top: 0;
+}
+
+.modal-value > .value-heading:first-child {
+    padding-top: 0;
+    border-top: 0;
+}
+
+#cexPricing {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-size: 14px;
+}
+
+.cex-entry-name {
+    display: block;
+    margin-bottom: 6px;
+    overflow: hidden;
+    font-size: 13px;
+    color: var(--ink-2);
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cex-entry-name:hover {
+    color: var(--accent);
+}
+
+.prices.prices-compact {
+    gap: 6px;
+    margin: 0;
+}
+
+.prices-compact > div {
+    padding: 6px 8px;
+}
+
+.prices-compact dt {
+    font-size: 11px;
+}
+
+.prices-compact dd {
+    font-size: 19px;
+}
+
 .panel-title .modal-body {
-    overflow-y: auto;
-    max-height: calc(100vh - 42px);
+    min-width: 0;
     padding: 32px;
 }
 
-.panel-title.no-poster {
-    grid-template-columns: minmax(0, 1fr);
-    background: var(--surface);
+.panel-title.no-poster .modal-aside {
+    justify-content: center;
+}
+
+.panel-title.no-aside {
     max-width: 720px;
 }
 
+.panel-title.no-aside .modal-scroll {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.panel-title.no-aside .modal-aside {
+    display: none;
+}
+
+/* Phones: one column, in reading order: poster, details, then the money. */
 @media (max-width: 760px) {
-    .panel-title {
+    .modal-scroll {
         grid-template-columns: minmax(0, 1fr);
-        overflow-y: auto;
     }
-    .panel-title {
-        background: var(--surface);
+    .modal-aside {
+        display: contents;
     }
     .panel-title .modal-poster {
         width: auto;
@@ -1290,9 +1394,15 @@ textarea.code {
         margin: 0 auto;
     }
     .panel-title .modal-body {
-        max-height: none;
-        overflow: visible;
-        padding: 24px 20px;
+        padding: 24px 20px 8px;
+    }
+    .modal-value {
+        order: 2;
+        margin: 0 20px 20px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface-2);
     }
 }
 
@@ -1338,8 +1448,7 @@ textarea.code {
     padding: 20px 80px 44px;
 }
 
-#modal .panel-title,
-#modal .panel-title .modal-body {
+#modal .panel-title {
     max-height: calc(100vh - 68px);
 }
 
@@ -1414,9 +1523,6 @@ textarea.code {
     }
     #modal .panel-title {
         max-height: calc(100vh - 92px);
-    }
-    #modal .panel-title .modal-body {
-        max-height: none;
     }
 }
 
