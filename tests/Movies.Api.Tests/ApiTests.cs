@@ -24,10 +24,10 @@ public class ApiTests : IClassFixture<TestApp>
     }
 
     [Fact]
-    public async Task Version_is_the_build_date()
+    public async Task Version_is_the_build_date_and_time()
     {
         var v = await _app.CreateClient().GetFromJsonAsync<JsonElement>("/api/version");
-        Assert.Matches(@"^\d{6}$", v.GetProperty("version").GetString());
+        Assert.Matches(@"^\d{6}\.\d{4}$", v.GetProperty("version").GetString());
     }
 
     [Fact]
@@ -37,7 +37,7 @@ public class ApiTests : IClassFixture<TestApp>
         var html = await resp.Content.ReadAsStringAsync();
         Assert.Equal("no-cache", resp.Headers.CacheControl?.ToString());
         Assert.DoesNotContain("{{version}}", html);
-        Assert.Matches(@"v\d{6}</span", html);
+        Assert.Matches(@"v\d{6}\.\d{4}</span", html);
         Assert.Matches(@"js/app\.js\?v=\d{12}", html);
     }
 
