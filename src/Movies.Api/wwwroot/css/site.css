@@ -1279,7 +1279,7 @@ textarea.code {
 .ticket {
     display: grid;
     grid-template-columns: var(--poster-w) minmax(0, 1fr) var(--stub-w);
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
     min-height: 100%;
 }
 
@@ -1289,7 +1289,7 @@ textarea.code {
 
 .ticket-poster {
     grid-column: 1;
-    grid-row: 1 / span 2;
+    grid-row: 1 / span 3;
     background: var(--poster-bg);
 }
 
@@ -1302,7 +1302,25 @@ textarea.code {
 
 .ticket-head {
     grid-column: -3;
+    grid-row: 1;
     padding: 36px 32px 0;
+}
+
+/* Edit / Watched again / Delete, when signed in (admin.js fills #modalAdminBar) */
+.ticket-actions {
+    grid-column: -3;
+    grid-row: 2;
+    padding: 20px 32px 0;
+}
+
+.ticket-actions:not(:has(.modal-actions)) {
+    display: none;
+}
+
+.ticket-actions .modal-actions {
+    margin: 0;
+    padding: 0;
+    border: 0;
 }
 
 .ticket-head-text {
@@ -1324,17 +1342,12 @@ textarea.code {
     white-space: nowrap;
 }
 
-.ticket-head .modal-actions {
-    margin: 20px 0 0;
-    padding: 0;
-    border: 0;
-}
 
 /* ---- the stub ---- */
 
 .stub {
     grid-column: -2;
-    grid-row: 1 / span 2;
+    grid-row: 1 / span 3;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1381,6 +1394,7 @@ textarea.code {
 
 .ticket-body {
     grid-column: -3;
+    grid-row: 3;
     display: flex;
     flex-direction: column;
     gap: 30px;
@@ -1566,7 +1580,8 @@ textarea.code {
     color: var(--warn);
 }
 
-/* Phones: the stub becomes a strip across the ticket, torn along the top and bottom. */
+/* Phones: a full-screen sheet. Poster and title share the first row, the actions run full
+   width under them, the stub becomes a strip torn along its top and bottom, then the history. */
 @media (max-width: 760px) {
     .panel-title {
         -webkit-mask: none;
@@ -1574,37 +1589,68 @@ textarea.code {
     }
     .ticket,
     .ticket.no-poster {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
+        grid-template-rows: none;
     }
-    .ticket-poster,
-    .ticket-head,
-    .ticket-body {
+    .ticket-poster {
         grid-column: 1;
-        grid-row: auto;
+        grid-row: 1;
+        align-self: start;
+        background: none;
+        padding: 16px 0 0 16px;
     }
     .ticket-poster .modal-poster {
-        width: auto;
-        max-width: 100%;
-        max-height: 60vh;
-        margin: 0 auto;
+        border-radius: var(--radius-sm);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--line);
     }
     .ticket-head {
-        padding: 22px 20px 20px;
+        grid-column: 2;
+        grid-row: 1;
+        align-self: end;
+        padding: 16px 16px 2px;
+    }
+    .ticket.no-poster .ticket-head {
+        grid-column: 1 / -1;
+        padding: 20px 16px 0;
+    }
+    .ticket-head .modal-title {
+        margin-top: 10px;
+        font-size: clamp(24px, 7vw, 34px);
+        overflow-wrap: anywhere;
+    }
+    .ticket-head .tags-large .tag,
+    .ticket-head .tag {
+        font-size: 12px;
+    }
+    .ticket-actions,
+    .stub,
+    .ticket-body {
+        grid-column: 1 / -1;
+        grid-row: auto;
+    }
+    .ticket-actions {
+        padding: 16px 16px 0;
+    }
+    .ticket-actions .modal-actions > * {
+        flex: 1 1 auto;
+    }
+    .ticket-actions .split {
+        flex: 0 0 auto;
     }
     .stub {
-        grid-column: 1;
-        grid-row: auto;
         flex-direction: row;
         flex-wrap: wrap;
-        justify-content: center;
-        gap: 14px 24px;
-        padding: 18px 20px;
+        justify-content: space-around;
+        align-items: center;
+        gap: 14px 16px;
+        margin-top: 18px;
+        padding: 18px 16px;
         border-left: 0;
         border-block: 2px dashed var(--line-strong);
     }
     .stub-facts {
         display: flex;
-        gap: 20px;
+        gap: 18px;
         width: auto;
         padding: 0;
         border: 0;
@@ -1616,7 +1662,8 @@ textarea.code {
         flex-basis: 100%;
     }
     .ticket-body {
-        padding: 24px 20px 28px;
+        gap: 24px;
+        padding: 22px 16px 28px;
     }
     .watch-log {
         grid-auto-flow: row;
@@ -1637,6 +1684,7 @@ textarea.code {
         bottom: auto;
         height: 8px;
     }
+}
 }
 
 .panel-body {
@@ -1742,22 +1790,60 @@ textarea.code {
 }
 
 @media (max-width: 760px) {
+    /* The title sheet fills the screen above a bar holding every control within thumb reach:
+       close on the left, previous / count / next on the right. Nothing floats over the content. */
     #modal {
-        padding: 12px 12px 76px;
+        --bar-h: calc(66px + env(safe-area-inset-bottom));
+        padding: 0 0 var(--bar-h);
+        place-items: stretch;
+        background: var(--surface-2);
+    }
+    #modal .panel-title {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: none;
+        border: 0;
+        border-bottom: 1px solid var(--line-strong);
+        border-radius: 0;
+        box-shadow: none;
+        animation: none;
+    }
+    #modal .modal-scroll {
+        height: 100%;
+    }
+    #modal .close {
+        position: fixed;
+        top: auto;
+        right: auto;
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        left: 12px;
+        width: 46px;
+        height: 46px;
+        font-size: 24px;
     }
     .modal-nav {
         top: auto;
-        bottom: 12px;
+        bottom: calc(10px + env(safe-area-inset-bottom));
         transform: none;
-        width: 48px;
-        height: 48px;
+        width: 46px;
+        height: 46px;
+        box-shadow: none;
+    }
+    .modal-prev {
+        left: auto;
+        right: 150px;
+    }
+    .modal-next {
+        right: 12px;
     }
     .modal-count {
-        bottom: 26px;
-    }
-    #modal .panel-title {
-        max-height: calc(100vh - 92px);
-        max-height: calc(100dvh - 92px);
+        left: auto;
+        right: 64px;
+        bottom: calc(24px + env(safe-area-inset-bottom));
+        width: 80px;
+        transform: none;
+        text-align: center;
     }
 }
 

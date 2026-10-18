@@ -605,9 +605,9 @@ async function openModal(row) {
             <div class="ticket-head-text">
                 <div class="tags">${tags}</div>
                 <h2 class="modal-title" id="modalTitle">${escapeHtml(row.name)}${row.releaseYear ? ` <span class="modal-year">${row.releaseYear}</span>` : ""}</h2>
-                <div id="modalAdminBar"></div>
             </div>
         </header>
+        <div class="ticket-actions"><div id="modalAdminBar"></div></div>
         ${stubHtml(row)}
         <div class="ticket-body">
             ${watchLogHtml(row)}
