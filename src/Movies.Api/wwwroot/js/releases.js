@@ -4,7 +4,7 @@
 //   /releases?new=1&title=34      opens "Add a release" with that title already picked (editors)
 
 (function () {
-    const { api, dialog, busy, esc, CLS } = Auth;
+    const { api, esc } = Auth;
     const { label, FORMATS, EDITIONS, money, renderTable, viewToggle } = Shelf;
 
     let releases = [];
@@ -81,33 +81,23 @@
         show();
     });
 
+    // the popup and editor (js/release-dialogs.js) work on this page's data
+    const ctx = {
+        titles: () => titles,
+        find: (id) => releases.find((x) => x.id === id),
+        async onChanged(saved) {
+            await load();
+            return saved ? releases.find((x) => x.id === saved.id) : null;
+        },
+        onOpen: (r) => setParam("release", r.id),
+        onClose: () => setParam("release", null),
+    };
+    const art = (r, opts) => ReleaseDialogs.art(r, ctx, opts);
+    const openRelease = (r) => ReleaseDialogs.open(r, ctx);
+    const openEditor = (r, presetTitleIds = []) => ReleaseDialogs.edit(r, presetTitleIds, ctx);
+    ReleaseDialogs.photoFallback(document.getElementById("releasesGrid"), ctx);
+
     // ---------- grid / table ----------
-
-    function art(r, { large = false, photo = true } = {}) {
-        if (r.imageUrl && photo) return `<img class="release-photo" data-release="${r.id}" src="${esc(r.imageUrl)}" alt="" loading="lazy">`;
-        const posters = titlesOf(r).filter((t) => t.posterUrl).slice(0, 4);
-        if (posters.length === 0) return `<div class="no-poster">${esc(r.name)}</div>`;
-        if (posters.length === 1) return `<img src="${esc(posters[0].posterUrl)}" alt="" loading="lazy">`;
-        // a box set without a CeX photo: its titles' posters together
-        return `<div class="release-collage n${posters.length}${large ? " is-large" : ""}">${posters.map((t) => `<img src="${esc(t.posterUrl)}" alt="" loading="lazy">`).join("")}</div>`;
-    }
-
-    // If CeX's photo won't load, show the titles' posters instead of an empty box.
-    function photoFallback(root) {
-        root.addEventListener(
-            "error",
-            (e) => {
-                const img = e.target.closest?.(".release-photo");
-                const r = img && releases.find((x) => x.id === Number(img.dataset.release));
-                if (!r) return;
-                const box = img.parentElement;
-                box.classList.remove("has-photo");
-                box.innerHTML = art(r, { photo: false, large: box.classList.contains("release-detail-art") });
-            },
-            true,
-        );
-    }
-    photoFallback(document.getElementById("releasesGrid"));
 
     const columns = [
         { key: "name", label: "Name", value: (r) => r.name },
@@ -170,221 +160,6 @@
             })
             .join("");
         grid.querySelectorAll("[data-i]").forEach((b) => (b.onclick = () => openRelease(list[Number(b.dataset.i)])));
-    }
-
-    // ---------- one release ----------
-
-    async function openRelease(r) {
-        const ts = titlesOf(r);
-        const canEdit = Auth.me.canEdit;
-        const d = dialog(
-            esc(r.name),
-            `
-            <div class="release-detail">
-                <div class="release-detail-art release-art${r.imageUrl ? " has-photo" : ""}">${art(r, { large: true })}</div>
-                <div class="release-detail-info">
-                    <div class="tags">
-                        <span class="tag tag-physical">${esc(FORMATS[r.format])}</span>
-                        ${r.edition !== "Standard" ? `<span class="tag">${esc(EDITIONS[r.edition])}</span>` : ""}
-                    </div>
-                    <dl class="facts release-facts">
-                        <dt>Paid</dt><dd>${r.pricePaid != null ? money(r.pricePaid) : "–"}${ts.length > 1 && r.pricePaid != null ? ` <span class="faint">(${money(r.pricePaid / ts.length)} a title)</span>` : ""}</dd>
-                        ${r.cexBoxName ? `<dt>At CeX</dt><dd>${esc(r.cexBoxName)}</dd>` : ""}
-                        <dt>Added</dt><dd>${esc(r.createdAt.slice(0, 10).split("-").reverse().join("/"))}</dd>
-                        ${r.notes ? `<dt class="sr-only">Notes</dt><dd class="wide release-notes">${esc(r.notes)}</dd>` : ""}
-                    </dl>
-                    ${r.cexSku ? `<section class="release-cex"><h3>At CeX today</h3><div data-cex class="stub-cex"><p class="muted pulse">Checking prices…</p></div></section>` : ""}
-                    ${canEdit ? `<div class="actions release-actions"><button type="button" data-edit class="btn">Edit</button><button type="button" data-delete class="btn btn-danger">Delete</button></div>` : ""}
-                </div>
-            </div>
-            <section class="release-titles">
-                <h3>${ts.length === 1 ? "The title on it" : `The ${ts.length} titles on it`}</h3>
-                ${ts.length
-                    ? `<ul class="release-title-list">${ts
-                          .map((t) => `
-                        <li><a href="/?title=${t.id}" class="release-title">
-                            ${t.posterUrl ? `<img src="${esc(t.posterUrl.replace("/w500/", "/w185/"))}" alt="" loading="lazy">` : `<span class="record-noposter">${esc(t.name)}</span>`}
-                            <span>${esc(t.name)}${t.releaseYear ? ` <span class="faint">${t.releaseYear}</span>` : ""}</span>
-                        </a></li>`)
-                          .join("")}</ul>`
-                    : `<p class="faint">No titles linked yet.</p>`}
-            </section>`,
-            { wide: true, onClose: () => setParam("release", null) },
-        );
-        setParam("release", r.id);
-        photoFallback(d.root);
-        d.$("[data-edit]")?.addEventListener("click", () => {
-            d.close();
-            openEditor(r);
-        });
-        d.$("[data-delete]")?.addEventListener("click", () => removeRelease(r, d));
-
-        if (r.cexSku) {
-            try {
-                const c = await api("GET", `/api/cex/${encodeURIComponent(r.cexSku)}`);
-                d.$("[data-cex]").innerHTML = `
-                    <div class="cex-entry">
-                        <a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link" title="${esc(c.boxName)}">${esc(c.boxName)}</a>
-                        <dl>
-                            <div><dt>Sells for</dt><dd>£${c.sellPrice}</dd></div>
-                            <div class="is-cash"><dt>Cash</dt><dd>£${c.cashPrice}</dd></div>
-                            <div class="is-voucher"><dt>Voucher</dt><dd>£${c.exchangePrice}</dd></div>
-                        </dl>
-                    </div>`;
-            } catch {
-                if (d.root.isConnected) d.$("[data-cex]").innerHTML = `<p class="status-bad">CeX didn't return prices for <a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link">${esc(r.cexSku)}</a>.</p>`;
-            }
-        }
-    }
-
-    async function removeRelease(r, d) {
-        if (!window.confirm(`Delete "${r.name}"? Its titles stay in the collection.`)) return;
-        try {
-            await api("DELETE", `/api/releases/${r.id}`);
-            d.close();
-            await load();
-            Auth.showSuccess(`Deleted ${r.name}`);
-        } catch (e) {
-            Auth.showError(e.message);
-        }
-    }
-
-    // ---------- add / edit ----------
-
-    // Pick titles by typing; picked ones are chips.
-    function titlePicker(container, initialIds) {
-        const picked = [...initialIds];
-        const all = [...titles.values()].sort((a, b) => a.name.localeCompare(b.name));
-        const listId = `titlePick-${Math.random().toString(36).slice(2, 8)}`;
-        container.className = "input chip-input";
-        container.innerHTML = `<input placeholder="Type a title" autocomplete="off" role="combobox" aria-label="Add a title" aria-autocomplete="list" aria-controls="${listId}" aria-expanded="false"><ul class="suggest hidden" id="${listId}" role="listbox"></ul>`;
-        const input = container.querySelector("input"), list = container.querySelector(".suggest");
-        let matches = [], active = -1;
-        const render = () => {
-            container.querySelectorAll("[data-chip]").forEach((c) => c.remove());
-            for (const id of picked) {
-                const t = titles.get(id);
-                const chip = document.createElement("span");
-                chip.dataset.chip = "";
-                chip.className = "chip-value";
-                chip.innerHTML = `${esc(t?.name ?? `#${id}`)} <button type="button" aria-label="Remove ${esc(t?.name ?? id)}">×</button>`;
-                chip.querySelector("button").onclick = (e) => {
-                    e.stopPropagation();
-                    picked.splice(picked.indexOf(id), 1);
-                    render();
-                };
-                container.insertBefore(chip, input);
-            }
-        };
-        const hide = () => {
-            list.classList.add("hidden");
-            input.setAttribute("aria-expanded", "false");
-            active = -1;
-        };
-        const suggest = () => {
-            const q = input.value.trim().toLowerCase();
-            if (!q) return hide();
-            matches = all.filter((t) => !picked.includes(t.id) && t.name.toLowerCase().includes(q)).slice(0, 12);
-            if (!matches.length) return hide();
-            list.innerHTML = matches
-                .map((t, i) => `<li role="option" id="${listId}-${i}" data-i="${i}" aria-selected="${i === active}">${esc(t.name)}${t.releaseYear ? ` <span class="faint">${t.releaseYear}</span>` : ""}</li>`)
-                .join("");
-            list.classList.remove("hidden");
-            input.setAttribute("aria-expanded", "true");
-        };
-        const pick = (i) => {
-            picked.push(matches[i].id);
-            input.value = "";
-            render();
-            hide();
-            input.focus();
-        };
-        input.addEventListener("input", () => {
-            active = -1;
-            suggest();
-        });
-        input.addEventListener("keydown", (e) => {
-            const open = !list.classList.contains("hidden");
-            if ((e.key === "ArrowDown" || e.key === "ArrowUp") && open) {
-                e.preventDefault();
-                active = (active + (e.key === "ArrowDown" ? 1 : -1) + matches.length) % matches.length;
-                suggest();
-            } else if (e.key === "Enter") {
-                e.preventDefault();
-                if (open) pick(Math.max(0, active));
-            } else if (e.key === "Escape" && open) {
-                e.preventDefault();
-                e.stopPropagation(); // keep the dialog open
-                hide();
-            } else if (e.key === "Backspace" && !input.value && picked.length) {
-                picked.pop();
-                render();
-            }
-        });
-        input.addEventListener("blur", () => setTimeout(hide, 150));
-        list.addEventListener("mousedown", (e) => {
-            const li = e.target.closest("[data-i]");
-            e.preventDefault();
-            if (li) pick(Number(li.dataset.i));
-        });
-        container.addEventListener("click", () => input.focus());
-        render();
-        return { get: () => picked };
-    }
-
-    function openEditor(r, presetTitleIds = []) {
-        const isNew = !r;
-        r = r ?? { name: "", format: "BluRay", edition: "Standard", pricePaid: null, notes: "", cexUrl: "", titleIds: presetTitleIds };
-        const v = (x) => (x == null ? "" : esc(x));
-        const options = (map, current) => Object.entries(map).map(([k, l]) => `<option value="${k}"${k === current ? " selected" : ""}>${esc(l)}</option>`).join("");
-        const d = dialog(
-            isNew ? "Add a release" : `Edit ${esc(r.name)}`,
-            `
-            <div data-error class="${CLS.error}" role="alert"></div>
-            <form class="release-form stack">
-                <div><label class="label" for="rel-name">Name</label>
-                    <input id="rel-name" name="name" maxlength="300" class="input" value="${v(r.name)}" placeholder="Leave empty to use CeX's name"></div>
-                <div class="row row-3">
-                    <div><label class="label" for="rel-format">Format</label><select id="rel-format" name="format" class="input">${options(FORMATS, r.format)}</select></div>
-                    <div><label class="label" for="rel-edition">Edition</label><select id="rel-edition" name="edition" class="input">${options(EDITIONS, r.edition)}</select></div>
-                    <div><label class="label" for="rel-price">Price paid (£)</label><input id="rel-price" name="pricePaid" type="number" min="0" step="0.01" class="input" value="${v(r.pricePaid)}"></div>
-                </div>
-                <div><label class="label" for="rel-cex">CeX link</label>
-                    <input id="rel-cex" name="cexUrl" class="input code" value="${v(r.cexUrl)}" placeholder="https://uk.webuy.com/product-detail?id=…"></div>
-                <div><span class="label">Titles on it</span><div data-titles></div></div>
-                <div><label class="label" for="rel-notes">Notes</label><textarea id="rel-notes" name="notes" rows="2" maxlength="2000" class="input">${v(r.notes)}</textarea></div>
-                <div class="actions">
-                    <button type="button" data-cancel class="btn">Cancel</button>
-                    <button type="submit" class="btn btn-primary">${isNew ? "Add release" : "Save changes"}</button>
-                </div>
-            </form>`,
-            { wide: true },
-        );
-        d.error("");
-        const picker = titlePicker(d.$("[data-titles]"), r.titleIds);
-        const form = d.$("form");
-        d.$("[data-cancel]").onclick = () => d.close();
-        form.onsubmit = (e) => {
-            e.preventDefault();
-            const body = {
-                name: form.name.value.trim(),
-                format: form.format.value,
-                edition: form.edition.value,
-                pricePaid: form.pricePaid.value === "" ? null : Number(form.pricePaid.value),
-                cexUrl: form.cexUrl.value.trim() || null,
-                notes: form.notes.value,
-                titleIds: picker.get(),
-            };
-            busy(d, form.querySelector("button[type=submit]"), async () => {
-                const saved = isNew ? await api("POST", "/api/releases", body) : await api("PUT", `/api/releases/${r.id}`, body);
-                d.close();
-                await load();
-                Auth.showSuccess(isNew ? `Added ${saved.name}` : `Saved ${saved.name}`);
-                const fresh = releases.find((x) => x.id === saved.id);
-                if (fresh) openRelease(fresh);
-            });
-        };
-        form.name.focus();
     }
 
     // ---------- page integration ----------

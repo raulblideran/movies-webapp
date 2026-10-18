@@ -592,7 +592,7 @@ function stubHtml(row) {
             ${formats ? `<ul class="stub-releases">${row.releases
                 .map((r) => `
                 <li>
-                    <a href="/releases?release=${r.id}" class="link">${escapeHtml(r.name)}</a>
+                    <a href="/releases?release=${r.id}" class="link" data-release-link="${r.id}">${escapeHtml(r.name)}</a>
                     <span class="stub-release-meta">${escapeHtml(Shelf.label(r))}${r.titleCount > 1 ? ` · ${r.titleCount} titles` : ""}${r.pricePaid != null ? ` · ${money(r.pricePaid)}` : ""}</span>
                 </li>`)
                 .join("")}</ul>` : ""}
@@ -654,6 +654,13 @@ async function openModal(row) {
 
     updateModalNav();
     window.Admin?.onModalOpened(row);
+    scroll.querySelectorAll("[data-release-link]").forEach((a) => {
+        a.onclick = (e) => {
+            if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; // new tab: the releases page
+            e.preventDefault();
+            showRelease(Number(a.dataset.releaseLink));
+        };
+    });
 
     // CeX pricing loads after the modal is visible
     if (cexReleases(row).length > 0) {
@@ -676,6 +683,41 @@ async function openModal(row) {
         document.getElementById("cexPricing").innerHTML = rows;
         fitPoster();
     }
+}
+
+// ---------- a release, over the title popup (js/release-dialogs.js) ----------
+
+const releaseCache = new Map();
+
+async function fetchRelease(id) {
+    const resp = await fetch(`/api/releases/${id}`, { cache: "no-store" });
+    if (!resp.ok) return null;
+    const r = await resp.json();
+    releaseCache.set(id, r);
+    return r;
+}
+
+const releaseCtx = {
+    titles: () => new Map(allData.map((t) => [t.id, t])),
+    find: (id) => releaseCache.get(id),
+    // after an edit or delete: refresh the collection and the title popup underneath
+    async onChanged(saved) {
+        await loadTitles({ quiet: true });
+        const row = modalRow && allData.find((r) => r.id === modalRow.id);
+        if (row) openModal(row);
+        return saved ? fetchRelease(saved.id) : null;
+    },
+    // a title on the release replaces the one in the popup underneath
+    openTitle(id) {
+        const row = allData.find((r) => r.id === id);
+        if (row) openModal(row);
+    },
+};
+
+async function showRelease(id) {
+    const r = await fetchRelease(id);
+    if (r) ReleaseDialogs.open(r, releaseCtx);
+    else showError("Couldn't load that release.");
 }
 
 // Releases with a CeX product, each product once.
