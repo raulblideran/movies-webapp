@@ -32,7 +32,7 @@ Settings live in `.env.dev`, which is git-ignored and created from `.env.dev.exa
 | `./dev.sh` / `up` | `dotnet watch` in pod `movies-dev`; hot-reloads C#, HTML and JS |
 | `./dev.sh test` | run the test suite |
 | `./dev.sh ef migrations add <Name>` | EF Core migrations (applied automatically on startup) |
-| `./dev.sh import <file.csv or url> [--replace] [--no-posters]` | import a sheet-format CSV |
+| `./dev.sh import <file.csv or url> [--replace] [--no-posters]` | import a sheet-format CSV. Dates can be `dd/MM/yyyy` or `MM/yyyy`; month-only dates get a random day in that month |
 | `./dev.sh create-user <name> [--role Admin\|Editor]` | create a user from the CLI |
 | `./dev.sh shell` / `./dev.sh dotnet …` | shell or any dotnet command inside the container |
 | `./dev.sh rebuild` / `down` / `nuke` | rebuild the image; remove the pod; remove the pod **and** data volumes |
@@ -91,7 +91,10 @@ src/Movies.Api/
   Endpoints/                    titles, auth/account, users, CeX/TMDB
   Import/SheetCsv.cs            sheet CSV ⇄ Title
   Services/                     TMDB + CeX clients
-  wwwroot/                      index.html, js/app.js (public page), js/admin.js (sign-in, 2FA, editing, users)
+  wwwroot/                      index.html, js/app.js (public page), js/auth.js (sign-in, 2FA, users),
+                                js/admin.js (edit controls), js/editor.js (the add/edit form),
+                                js/datepicker.js (themed date picker), edit.html + js/edit-page.js
+                                (/titles/new and /titles/{id}/edit: the form on its own page)
 tests/Movies.Api.Tests/         CSV parsing + API/auth integration tests
 ```
 
@@ -121,6 +124,7 @@ Day to day, from this repo (the server address is in `deploy/secrets/host`):
 ./deploy/vps.sh cex-add <link> [<link> …]      # track CeX products (or paste links on /cex when signed in)
 ./deploy/vps.sh install                        # re-apply config after editing deploy/ or deploy/secrets/
 ./deploy/vps.sh restore <backup.db>            # roll the live DB back to a backup
+./deploy/vps.sh reset-db                       # back up, then wipe the live DB (titles, users, CeX items)
 ```
 
 Secrets live in `deploy/secrets/` (git-ignored; see the `*.example` files):

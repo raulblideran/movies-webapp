@@ -13,6 +13,7 @@
 #   ./deploy/vps.sh ssh
 #
 #   ./deploy/vps.sh restore <backup.db>  replace the live database with a backup (app restarts)
+#   ./deploy/vps.sh reset-db             back up, then delete the live database: titles, users and CeX items (app restarts empty)
 #
 # The server address comes from deploy/secrets/host (e.g. "raul@203.0.113.10"), or $VPS_HOST.
 set -euo pipefail
@@ -101,6 +102,21 @@ systemctl --user start movies-app.service
 SCRIPT
         echo "Restored $file."
         ;;
+    reset-db)
+        read -rp "Delete ALL live data (titles, users, CeX items)? A backup is taken first. Type 'reset' to go on: " ok
+        [[ "$ok" == reset ]] || exit 1
+        "$0" backup
+        # Same steps as restore, without the copy: the app recreates an empty DB on startup (migrations).
+        ssh "$HOST" 'cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/$(id -u movies) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u movies)/bus bash -s' <<'SCRIPT'
+set -euo pipefail
+cd ~
+systemctl --user stop movies-app.service
+vol="$(podman volume inspect movies-data --format '{{.Mountpoint}}')"
+podman unshare sh -c 'rm -f "$1/movies.db" "$1/movies.db-wal" "$1/movies.db-shm"' _ "$vol"
+systemctl --user start movies-app.service
+SCRIPT
+        echo "Live database reset. Next: import, cex-add, create-user."
+        ;;
     backup)
         as_movies .local/bin/movies-backup
         mkdir -p backups
@@ -112,5 +128,5 @@ SCRIPT
         exec ssh "$HOST"
         ;;
     *)
-        sed -n '2,14p' "$0"; exit 1 ;;
+        sed -n '2,17p' "$0"; exit 1 ;;
 esac

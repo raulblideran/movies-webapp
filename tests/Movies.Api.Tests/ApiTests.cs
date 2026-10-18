@@ -10,7 +10,7 @@ public class ApiTests : IClassFixture<TestApp>
     public ApiTests(TestApp app) => _app = app;
 
     private static object NewTitle(string name, decimal? rating = 8) =>
-        new { name, type = "Film", rating, watchCount = 1, genres = new[] { "Drama" }, firstWatch = "2024-05-01" };
+        new { name, type = "Film", rating, watchCount = 1, genres = new[] { "Drama" }, firstWatch = "2024-05-17" };
 
     [Fact]
     public async Task Anonymous_can_read_but_not_write()
@@ -39,6 +39,18 @@ public class ApiTests : IClassFixture<TestApp>
         Assert.DoesNotContain("{{version}}", html);
         Assert.Matches(@"v\d{6}</span", html);
         Assert.Matches(@"js/app\.js\?v=\d{12}", html);
+    }
+
+    [Theory]
+    [InlineData("/titles/new")]
+    [InlineData("/titles/12/edit")]
+    public async Task Editor_pages_are_served(string path)
+    {
+        var resp = await _app.CreateClient().GetAsync(path);
+        var html = await resp.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Contains("<base href=\"/\"", html);
+        Assert.Matches(@"js/edit-page\.js\?v=\d{12}", html);
     }
 
     [Fact]
@@ -70,7 +82,9 @@ public class ApiTests : IClassFixture<TestApp>
 
         var created = await client.PostAsJsonAsync("/api/titles", NewTitle("Test Film"));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        var createdJson = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var id = createdJson.GetProperty("id").GetInt32();
+        Assert.Equal("2024-05-17", createdJson.GetProperty("firstWatch").GetString()); // the day is kept
 
         var bad = await client.PutAsJsonAsync($"/api/titles/{id}", NewTitle("Test Film", rating: 12));
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);

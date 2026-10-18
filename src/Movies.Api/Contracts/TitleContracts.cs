@@ -86,12 +86,11 @@ public record TitleUpsertRequest(
     {
         static List<string> Clean(List<string>? xs) =>
             (xs ?? []).Select(x => x.Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        static DateOnly? Month(DateOnly? d) => d is { } v ? new DateOnly(v.Year, v.Month, 1) : null;
 
         t.Name = Name!.Trim();
         t.Type = Type;
-        t.FirstWatch = Month(FirstWatch);
-        t.LatestWatch = Month(LatestWatch);
+        t.FirstWatch = FirstWatch;
+        t.LatestWatch = LatestWatch;
         t.WatchCount = WatchCount;
         t.Rating = Rating;
         t.RewatchPotential = RewatchPotential;
@@ -100,7 +99,7 @@ public record TitleUpsertRequest(
         t.Seasons = Seasons;
         t.EpisodesTotal = EpisodesTotal;
         t.WithBogdan = WithBogdan;
-        t.DateWithBogdan = Month(DateWithBogdan);
+        t.DateWithBogdan = DateWithBogdan;
         t.Comments = string.IsNullOrWhiteSpace(Comments) ? null : Comments.Trim();
         t.ReleaseYear = ReleaseYear;
         t.PricePaid = PricePaid;

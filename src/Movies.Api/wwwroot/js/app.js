@@ -23,11 +23,11 @@ function escapeHtml(value) {
         .replace(/'/g, "&#39;");
 }
 
-// "2020-04-01" -> "04/2020"
-function formatMonth(iso) {
+// "2020-04-15" -> "15/04/2020"
+function formatDate(iso) {
     if (!iso) return "";
-    const [y, m] = iso.split("-");
-    return `${m}/${y}`;
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y}`;
 }
 
 function formatRating(rating) {
@@ -41,13 +41,13 @@ function money(value) {
 // Detail rows shown on cards and in the modal, in the original sheet's column order and labels.
 function detailFields(row) {
     return [
-        ["First watch", formatMonth(row.firstWatch)],
+        ["First watch", formatDate(row.firstWatch)],
         ["Watch count", row.watchCount ? String(row.watchCount) : ""],
-        ["Latest watch", formatMonth(row.latestWatch)],
+        ["Latest watch", formatDate(row.latestWatch)],
         ["Seasons", row.seasons != null ? String(row.seasons) : ""],
         ["Episodes", row.episodesTotal != null ? String(row.episodesTotal) : ""],
         ["Genre", row.genres.join("/")],
-        ["With Bogdan", formatMonth(row.dateWithBogdan)],
+        ["With Bogdan", formatDate(row.dateWithBogdan)],
         ["Comments", row.comments || ""],
         ["Price (£)", row.pricePaid != null ? String(row.pricePaid) : ""],
     ].filter(([, v]) => v !== "");
@@ -61,8 +61,8 @@ function searchTextFor(row) {
         row.physicalFormats.join(" "),
         row.comments,
         formatRating(row.rating),
-        formatMonth(row.firstWatch),
-        formatMonth(row.latestWatch),
+        formatDate(row.firstWatch),
+        formatDate(row.latestWatch),
         row.releaseYear,
     ]
         .filter(Boolean)
@@ -241,7 +241,20 @@ async function refreshData() {
     refreshButton.classList.remove("is-busy");
 }
 
-window.addEventListener("DOMContentLoaded", () => loadTitles());
+// "/?title=12" opens that title (the full-page editor lands here after saving).
+window.addEventListener("DOMContentLoaded", async () => {
+    if (!(await loadTitles())) return;
+    const params = new URLSearchParams(location.search);
+    const id = Number(params.get("title"));
+    if (!id) return;
+    params.delete("title");
+    history.replaceState(null, "", location.pathname + (params.size ? `?${params}` : "") + location.hash);
+    const row = allData.find((r) => r.id === id);
+    if (row) {
+        document.getElementById("cardsGrid").children[shownRows.indexOf(row)]?.scrollIntoView({ block: "center" });
+        openModal(row);
+    }
+});
 
 // ---------- stats & filters ----------
 

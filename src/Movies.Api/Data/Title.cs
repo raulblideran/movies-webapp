@@ -18,7 +18,7 @@ public class Title : ITimestamped
     public required string Name { get; set; }
     public TitleType Type { get; set; }
 
-    /// <summary>Month precision; stored as the 1st of the month.</summary>
+    /// <summary>Full dates. The old sheet only had months, so imports pick a random day (see SheetCsv).</summary>
     public DateOnly? FirstWatch { get; set; }
     public DateOnly? LatestWatch { get; set; }
     public int WatchCount { get; set; }

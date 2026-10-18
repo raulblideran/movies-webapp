@@ -602,6 +602,7 @@ code,
     font-weight: 600;
     line-height: 1.2;
     white-space: nowrap;
+    text-decoration: none;
     transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 
@@ -1191,18 +1192,24 @@ textarea.code {
     max-width: 920px;
 }
 
+/* The poster column is sized so a 2:3 poster always fits the panel's height: the poster is never
+   stretched to the text column's height (which made object-fit crop and "zoom" it). */
 .panel-title {
+    --poster-w: min(460px, calc((100vh - 68px) * 2 / 3));
     max-width: 1180px;
     display: grid;
-    grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, var(--poster-w)) minmax(0, 1fr);
+    align-items: start;
     overflow: hidden;
     padding: 0;
+    background: linear-gradient(90deg, var(--poster-bg) var(--poster-w), var(--surface) var(--poster-w));
 }
 
 .panel-title .modal-poster {
+    display: block;
     width: 100%;
-    height: 100%;
-    max-height: calc(100vh - 40px);
+    height: auto;
+    aspect-ratio: 2 / 3;
     object-fit: cover;
     background: var(--poster-bg);
 }
@@ -1215,6 +1222,7 @@ textarea.code {
 
 .panel-title.no-poster {
     grid-template-columns: minmax(0, 1fr);
+    background: var(--surface);
     max-width: 720px;
 }
 
@@ -1223,10 +1231,14 @@ textarea.code {
         grid-template-columns: minmax(0, 1fr);
         overflow-y: auto;
     }
+    .panel-title {
+        background: var(--surface);
+    }
     .panel-title .modal-poster {
-        height: auto;
+        width: auto;
+        max-width: 100%;
         max-height: 60vh;
-        object-fit: contain;
+        margin: 0 auto;
     }
     .panel-title .modal-body {
         max-height: none;
@@ -1278,7 +1290,6 @@ textarea.code {
 }
 
 #modal .panel-title,
-#modal .panel-title .modal-poster,
 #modal .panel-title .modal-body {
     max-height: calc(100vh - 68px);
 }
@@ -2266,6 +2277,217 @@ textarea.code {
     font-weight: var(--display-weight);
     font-size: 17px;
     font-variant-numeric: tabular-nums;
+}
+
+/* ---------- split button: dialog / own page ---------- */
+
+.split {
+    display: inline-flex;
+}
+
+.split > .btn:first-child {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.split > .split-end {
+    padding-inline: 11px;
+    border-left-color: color-mix(in srgb, var(--accent-ink) 30%, transparent);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.split > .btn:not(.btn-primary).split-end {
+    border-left-color: transparent;
+    margin-left: -1px;
+}
+
+/* ---------- date picker (js/datepicker.js) ---------- */
+
+.date-field {
+    position: relative;
+}
+
+.date-field .input {
+    padding-right: 44px;
+}
+
+.date-field .input.is-invalid {
+    border-color: var(--danger);
+}
+
+.date-toggle {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--ink-2);
+    transform: translateY(-50%);
+}
+
+.date-toggle:hover,
+.date-toggle[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+}
+
+.date-toggle svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+}
+
+.datepicker {
+    position: fixed;
+    z-index: 1300;
+    width: 300px;
+    padding: 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+    font-family: var(--font-body);
+    animation: fade-in 0.12s ease;
+}
+
+.dp-head {
+    display: grid;
+    grid-template-columns: 36px 1fr 36px;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.dp-nav,
+.dp-title,
+.dp-day,
+.dp-cell {
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+}
+
+.dp-nav {
+    height: 36px;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.dp-title {
+    height: 36px;
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    text-transform: var(--display-case);
+    letter-spacing: var(--display-tracking);
+    font-size: 18px;
+}
+
+.dp-title:disabled {
+    cursor: default;
+}
+
+.dp-nav:hover,
+.dp-title:hover:not(:disabled),
+.dp-day:hover,
+.dp-cell:hover {
+    border-color: var(--line-strong);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.dp-grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.dp-grid th {
+    padding: 4px 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.dp-grid td {
+    padding: 1px;
+}
+
+.dp-day {
+    width: 100%;
+    aspect-ratio: 1;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+.dp-day.is-outside {
+    color: var(--ink-3);
+    opacity: 0.6;
+}
+
+.dp-day[aria-current="date"],
+.dp-cell[aria-current="date"] {
+    border-color: var(--accent);
+}
+
+.dp-day[aria-selected="true"],
+.dp-cell[aria-selected="true"] {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 700;
+    opacity: 1;
+}
+
+.dp-cells {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+}
+
+.dp-cell {
+    height: 48px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.dp-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+}
+
+/* ---------- full-page title editor (edit.html) ---------- */
+
+.editor-page {
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.editor-page .panel {
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+}
+
+.editor-page .back {
+    display: inline-block;
+    margin-bottom: 14px;
 }
 
 /* ---------- motion preferences ---------- */
