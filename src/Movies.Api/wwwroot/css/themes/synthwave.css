@@ -30,6 +30,14 @@
     --poster-bg: #0e0320;
     --overlay: rgba(8, 1, 18, 0.86);
     --focus: #ff3cac;
+    /* chart colours for the stats page, checked for colour-blind separation on --surface */
+    --chart-1: #169aab;
+    --chart-2: #976202;
+    --chart-3: #9470dd;
+    --chart-4: #018357;
+    --chart-5: #ce5a95;
+    --chart-6: #1d6ec9;
+    --chart-7: #859312;
 
     --font-display: "Exo 2", system-ui, sans-serif;
     --font-body: "Exo 2", system-ui, sans-serif;

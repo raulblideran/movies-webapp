@@ -30,6 +30,14 @@
     --poster-bg: #26100a;
     --overlay: rgba(30, 10, 4, 0.82);
     --focus: #ffd36b;
+    /* chart colours for the stats page, checked for colour-blind separation on --surface */
+    --chart-1: #b77b0f;
+    --chart-2: #b33c6f;
+    --chart-3: #13a265;
+    --chart-4: #8750b6;
+    --chart-5: #3c8ae7;
+    --chart-6: #6c7609;
+    --chart-7: #129ba8;
     --hero-shade: linear-gradient(180deg, rgba(110, 42, 14, 0.12) 0%, rgba(58, 20, 8, 0.45) 60%, rgba(42, 16, 7, 0.96) 100%);
 
     --font-display: "Cinzel", Georgia, serif;

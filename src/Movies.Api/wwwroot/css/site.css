@@ -28,6 +28,18 @@
     --poster-bg: #1b0407;
     --overlay: rgba(14, 2, 4, 0.82);
     --focus: #ffc861;
+    /* chart colours for the stats page, checked for colour-blind separation on --surface */
+    --chart-1: #b17f01;
+    --chart-2: #2679d4;
+    --chart-3: #298118;
+    --chart-4: #a769d0;
+    --chart-5: #078c81;
+    --chart-6: #b63945;
+    --chart-7: #1898b7;
+    --viz-main: var(--accent); /* single-series marks */
+    --viz-hi: var(--accent-2); /* the one mark a chart calls out */
+    --viz-seq: var(--accent); /* heatmap ramp, mixed into the surface */
+    --viz-other: color-mix(in oklab, var(--ink-3) 75%, var(--surface));
     /* laid over the hero photo so the marquee and text stay legible */
     --hero-shade: linear-gradient(180deg, rgba(36, 5, 9, 0.62) 0%, rgba(36, 5, 9, 0.78) 65%, rgba(36, 5, 9, 0.95) 100%);
 
@@ -3022,6 +3034,558 @@ textarea.code {
 .editor-page .back {
     display: inline-block;
     margin-bottom: 14px;
+}
+
+/* ---------- stats page (stats.html, js/charts.js) ---------- */
+
+.stats-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px 18px;
+    margin: 0 0 24px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.stats-range {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 110px;
+}
+
+.stats-range .label {
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
+.stats-filters .result-count {
+    margin-left: auto;
+    color: var(--ink-3);
+    font-size: 13px;
+}
+
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+    gap: 12px;
+    margin: 0 0 36px;
+}
+
+.kpi {
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.kpi dt {
+    font-size: 13px;
+    color: var(--ink-2);
+}
+
+.kpi dd {
+    margin: 2px 0 0;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--ink);
+}
+
+.kpi p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
+.viz-section {
+    margin: 0 0 40px;
+}
+
+.viz-section-head {
+    margin: 0 0 14px;
+}
+
+.viz-section-head h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    text-transform: var(--display-case);
+    letter-spacing: var(--display-tracking);
+    font-size: clamp(24px, 3vw, 32px);
+    color: var(--ink);
+}
+
+.viz-section-head p {
+    margin: 4px 0 0;
+    max-width: 70ch;
+    color: var(--ink-2);
+    font-size: 14px;
+}
+
+.viz-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr));
+    align-items: start;
+    gap: 16px;
+}
+
+.viz-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 16px 18px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.viz-card.is-wide {
+    grid-column: 1 / -1;
+}
+
+.viz-head h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.viz-sub {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.viz-body {
+    position: relative;
+    margin-top: 12px;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.viz-note,
+.viz-empty {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.viz-svg {
+    display: block;
+    max-width: none;
+    overflow: visible;
+    font-family: var(--font-body);
+}
+
+.viz-gridline {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+
+.viz-axis {
+    stroke: var(--line-strong);
+    stroke-width: 1;
+}
+
+.viz-tick {
+    fill: var(--ink-3);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.viz-label {
+    fill: var(--ink-2);
+    font-size: 12px;
+}
+
+.viz-value {
+    fill: var(--ink);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.viz-axis-title {
+    fill: var(--ink-3);
+    font-size: 11px;
+}
+
+.viz-mark {
+    transition: opacity 0.15s, filter 0.15s;
+}
+
+.viz-hit {
+    fill: transparent;
+}
+
+/* hovering one column, bar, dot or slice dims the others */
+.viz-svg:has(.viz-item:hover) .viz-item .viz-mark,
+.viz-svg:has(.viz-seg:hover) .viz-seg {
+    opacity: 0.5;
+}
+
+.viz-svg .viz-item:hover .viz-mark,
+.viz-svg .viz-seg:hover {
+    opacity: 1;
+}
+
+.viz-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.viz-area {
+    opacity: 0.12;
+}
+
+.viz-dot {
+    stroke: var(--surface);
+    stroke-width: 2;
+}
+
+.viz-dot.is-bubble {
+    fill-opacity: 0.85;
+}
+
+.viz-crossline {
+    stroke: var(--ink-3);
+    stroke-width: 1;
+}
+
+.viz-hover {
+    cursor: crosshair;
+}
+
+/* heatmap: five steps of one hue mixed into the card surface */
+.viz-cell,
+.viz-scale i {
+    fill: color-mix(in oklab, var(--ink) 6%, var(--surface));
+    background: color-mix(in oklab, var(--ink) 6%, var(--surface));
+}
+.viz-cell[data-step="1"] { fill: color-mix(in oklab, var(--viz-seq) 24%, var(--surface)); }
+.viz-scale [data-step="1"] { background: color-mix(in oklab, var(--viz-seq) 24%, var(--surface)); }
+.viz-cell[data-step="2"] { fill: color-mix(in oklab, var(--viz-seq) 42%, var(--surface)); }
+.viz-scale [data-step="2"] { background: color-mix(in oklab, var(--viz-seq) 42%, var(--surface)); }
+.viz-cell[data-step="3"] { fill: color-mix(in oklab, var(--viz-seq) 60%, var(--surface)); }
+.viz-scale [data-step="3"] { background: color-mix(in oklab, var(--viz-seq) 60%, var(--surface)); }
+.viz-cell[data-step="4"] { fill: color-mix(in oklab, var(--viz-seq) 80%, var(--surface)); }
+.viz-scale [data-step="4"] { background: color-mix(in oklab, var(--viz-seq) 80%, var(--surface)); }
+.viz-cell[data-step="5"] { fill: var(--viz-seq); }
+.viz-scale [data-step="5"] { background: var(--viz-seq); }
+
+.viz-cell.is-diagonal {
+    fill: transparent;
+}
+
+.viz-cell:hover {
+    stroke: var(--ink);
+    stroke-width: 1.5;
+}
+
+.viz-scale {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--ink-3);
+}
+
+.viz-scale i {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+}
+
+.viz-scale span:first-child {
+    margin-right: 4px;
+}
+
+.viz-scale span:last-child {
+    margin-left: 4px;
+}
+
+/* donut and legends */
+.viz-donut {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.viz-donut .viz-svg {
+    width: min(200px, 100%);
+    height: auto;
+    flex: 0 0 auto;
+}
+
+.viz-center {
+    fill: var(--ink);
+    font-size: 30px;
+    font-weight: 700;
+}
+
+.viz-center-label {
+    fill: var(--ink-3);
+    font-size: 12px;
+}
+
+.viz-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1 1 160px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+}
+
+.viz-legend li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-2);
+}
+
+.viz-legend-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.viz-legend-value {
+    color: var(--ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.viz-legend-row {
+    flex: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin-top: 10px;
+}
+
+.viz-legend-row li {
+    flex: 0 0 auto;
+}
+
+.viz-key {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+
+/* the paired Bogdan histograms */
+.viz-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: 8px 24px;
+    margin-top: 10px;
+}
+
+.viz-pair h4 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+}
+
+.viz-pair .viz-body {
+    margin-top: 4px;
+}
+
+/* table view */
+.viz-details {
+    margin-top: 10px;
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+    font-size: 13px;
+}
+
+.viz-details summary {
+    width: fit-content;
+    color: var(--ink-3);
+    cursor: pointer;
+}
+
+.viz-details summary:hover {
+    color: var(--ink);
+}
+
+.viz-table-wrap {
+    max-height: 320px;
+    overflow: auto;
+    margin-top: 8px;
+}
+
+.viz-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+
+.viz-table th,
+.viz-table td {
+    padding: 4px 10px 4px 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    font-weight: 400;
+    color: var(--ink-2);
+    white-space: nowrap;
+}
+
+.viz-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    color: var(--ink-3);
+    font-weight: 600;
+}
+
+.viz-table tbody th {
+    color: var(--ink);
+}
+
+/* tooltip */
+.viz-tip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 80;
+    display: flex;
+    flex-direction: column;
+    max-width: 260px;
+    padding: 7px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--raised);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.35;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.viz-tip.is-on {
+    opacity: 1;
+}
+
+.viz-tip strong {
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+}
+
+.viz-tip span {
+    color: var(--ink-2);
+}
+
+.viz-tip span:empty {
+    display: none;
+}
+
+/* records */
+.records {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    gap: 12px;
+}
+
+.record {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 0.15s, transform 0.15s;
+}
+
+.record:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+}
+
+.record img,
+.record-noposter {
+    flex: 0 0 auto;
+    width: 56px;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    background: var(--poster-bg);
+}
+
+.record-noposter {
+    display: grid;
+    place-items: center;
+    padding: 4px;
+    overflow: hidden;
+    font-size: 10px;
+    text-align: center;
+    color: var(--ink-3);
+}
+
+.record-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.record-label {
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
+.record-name {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.record-value {
+    font-size: 13px;
+    color: var(--ink-2);
+}
+
+@media (max-width: 640px) {
+    .viz-card {
+        padding: 14px 12px 10px;
+    }
+    .kpi dd {
+        font-size: 24px;
+    }
+    .stats-filters .chips {
+        flex-basis: 100%;
+    }
+    .stats-range {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+    .stats-filters .result-count {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+    .kpi {
+        padding: 12px;
+    }
 }
 
 /* ---------- motion preferences ---------- */

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-asset-version="{{stamp}}">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Collection Stats</title>
+        <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32" />
+        <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+        <meta name="theme-color" content="#240509" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=Big+Shoulders+Display:wght@600;800;900&display=swap"
+        />
+        <link rel="stylesheet" href="css/site.css" />
+        <script>
+            // Load the saved theme before first paint (js/theme.js owns the picker).
+            (function () {
+                var t = new URLSearchParams(location.search).get("theme");
+                try {
+                    if (t) localStorage.setItem("theme", t);
+                    else t = localStorage.getItem("theme");
+                } catch (e) {}
+                if (t && t !== "house" && /^[a-z-]+$/.test(t)) {
+                    document.documentElement.dataset.theme = t;
+                    document.write('<link rel="stylesheet" id="themeCss" href="css/themes/' + t + '.css?v={{stamp}}">');
+                }
+            })();
+        </script>
+    </head>
+    <body>
+        <nav class="topbar" id="topBar" aria-label="Site">
+            <div class="topbar-nav">
+                <a href="/">Collection</a>
+                <a href="/stats" aria-current="page">Stats</a>
+                <a href="/cex">CeX tracker</a>
+            </div>
+            <div class="topbar-end">
+                <div id="themeSlot"></div>
+                <div id="authArea" class="account"></div>
+            </div>
+        </nav>
+
+        <header class="hero hero-compact">
+            <div class="hero-art" aria-hidden="true"></div>
+            <div class="marquee">
+                <div class="marquee-board">
+                    <p class="hero-tagline">By the numbers</p>
+                    <h1 class="hero-title">Collection Stats</h1>
+                    <dl class="hero-stats" id="stats">
+                        <div class="stat stat-placeholder"><dt>titles</dt><dd>000</dd></div>
+                    </dl>
+                </div>
+            </div>
+        </header>
+
+        <main class="page stats-page">
+            <div class="stats-filters" id="statsFilters" aria-label="Filter the stats"></div>
+            <div id="statsRoot" class="stats-root"></div>
+        </main>
+
+        <div id="loadingOverlay" class="loading">
+            <div>
+                <div class="leader" aria-hidden="true"><span>3</span></div>
+                <p>Crunching the numbers…</p>
+            </div>
+        </div>
+
+        <footer class="footer" id="footer">
+            <span>Designed by <strong>Raul</strong></span>
+            <span id="photoCredit" class="photo-credit"></span>
+            <span class="version" title="Build date and time (yyMMdd.HHmm, UTC)">v{{version}}</span>
+        </footer>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+        <script src="js/theme.js"></script>
+        <script src="js/select.js"></script>
+        <script src="js/auth.js"></script>
+        <script src="js/charts.js"></script>
+        <script src="js/stats.js"></script>
+    </body>
+</html>

@@ -30,6 +30,14 @@
     --poster-bg: #121809;
     --overlay: rgba(12, 16, 6, 0.86);
     --focus: #f2c14e;
+    /* chart colours for the stats page, checked for colour-blind separation on --surface */
+    --chart-1: #7a960d;
+    --chart-2: #1d6ec9;
+    --chart-3: #d85e44;
+    --chart-4: #8053bb;
+    --chart-5: #009f8a;
+    --chart-6: #95630f;
+    --chart-7: #cb5b9c;
     --hero-shade: linear-gradient(180deg, rgba(22, 29, 13, 0.2) 0%, rgba(22, 29, 13, 0.55) 62%, rgba(22, 29, 13, 0.97) 100%);
 
     --font-display: "Uncial Antiqua", Georgia, serif;

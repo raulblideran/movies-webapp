@@ -41,6 +41,15 @@ public class ApiTests : IClassFixture<TestApp>
         Assert.Matches(@"js/app\.js\?v=\d{12}", html);
     }
 
+    [Fact]
+    public async Task Stats_page_is_served()
+    {
+        var html = await _app.CreateClient().GetStringAsync("/stats");
+        Assert.Contains("Collection Stats", html);
+        Assert.Matches(@"js/charts\.js\?v=\d{12}", html);
+        Assert.Matches(@"js/stats\.js\?v=\d{12}", html);
+    }
+
     [Theory]
     [InlineData("/titles/new")]
     [InlineData("/titles/12/edit")]

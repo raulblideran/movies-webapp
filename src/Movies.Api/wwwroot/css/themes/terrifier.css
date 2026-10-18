@@ -30,6 +30,14 @@
     --poster-bg: #141414;
     --overlay: rgba(0, 0, 0, 0.86);
     --focus: #ff3b45;
+    /* chart colours for the stats page, checked for colour-blind separation on --surface */
+    --chart-1: #d95b52;
+    --chart-2: #12799c;
+    --chart-3: #8476e4;
+    --chart-4: #018635;
+    --chart-5: #c35eac;
+    --chart-6: #896a01;
+    --chart-7: #199d95;
     --hero-shade: radial-gradient(ellipse 40% 45% at 50% 52%, rgba(0, 0, 0, 0.55), transparent),
         linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.45) 60%, #000 100%);
 

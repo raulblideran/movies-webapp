@@ -191,6 +191,8 @@ app.MapGet("/", (HttpContext ctx) => Page(ctx, "index.html"));
 app.MapGet("/index.html", (HttpContext ctx) => Page(ctx, "index.html"));
 app.MapGet("/cex", (HttpContext ctx) => Page(ctx, "cex.html"));
 app.MapGet("/cex.html", (HttpContext ctx) => Page(ctx, "cex.html"));
+app.MapGet("/stats", (HttpContext ctx) => Page(ctx, "stats.html"));
+app.MapGet("/stats.html", (HttpContext ctx) => Page(ctx, "stats.html"));
 app.MapGet("/titles/new", (HttpContext ctx) => Page(ctx, "edit.html"));
 app.MapGet("/titles/{id:int}/edit", (HttpContext ctx) => Page(ctx, "edit.html"));
 app.MapTitlesEndpoints();

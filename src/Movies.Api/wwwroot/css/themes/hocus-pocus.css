@@ -30,6 +30,14 @@
     --poster-bg: #120b20;
     --overlay: rgba(10, 6, 20, 0.86);
     --focus: #b9f27c;
+    /* chart colours for the stats page, checked for colour-blind separation on --surface */
+    --chart-1: #599e2f;
+    --chart-2: #8052bb;
+    --chart-3: #109c9d;
+    --chart-4: #b93c4b;
+    --chart-5: #3c8ae7;
+    --chart-6: #94630e;
+    --chart-7: #c65da8;
     --hero-shade: linear-gradient(180deg, rgba(20, 13, 36, 0.35) 0%, rgba(20, 13, 36, 0.62) 62%, rgba(20, 13, 36, 0.97) 100%);
 
     --font-display: "Grenze Gotisch", Georgia, serif;

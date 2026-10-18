@@ -30,6 +30,14 @@
     --poster-bg: #0a1838;
     --overlay: rgba(6, 14, 36, 0.86);
     --focus: #ffd21f;
+    /* chart colours for the stats page, checked for colour-blind separation on --surface */
+    --chart-1: #a48611;
+    --chart-2: #6b5bc5;
+    --chart-3: #139e8e;
+    --chart-4: #ba3e3b;
+    --chart-5: #028fe3;
+    --chart-6: #208525;
+    --chart-7: #c35ead;
     --hero-shade: linear-gradient(180deg, rgba(11, 27, 69, 0.2) 0%, rgba(11, 27, 69, 0.5) 60%, rgba(11, 27, 69, 0.96) 100%);
 
     --font-display: "Bungee", Impact, sans-serif;

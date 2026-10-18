@@ -30,6 +30,15 @@
     --poster-bg: #0d0805;
     --overlay: rgba(0, 0, 0, 0.88);
     --focus: #ff7a1a;
+    /* chart colours for the stats page, checked for colour-blind separation on --surface */
+    --chart-1: #d36519;
+    --chart-2: #8f5bc3;
+    --chart-3: #107f59;
+    --chart-4: #3c8ae7;
+    --chart-5: #768103;
+    --chart-6: #b13967;
+    --chart-7: #159aab;
+    --viz-hi: var(--gold);
     --hero-shade: rgba(0, 0, 0, 0.4);
 
     --font-display: "Marcellus", Georgia, serif;
