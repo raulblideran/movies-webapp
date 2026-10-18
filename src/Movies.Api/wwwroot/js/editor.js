@@ -137,6 +137,22 @@
         return [...map.values()].sort((a, b) => a.localeCompare(b));
     }
 
+    // Copies on the shelf are releases, edited on the releases page; the title form lists them.
+    function releasesHtml(row, isNew) {
+        const label = window.Shelf?.label ?? ((r) => r.format);
+        const items = row.releases
+            .map((r) => `<li><a href="/releases?release=${r.id}" class="link">${esc(r.name)}</a> <span class="faint">${esc(label(r))}${r.pricePaid != null ? ` · £${Number(r.pricePaid).toFixed(2)}` : ""}</span></li>`)
+            .join("");
+        return `
+            <div class="editor-releases">
+                <span class="label">On the shelf</span>
+                ${items ? `<ul>${items}</ul>` : `<p class="faint">Not on any release.</p>`}
+                ${isNew
+                    ? `<p class="faint">Save the title first, then add the discs it's on from the releases page.</p>`
+                    : `<a href="/releases?new=1&title=${row.id}" class="btn btn-small">Add a release with this title</a>`}
+            </div>`;
+    }
+
     /**
      * Render the form into container.
      *   row        the title to edit, or null to add one
@@ -154,8 +170,7 @@
             firstWatch: todayIso(),
             latestWatch: todayIso(),
             genres: [],
-            physicalFormats: [],
-            cexLinks: [],
+            releases: [],
             withBogdan: false,
         };
         const poster = { tmdbId: row.tmdbId ?? null, tmdbMediaType: row.tmdbMediaType ?? null, posterPath: row.posterPath ?? null };
@@ -196,13 +211,11 @@
                         ${f("Episodes", `<input name="episodesTotal" type="number" min="0" class="input" value="${v(row.episodesTotal)}">`)}
                     </div>
                     ${f("Genres", `<div data-genres data-label="Add a genre"></div>`)}
-                    ${f("Physical formats", `<div data-formats data-label="Add a physical format"></div>`)}
                     <div class="row row-3" style="align-items:end">
                         <label class="check" style="padding-bottom:10px"><input type="checkbox" name="withBogdan" ${row.withBogdan ? "checked" : ""}> Watched with Bogdan</label>
                         ${f("Date with Bogdan", date("dateWithBogdan", row.dateWithBogdan))}
-                        ${f("Price paid (£)", `<input name="pricePaid" type="number" min="0" step="0.01" class="input" value="${v(row.pricePaid)}">`)}
                     </div>
-                    ${f("CeX links, one per line", `<textarea name="cexLinks" rows="2" class="input code">${esc(row.cexLinks.join("\n"))}</textarea>`)}
+                    ${releasesHtml(row, isNew)}
                     ${f("Comments", `<textarea name="comments" rows="3" maxlength="4000" class="input">${v(row.comments)}</textarea>`)}
                     <div class="actions">
                         ${pageLink ? `<a href="${esc(pageLink)}" class="btn push" title="Open this form on its own page">Open as page ↗</a>` : ""}
@@ -227,7 +240,6 @@
         const form = d.$("form");
         form.querySelectorAll("[data-date]").forEach(DatePicker.attach);
         const genres = chipInput(d.$("[data-genres]"), row.genres, unique(allRows, (r) => r.genres), `genreOptions-${uid}`);
-        const formats = chipInput(d.$("[data-formats]"), row.physicalFormats, unique(allRows, (r) => r.physicalFormats), `formatOptions-${uid}`);
 
         const renderPoster = () => {
             const el = d.$("[data-poster]");
@@ -299,10 +311,7 @@
                 seasons: numOrNull(form.seasons.value),
                 episodesTotal: numOrNull(form.episodesTotal.value),
                 genres: genres.get(),
-                physicalFormats: formats.get(),
                 withBogdan: form.withBogdan.checked,
-                pricePaid: numOrNull(form.pricePaid.value),
-                cexLinks: form.cexLinks.value.split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
                 comments: form.comments.value,
                 ...poster,
             };

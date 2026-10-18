@@ -34,6 +34,7 @@
         <nav class="topbar" id="topBar" aria-label="Site">
             <div class="topbar-nav">
                 <a href="/" aria-current="page">Collection</a>
+                <a href="/releases">Releases</a>
                 <a href="/stats">Stats</a>
                 <a href="/cex">CeX tracker</a>
             </div>
@@ -124,6 +125,7 @@
                     <button type="button" id="refreshButton" class="btn" onclick="refreshData()" title="Reload the collection">
                         Refresh
                     </button>
+                    <div id="viewToggle"></div>
                     <div id="adminControls"></div>
                 </div>
 
@@ -186,6 +188,7 @@
 
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
         <script src="js/theme.js"></script>
+        <script src="js/shelf.js"></script>
         <script src="js/app.js"></script>
         <script src="js/select.js"></script>
         <script src="js/auth.js"></script>

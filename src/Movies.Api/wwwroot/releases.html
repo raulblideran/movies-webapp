@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" data-asset-version="{{stamp}}">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Physical Releases</title>
+        <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32" />
+        <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+        <meta name="theme-color" content="#240509" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=Big+Shoulders+Display:wght@600;800;900&display=swap"
+        />
+        <link rel="stylesheet" href="css/site.css" />
+        <script>
+            // Load the saved theme before first paint (js/theme.js owns the picker).
+            (function () {
+                var t = new URLSearchParams(location.search).get("theme");
+                try {
+                    if (t) localStorage.setItem("theme", t);
+                    else t = localStorage.getItem("theme");
+                } catch (e) {}
+                if (t && t !== "house" && /^[a-z-]+$/.test(t)) {
+                    document.documentElement.dataset.theme = t;
+                    document.write('<link rel="stylesheet" id="themeCss" href="css/themes/' + t + '.css?v={{stamp}}">');
+                }
+            })();
+        </script>
+    </head>
+    <body>
+        <nav class="topbar" id="topBar" aria-label="Site">
+            <div class="topbar-nav">
+                <a href="/">Collection</a>
+                <a href="/releases" aria-current="page">Releases</a>
+                <a href="/stats">Stats</a>
+                <a href="/cex">CeX tracker</a>
+            </div>
+            <div class="topbar-end">
+                <div id="themeSlot"></div>
+                <div id="authArea" class="account"></div>
+            </div>
+        </nav>
+
+        <header class="hero hero-compact">
+            <div class="hero-art" aria-hidden="true"></div>
+            <div class="marquee">
+                <div class="marquee-board">
+                    <p class="hero-tagline">On the shelf</p>
+                    <h1 class="hero-title">Physical Releases</h1>
+                    <dl class="hero-stats" id="stats">
+                        <div class="stat stat-placeholder"><dt>releases</dt><dd>000</dd></div>
+                    </dl>
+                </div>
+            </div>
+        </header>
+
+        <main class="page">
+            <div class="toolbar">
+                <div class="toolbar-row">
+                    <label class="search">
+                        <span class="sr-only">Search releases</span>
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <circle cx="8.5" cy="8.5" r="6" />
+                            <path d="m13 13 5 5" stroke-linecap="round" />
+                        </svg>
+                        <input type="search" class="input" id="releaseSearch" placeholder="Search releases, titles, notes…" />
+                    </label>
+                    <span class="result-count" id="releaseCount" aria-live="polite"></span>
+                    <label class="release-sort"><span class="sr-only">Sort</span>
+                        <select class="input" id="releaseSort">
+                            <option value="name">Name (A–Z)</option>
+                            <option value="price-desc">Price, highest first</option>
+                            <option value="price-asc">Price, lowest first</option>
+                            <option value="titles">Most titles</option>
+                            <option value="newest">Newest added</option>
+                        </select>
+                    </label>
+                    <div id="viewToggle"></div>
+                    <div id="adminControls"></div>
+                </div>
+                <div class="toolbar-row release-filters">
+                    <div class="chips" id="formatFilters" role="group" aria-label="Format"></div>
+                    <div class="chips" id="editionFilters" role="group" aria-label="Edition"></div>
+                </div>
+            </div>
+
+            <div class="grid" id="releasesGrid"></div>
+        </main>
+
+        <div id="loadingOverlay" class="loading">
+            <div>
+                <div class="leader" aria-hidden="true"><span>3</span></div>
+                <p>Dusting the shelf…</p>
+            </div>
+        </div>
+
+        <footer class="footer" id="footer">
+            <span>Designed by <strong>Raul</strong></span>
+            <span id="photoCredit" class="photo-credit"></span>
+            <span class="version" title="Build date and time (yyMMdd.HHmm, UTC)">v{{version}}</span>
+        </footer>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+        <script src="js/theme.js"></script>
+        <script src="js/select.js"></script>
+        <script src="js/auth.js"></script>
+        <script src="js/shelf.js"></script>
+        <script src="js/releases.js"></script>
+    </body>
+</html>

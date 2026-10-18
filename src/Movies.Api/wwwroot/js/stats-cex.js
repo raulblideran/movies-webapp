@@ -24,29 +24,25 @@
         const step = 10 ** Math.floor(Math.log10(Math.max(n, 1)));
         return Math.max(0, Math.floor(n / step) * step);
     };
-    const skuOf = (link) => {
-        const m = /[?&]id=([^&#\s]+)/.exec(link);
-        return m ? decodeURIComponent(m[1]) : null;
-    };
 
     let history = null; // [{ sku, boxName, category, points: [{ date, sell, cash, exchange }] }]
     let hero = [];
 
-    // One row per CeX product: latest prices, the titles that link it, and their price paid
-    // (a title linking several products splits its price between them).
+    // One row per CeX product: latest prices, the titles on it, and what its releases cost.
     function build() {
         const bySku = new Map(history.map((h) => [h.sku, h]));
         const items = new Map();
+        const seen = new Set();
         for (const t of K.titles()) {
-            const skus = [...new Set(t.cexLinks.map(skuOf).filter(Boolean))];
-            for (const sku of skus) {
-                const it = items.get(sku) ?? { sku, titles: [], paid: 0, priced: false };
-                it.titles.push(t);
-                if (t.pricePaid != null) {
-                    it.paid += t.pricePaid / skus.length;
+            for (const r of t.releases.filter((r) => r.cexSku)) {
+                const it = items.get(r.cexSku) ?? { sku: r.cexSku, titles: [], paid: 0, priced: false };
+                if (!it.titles.includes(t)) it.titles.push(t);
+                if (!seen.has(r.id) && r.pricePaid != null) {
+                    it.paid += r.pricePaid; // once per release, however many titles share it
                     it.priced = true;
                 }
-                items.set(sku, it);
+                seen.add(r.id);
+                items.set(r.cexSku, it);
             }
         }
         for (const it of items.values()) {
@@ -84,7 +80,7 @@
         const I = all.filter((i) => i.latest);
         const waiting = all.length - I.length;
         if (!all.length) {
-            root.innerHTML = `<div class="empty"><h2>No CeX links yet</h2><p class="muted">Add CeX product links to titles and their prices show up here.</p></div>`;
+            root.innerHTML = `<div class="empty"><h2>No CeX links yet</h2><p class="muted">Add CeX product links to releases and their prices show up here.</p></div>`;
             return;
         }
         if (!I.length) {
@@ -94,7 +90,8 @@
 
         const paidCex = sum(I.map((i) => i.paid));
         const cash = sum(I.map((i) => i.latest.cash)), voucher = sum(I.map((i) => i.latest.exchange)), sell = sum(I.map((i) => i.latest.sell));
-        const paidOther = sum(K.titles().filter((t) => !t.cexLinks.length && t.pricePaid != null).map((t) => t.pricePaid));
+        const elsewhere = new Map(K.titles().flatMap((t) => t.releases.filter((r) => !r.cexSku && r.pricePaid != null).map((r) => [r.id, r])));
+        const paidOther = sum([...elsewhere.values()].map((r) => r.pricePaid));
         const priced = I.filter((i) => i.priced && i.paid > 0);
         const gainers = priced.filter((i) => i.latest.cash > i.paid);
         const best = [...I].sort((a, b) => b.latest.cash - a.latest.cash)[0];
@@ -112,7 +109,7 @@
             ["Voucher if sold today", gbp(voucher), `${pct(paidCex ? (voucher / paidCex) * 100 : null)} of what you paid`],
             ["CeX sells them for", gbp(sell), "what it would cost to buy them all again"],
             ["Paid at CeX", gbp(paidCex), `${plural(priced.length, "item")} with a price`],
-            ["Paid elsewhere", gbp(paidOther), "titles without a CeX link"],
+            ["Paid elsewhere", gbp(paidOther), "releases without a CeX link"],
             ["Cash vs paid", signed(cash - paidCex), cash >= paidCex ? "you'd come out ahead" : "you'd be out of pocket"],
             ["Voucher vs paid", signed(voucher - paidCex), voucher >= paidCex ? "you'd come out ahead" : "you'd be out of pocket"],
             ["Voucher bonus", gbp(voucher - cash), `${pct(cash ? ((voucher - cash) / cash) * 100 : null)} more than cash`],

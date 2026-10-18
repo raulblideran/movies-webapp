@@ -14,12 +14,12 @@ public static class TitlesEndpoints
 
         titles.MapGet("/", async (MoviesDbContext db) =>
         {
-            var all = await db.Titles.AsNoTracking().OrderBy(t => t.Name).ToListAsync();
+            var all = await WithReleases(db.Titles.AsNoTrackingWithIdentityResolution()).OrderBy(t => t.Name).ToListAsync();
             return all.Select(TitleDto.From);
         });
 
         titles.MapGet("/{id:int}", async (int id, MoviesDbContext db) =>
-            await db.Titles.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id) is { } t
+            await WithReleases(db.Titles.AsNoTrackingWithIdentityResolution()).FirstOrDefaultAsync(t => t.Id == id) is { } t
                 ? Results.Ok(TitleDto.From(t))
                 : Results.NotFound());
 
@@ -40,7 +40,7 @@ public static class TitlesEndpoints
         {
             var errors = req.Validate();
             if (errors.Count > 0) return Results.ValidationProblem(errors);
-            var t = await db.Titles.FindAsync(id);
+            var t = await WithReleases(db.Titles).FirstOrDefaultAsync(x => x.Id == id);
             if (t is null) return Results.NotFound();
             req.ApplyTo(t);
             await db.SaveChangesAsync();
@@ -55,10 +55,14 @@ public static class TitlesEndpoints
 
         app.MapGet("/api/export.csv", async (MoviesDbContext db) =>
         {
-            var all = await db.Titles.AsNoTracking().OrderBy(t => t.Name).ToListAsync();
+            var all = await WithReleases(db.Titles.AsNoTrackingWithIdentityResolution()).OrderBy(t => t.Name).ToListAsync();
             var csv = SheetCsv.Write(all);
             return Results.File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv",
                 $"movies-{DateTime.UtcNow:yyyy-MM-dd}.csv");
         }).RequireAuthorization(Policies.Editor);
     }
+
+    /// <summary>Titles with their releases (and each release's title count) for TitleDto.</summary>
+    public static IQueryable<Title> WithReleases(IQueryable<Title> q) =>
+        q.Include(t => t.ReleaseLinks).ThenInclude(l => l.Release).ThenInclude(r => r.TitleLinks).AsSplitQuery();
 }

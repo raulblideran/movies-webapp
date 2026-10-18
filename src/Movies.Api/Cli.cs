@@ -98,12 +98,25 @@ public static class Cli
         }
 
         await using var tx = await db.Database.BeginTransactionAsync();
-        if (existing > 0) await db.Titles.ExecuteDeleteAsync();
+        if (existing > 0)
+        {
+            await db.Titles.ExecuteDeleteAsync();
+            await db.Releases.ExecuteDeleteAsync();
+        }
         db.Titles.AddRange(parsed.Titles);
+        await db.SaveChangesAsync();
+        // The sheet's formats, prices and CeX links become releases (now that the titles have ids).
+        var plan = ReleaseConversion.Plan(parsed.Titles.Select((t, i) =>
+            new ReleaseConversion.Shelf(t.Id, t.Name, parsed.Shelves[i].Formats, parsed.Shelves[i].PricePaid, parsed.Shelves[i].CexLinks)));
+        foreach (var p in plan)
+        {
+            p.Release.TitleLinks = p.TitleIds.Select(id => new TitleRelease { TitleId = id }).ToList();
+            db.Releases.Add(p.Release);
+        }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
 
-        Console.WriteLine($"Imported {parsed.Titles.Count} titles{(existing > 0 ? $" (replaced {existing})" : "")}.");
+        Console.WriteLine($"Imported {parsed.Titles.Count} titles and {plan.Count} releases{(existing > 0 ? $" (replaced {existing} titles)" : "")}.");
         if (parsed.Anomalies.Count > 0)
         {
             Console.WriteLine($"{parsed.Anomalies.Count} things to check:");

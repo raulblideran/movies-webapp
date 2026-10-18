@@ -67,10 +67,14 @@
     }
 
     function shape(row) {
+        // what's on the shelf comes from the title's releases: their labels, and its share of what they cost
+        const formats = row.releases.map(Shelf.label);
         const d = row.firstWatch ? new Date(row.firstWatch + "T00:00:00") : null;
         const l = row.latestWatch ? new Date(row.latestWatch + "T00:00:00") : null;
         return {
             ...row,
+            physicalFormats: formats,
+            pricePaid: Shelf.titleShare(row),
             fy: d ? d.getFullYear() : null,
             fm: d ? d.getMonth() : null,
             ly: l ? l.getFullYear() : null,
@@ -79,8 +83,8 @@
             r10: row.rating == null ? null : Math.min(row.rating, 10),
             fav: row.rating != null && row.rating > 10,
             gkeys: [...new Set(row.genres.map(genreKey).filter(Boolean))],
-            medium: medium(row.physicalFormats),
-            packaging: row.physicalFormats.length ? packaging(row.physicalFormats) : [],
+            medium: medium(formats),
+            packaging: formats.length ? packaging(formats) : [],
             rewatch: row.rewatchPotential != null && row.rewatchPotential <= 10 ? row.rewatchPotential : null,
         };
     }

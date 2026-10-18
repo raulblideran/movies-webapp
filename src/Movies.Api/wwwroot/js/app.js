@@ -1,4 +1,5 @@
 // Public collection page. Data comes from /api/titles; admin features live in admin.js.
+// Physical copies are releases (their own page, releases.html); each title lists the ones it's on.
 
 let allData = [];
 let filteredData = [];
@@ -49,7 +50,7 @@ function detailFields(row) {
         ["Genre", row.genres.join("/")],
         ["With Bogdan", formatDate(row.dateWithBogdan)],
         ["Comments", row.comments || ""],
-        ["Price (£)", row.pricePaid != null ? String(row.pricePaid) : ""],
+        ["Price (£)", Shelf.titleShare(row) != null ? Shelf.titleShare(row).toFixed(2) : ""],
     ].filter(([, v]) => v !== "");
 }
 
@@ -58,7 +59,7 @@ function searchTextFor(row) {
         row.name,
         row.type,
         row.genres.join(" "),
-        row.physicalFormats.join(" "),
+        row.releases.map((r) => `${r.name} ${Shelf.label(r)}`).join(" "),
         row.comments,
         formatRating(row.rating),
         formatDate(row.firstWatch),
@@ -71,12 +72,6 @@ function searchTextFor(row) {
 }
 
 // ---------- CeX ----------
-
-function extractCexSku(url) {
-    if (!url) return null;
-    const match = url.match(/[?&]id=([^&]+)/);
-    return match ? match[1] : null;
-}
 
 async function fetchCexDetails(sku) {
     if (!sku) return null;
@@ -97,34 +92,27 @@ async function calculateCollectionValue() {
     const btn = document.getElementById("calcCexBtn");
     const totalsEl = document.getElementById("cexTotals");
 
-    // Phase 1: Scan all rows and collect data
+    // Phase 1: every release once (a box set is shared by its titles), split by where it came from
+    const releases = new Map(allData.flatMap((row) => row.releases.map((r) => [r.id, r])));
     const uniqueSkus = new Set();
     let totalPaidCex = 0;
     let totalPaidOther = 0;
     let itemCount = 0;
 
-    for (const row of allData) {
-        const links = row.cexLinks;
-        const paidPrice = row.pricePaid || 0;
-        if (links.length === 0 && paidPrice <= 0) continue;
-
+    for (const r of releases.values()) {
+        const paidPrice = r.pricePaid || 0;
+        if (!r.cexSku && paidPrice <= 0) continue;
         itemCount++;
-
-        // Split by source: has CeX link = CeX, otherwise = Other
-        if (links.length > 0) {
+        if (r.cexSku) {
             totalPaidCex += paidPrice;
+            uniqueSkus.add(r.cexSku);
         } else {
             totalPaidOther += paidPrice;
-        }
-
-        for (const link of links) {
-            const sku = extractCexSku(link);
-            if (sku) uniqueSkus.add(sku);
         }
     }
 
     if (itemCount === 0) {
-        showError("No CeX links or prices found in your collection");
+        showError("No releases with CeX links or prices in your collection");
         return;
     }
 
@@ -313,7 +301,7 @@ function createFilters() {
     fill("typeFilters", "type", [["all", "All"], ["film", "Film"], ["series", "Series"]]);
     fill("genreFilters", "genre", [["all", "All"], ...uniqueValues((r) => r.genres)]);
     fill("ratingFilters", "rating", ["All", "10", "9-10", "8-9", "7-8", "<7"].map((r) => [r.toLowerCase(), r]));
-    fill("physicalFormatFilters", "physicalFormat", [["all", "All"], ...uniqueValues((r) => r.physicalFormats)]);
+    fill("physicalFormatFilters", "physicalFormat", [["all", "All"], ...uniqueValues((r) => r.releases.map(Shelf.label))]);
     fill(
         "specialFilters",
         "special",
@@ -352,7 +340,7 @@ function applyFilters() {
 
         if (
             activeFilters.physicalFormat !== "all" &&
-            !row.physicalFormats.some((f) => f.toLowerCase() === activeFilters.physicalFormat)
+            !row.releases.some((r) => Shelf.label(r).toLowerCase() === activeFilters.physicalFormat)
         )
             return false;
 
@@ -364,7 +352,7 @@ function applyFilters() {
                 if (row.withBogdan) return false;
                 break;
             case "physical copy":
-                if (row.physicalFormats.length === 0) return false;
+                if (row.releases.length === 0) return false;
                 break;
             case "high rewatch":
                 if ((row.rewatchPotential ?? 0) < 9) return false;
@@ -453,8 +441,8 @@ function ratingHtml(row, large = false) {
 function tagsHtml(row, { formats = false } = {}) {
     const tags = [`<span class="tag tag-${row.type === "Film" ? "film" : "series"}">${escapeHtml(row.type)}</span>`];
     if (row.withBogdan) tags.push(`<span class="tag tag-bogdan">With Bogdan</span>`);
-    if (formats) for (const f of row.physicalFormats) tags.push(`<span class="tag tag-physical">${escapeHtml(f)}</span>`);
-    else if (row.physicalFormats.length > 0) tags.push(`<span class="tag tag-physical">On the shelf</span>`);
+    if (formats) for (const r of row.releases) tags.push(`<span class="tag tag-physical">${escapeHtml(Shelf.label(r))}</span>`);
+    else if (row.releases.length > 0) tags.push(`<span class="tag tag-physical">On the shelf</span>`);
     if ((row.rewatchPotential ?? 0) >= 9) tags.push(`<span class="tag tag-rewatch">High rewatch</span>`);
     return tags.join("");
 }
@@ -476,10 +464,45 @@ function factsHtml(row, { skip = [] } = {}) {
 // The cards currently on screen, in order: the title modal's previous/next step through these.
 let shownRows = [];
 
+// Admins can switch the grid for a sortable table (js/shelf.js).
+let tableSort = { key: "name", dir: "asc" };
+const titleColumns = [
+    { key: "name", label: "Name", value: (r) => r.name },
+    { key: "type", label: "Type", value: (r) => r.type },
+    { key: "year", label: "Year", value: (r) => r.releaseYear, num: true },
+    { key: "rating", label: "Rating", value: (r) => r.rating, num: true },
+    { key: "watches", label: "Watches", value: (r) => r.watchCount, num: true },
+    { key: "first", label: "First watch", value: (r) => r.firstWatch, html: (r) => escapeHtml(formatDate(r.firstWatch)) },
+    { key: "latest", label: "Latest watch", value: (r) => r.latestWatch, html: (r) => escapeHtml(formatDate(r.latestWatch)) },
+    { key: "genres", label: "Genres", value: (r) => r.genres.join(", "), wrap: true },
+    { key: "releases", label: "On the shelf", value: (r) => r.releases.map(Shelf.label).join(", "), wrap: true },
+    { key: "paid", label: "Paid", value: (r) => Shelf.titleShare(r), html: (r) => Shelf.money(Shelf.titleShare(r)), num: true },
+    { key: "bogdan", label: "Bogdan", value: (r) => (r.withBogdan ? "Yes" : "") },
+    { key: "rewatch", label: "Rewatch", value: (r) => r.rewatchPotential, num: true },
+];
+const view = Shelf.viewToggle(document.getElementById("viewToggle"), "titles", () => filterCards());
+
 function displayCards(data) {
     const grid = document.getElementById("cardsGrid");
     grid.innerHTML = "";
     shownRows = data;
+    grid.classList.toggle("is-table", view.get() === "table" && data.length > 0);
+
+    if (view.get() === "table" && data.length > 0) {
+        // the modal's previous/next follow the table's order
+        shownRows = Shelf.renderTable(grid, {
+            rows: data,
+            columns: titleColumns,
+            sort: tableSort,
+            caption: "Titles",
+            onSort: (s) => {
+                tableSort = s;
+                displayCards(data);
+            },
+            onRow: (row) => openModal(row),
+        });
+        return;
+    }
 
     if (data.length === 0) {
         grid.innerHTML = allData.length
@@ -555,17 +578,24 @@ function stubHtml(row) {
         if (row.seasons != null) facts.push(["Seasons", String(row.seasons)]);
         if (row.episodesTotal != null) facts.push(["Episodes", String(row.episodesTotal)]);
     }
-    const paid = (row.pricePaid || 0) > 0;
-    const formats = row.physicalFormats.length > 0;
-    const cex = row.cexLinks.length > 0;
+    const share = Shelf.titleShare(row);
+    const paid = (share || 0) > 0;
+    const formats = row.releases.length > 0;
+    const cex = row.releases.some((r) => r.cexSku);
     return `
     <aside class="stub" aria-label="Verdict and value">
         ${ratingHtml(row, true) || `<p class="stub-unrated">Not rated yet</p>`}
         ${facts.length ? `<dl class="stub-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>` : ""}
         ${paid || formats || cex ? `
         <section class="stub-copy" aria-label="Your copy">
-            ${paid ? `<p class="stub-paid">You paid <span class="price-paid">${money(row.pricePaid)}</span></p>` : ""}
-            ${formats ? `<p class="stub-formats">${row.physicalFormats.map(escapeHtml).join(", ")}</p>` : ""}
+            ${paid ? `<p class="stub-paid">You paid <span class="price-paid">${money(share)}</span>${row.releases.some((r) => r.titleCount > 1 && r.pricePaid != null) ? ` <span class="stub-share">(its share of a set)</span>` : ""}</p>` : ""}
+            ${formats ? `<ul class="stub-releases">${row.releases
+                .map((r) => `
+                <li>
+                    <a href="/releases?release=${r.id}" class="link">${escapeHtml(r.name)}</a>
+                    <span class="stub-release-meta">${escapeHtml(Shelf.label(r))}${r.titleCount > 1 ? ` · ${r.titleCount} titles` : ""}${r.pricePaid != null ? ` · ${money(r.pricePaid)}` : ""}</span>
+                </li>`)
+                .join("")}</ul>` : ""}
             ${cex ? `<h3>At CeX today</h3><div id="cexPricing" class="stub-cex"><p class="muted pulse">Checking prices…</p></div>` : ""}
         </section>` : ""}
     </aside>`;
@@ -626,11 +656,9 @@ async function openModal(row) {
     window.Admin?.onModalOpened(row);
 
     // CeX pricing loads after the modal is visible
-    if (row.cexLinks.length > 0) {
+    if (cexReleases(row).length > 0) {
         let rows = "";
-        for (const link of row.cexLinks) {
-            const sku = extractCexSku(link);
-            if (!sku) continue;
+        for (const { cexSku: sku, cexUrl: link } of cexReleases(row)) {
             const details = await fetchCexDetails(sku);
             if (modalRow !== row) return; // modal was closed or switched meanwhile
             rows += details
@@ -645,10 +673,14 @@ async function openModal(row) {
                 </div>`
                 : `<p class="status-bad">CeX didn't return prices for <a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="link">${escapeHtml(sku)}</a>.</p>`;
         }
-        document.getElementById("cexPricing").innerHTML =
-            rows || `<p class="status-bad">None of the CeX links has a product id. Fix them in Edit.</p>`;
+        document.getElementById("cexPricing").innerHTML = rows;
         fitPoster();
     }
+}
+
+// Releases with a CeX product, each product once.
+function cexReleases(row) {
+    return [...new Map(row.releases.filter((r) => r.cexSku).map((r) => [r.cexSku, r])).values()];
 }
 
 // ---------- modal: previous / next ----------
@@ -672,7 +704,7 @@ function stepModal(step) {
     if (!target) return;
     openModal(target);
     // keep the grid behind in step, so closing lands on the title you ended up on
-    document.getElementById("cardsGrid").children[i + step]?.scrollIntoView({ block: "center" });
+    if (view.get() !== "table") document.getElementById("cardsGrid").children[i + step]?.scrollIntoView({ block: "center" });
 }
 
 document.getElementById("modalPrev").onclick = () => stepModal(-1);

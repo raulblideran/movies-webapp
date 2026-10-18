@@ -8,12 +8,9 @@ public class CexHistoryService(MoviesDbContext db, CexClient cex, ILogger<CexHis
 {
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
 
-    /// <summary>Distinct SKUs from every title's CeX links.</summary>
-    public async Task<List<string>> OwnedSkusAsync(CancellationToken ct = default)
-    {
-        var links = await db.Titles.AsNoTracking().Select(t => t.CexLinks).ToListAsync(ct);
-        return links.SelectMany(l => l).Select(CexItemsService.ExtractSku).OfType<string>().Distinct().ToList();
-    }
+    /// <summary>Distinct CeX SKUs of the releases on the shelf.</summary>
+    public async Task<List<string>> OwnedSkusAsync(CancellationToken ct = default) =>
+        await db.Releases.Where(r => r.CexSku != null).Select(r => r.CexSku!).Distinct().ToListAsync(ct);
 
     /// <summary>
     /// Snapshots today's prices for owned SKUs that don't have one yet, so a run that CeX cut short
@@ -40,12 +37,30 @@ public class CexHistoryService(MoviesDbContext db, CexClient cex, ILogger<CexHis
                     CashPrice = d.CashPrice,
                     ExchangePrice = d.ExchangePrice,
                 });
+                // keep the releases' CeX name and picture current
+                foreach (var r in await db.Releases.Where(r => r.CexSku == sku).ToListAsync(ct))
+                {
+                    r.CexBoxName = d.BoxName;
+                    r.ImageUrl = d.ImageUrl ?? r.ImageUrl;
+                }
                 await db.SaveChangesAsync(ct);
                 recorded++;
             }
             if (pause > TimeSpan.Zero) await Task.Delay(pause, ct); // be gentle with CeX
         }
         if (todo.Count > 0) logger.LogInformation("Recorded CeX prices for {Recorded}/{Total} owned items", recorded, todo.Count);
+
+        // Releases still without CeX's name and picture (new links, converted releases) get them now rather than tomorrow.
+        foreach (var r in await db.Releases.Where(r => r.CexSku != null && r.CexBoxName == null).ToListAsync(ct))
+        {
+            if (await cex.GetAsync(r.CexSku!, ct) is { } d)
+            {
+                r.CexBoxName = d.BoxName;
+                r.ImageUrl = d.ImageUrl ?? r.ImageUrl;
+                await db.SaveChangesAsync(ct);
+            }
+            if (pause > TimeSpan.Zero) await Task.Delay(pause, ct);
+        }
         return recorded;
     }
 }

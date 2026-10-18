@@ -315,15 +315,69 @@ namespace Movies.Api.Data.Migrations
                     b.ToTable("CexPriceSnapshots");
                 });
 
-            modelBuilder.Entity("Movies.Api.Data.Title", b =>
+            modelBuilder.Entity("Movies.Api.Data.PhysicalRelease", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.PrimitiveCollection<string>("CexLinks")
-                        .IsRequired()
+                    b.Property<string>("CexBoxName")
+                        .HasMaxLength(300)
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("CexSku")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CexUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Edition")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Format")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("PricePaid")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CexSku");
+
+                    b.ToTable("PhysicalReleases", (string)null);
+                });
+
+            modelBuilder.Entity("Movies.Api.Data.Title", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Comments")
                         .HasMaxLength(4000)
@@ -353,16 +407,8 @@ namespace Movies.Api.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("TEXT");
 
-                    b.PrimitiveCollection<string>("PhysicalFormats")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("PosterPath")
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("PricePaid")
-                        .HasPrecision(10, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Rating")
@@ -404,6 +450,21 @@ namespace Movies.Api.Data.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("Titles");
+                });
+
+            modelBuilder.Entity("Movies.Api.Data.TitleRelease", b =>
+                {
+                    b.Property<int>("TitleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ReleaseId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("TitleId", "ReleaseId");
+
+                    b.HasIndex("ReleaseId");
+
+                    b.ToTable("TitleReleases");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -455,6 +516,35 @@ namespace Movies.Api.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Movies.Api.Data.TitleRelease", b =>
+                {
+                    b.HasOne("Movies.Api.Data.PhysicalRelease", "Release")
+                        .WithMany("TitleLinks")
+                        .HasForeignKey("ReleaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Movies.Api.Data.Title", "Title")
+                        .WithMany("ReleaseLinks")
+                        .HasForeignKey("TitleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Release");
+
+                    b.Navigation("Title");
+                });
+
+            modelBuilder.Entity("Movies.Api.Data.PhysicalRelease", b =>
+                {
+                    b.Navigation("TitleLinks");
+                });
+
+            modelBuilder.Entity("Movies.Api.Data.Title", b =>
+                {
+                    b.Navigation("ReleaseLinks");
                 });
 #pragma warning restore 612, 618
         }

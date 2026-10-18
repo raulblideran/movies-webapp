@@ -27,11 +27,12 @@ public class SheetCsvTests
         Assert.Equal(t.FirstWatch, t.DateWithBogdan);
         Assert.Equal(10m, t.Rating);
         Assert.Equal(["Anime"], t.Genres);
-        Assert.Equal(["Blu-Ray"], t.PhysicalFormats);
+        var shelf = Assert.Single(r.Shelves);
+        Assert.Equal(["Blu-Ray"], shelf.Formats);
         Assert.True(t.WithBogdan);
         Assert.Equal(2007, t.ReleaseYear);
-        Assert.Equal(6m, t.PricePaid);
-        Assert.Single(t.CexLinks);
+        Assert.Equal(6m, shelf.PricePaid);
+        Assert.Single(shelf.CexLinks);
         Assert.Null(t.Seasons);
         Assert.Empty(r.Anomalies);
     }
@@ -45,9 +46,9 @@ public class SheetCsvTests
         Assert.Equal(TitleType.Series, show.Type);
         Assert.Null(show.Rating);
         Assert.Null(show.FirstWatch);
-        Assert.Equal(["4K Blu-Ray Box Set", "4K Blu-Ray Steelbook"], show.PhysicalFormats);
+        Assert.Equal(["4K Blu-Ray Box Set", "4K Blu-Ray Steelbook"], r.Shelves[0].Formats);
         Assert.Equal(["Sci-Fi", "Drama"], show.Genres);
-        Assert.Equal(2, show.CexLinks.Count);
+        Assert.Equal(2, r.Shelves[0].CexLinks.Count);
         Assert.Equal(4, show.Seasons);
         Assert.Equal(52, show.EpisodesTotal);
         Assert.Equal(11m, r.Titles[1].Rating);
@@ -68,18 +69,27 @@ public class SheetCsvTests
     [Fact]
     public void Export_round_trips()
     {
-        var original = Parse("Show,Series,02/2021,\"Blu-Ray, DVD\",8.5,2,03/2022,2,20,Comedy/Drama,7,Yes,03/2022,\"Nice, really\",12.5,https://a.example/x?id=1\n").Titles;
-        var again = SheetCsv.Parse(new StringReader(SheetCsv.Write(original))).Titles;
-        var (a, b) = (original[0], again[0]);
+        var parsed = Parse("Show,Series,02/2021,\"Blu-Ray, DVD\",8.5,2,03/2022,2,20,Comedy/Drama,7,Yes,03/2022,\"Nice, really\",12.5,https://uk.webuy.com/product-detail?id=1&categoryName=DVD-KIDS\n");
+        var original = parsed.Titles;
+        // what the import does: the shelf becomes releases linked to the title
+        original[0].Id = 1;
+        foreach (var p in ReleaseConversion.Plan([new(1, original[0].Name, parsed.Shelves[0].Formats, parsed.Shelves[0].PricePaid, parsed.Shelves[0].CexLinks)]))
+        {
+            var link = new TitleRelease { TitleId = 1, Title = original[0], Release = p.Release };
+            p.Release.TitleLinks.Add(link);
+            original[0].ReleaseLinks.Add(link);
+        }
+        var reparsed = SheetCsv.Parse(new StringReader(SheetCsv.Write(original)));
+        var (a, b) = (original[0], reparsed.Titles[0]);
         Assert.Equal(a.Name, b.Name);
         Assert.Equal(a.Rating, b.Rating);
         Assert.Equal(a.FirstWatch, b.FirstWatch);
         Assert.Equal(a.LatestWatch, b.LatestWatch);
-        Assert.Equal(a.PhysicalFormats, b.PhysicalFormats);
         Assert.Equal(a.Genres, b.Genres);
         Assert.Equal(a.Comments, b.Comments);
-        Assert.Equal(a.PricePaid, b.PricePaid);
-        Assert.Equal(a.CexLinks, b.CexLinks);
+        Assert.Equal(["Blu-Ray", "DVD"], reparsed.Shelves[0].Formats.Order());
+        Assert.Equal(12.5m, reparsed.Shelves[0].PricePaid);
+        Assert.Equal(["https://uk.webuy.com/product-detail?id=1"], reparsed.Shelves[0].CexLinks);
         Assert.Equal(a.WithBogdan, b.WithBogdan);
         Assert.Equal(a.DateWithBogdan, b.DateWithBogdan);
     }

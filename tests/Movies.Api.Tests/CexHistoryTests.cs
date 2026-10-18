@@ -47,10 +47,10 @@ public class CexHistoryTests : IClassFixture<FakeCexApp>
         using (var scope = _app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<MoviesDbContext>();
-            db.Titles.AddRange(
-                new Title { Name = "A", CexLinks = ["https://uk.webuy.com/product-detail?id=1000000000001&categoryName=X"] },
-                // the same box linked from two titles (a box set) counts once
-                new Title { Name = "B", CexLinks = ["https://uk.webuy.com/product-detail?id=1000000000001", "https://uk.webuy.com/product-detail?id=missing"] });
+            db.Releases.AddRange(
+                new PhysicalRelease { Name = "A", CexSku = "1000000000001" },
+                new PhysicalRelease { Name = "A again", CexSku = "1000000000001" },
+                new PhysicalRelease { Name = "B", CexSku = "missing" });
             await db.SaveChangesAsync();
         }
 
@@ -58,10 +58,10 @@ public class CexHistoryTests : IClassFixture<FakeCexApp>
         {
             var history = scope.ServiceProvider.GetRequiredService<CexHistoryService>();
             Assert.Equal(1, await history.SnapshotAsync(TimeSpan.Zero));
-            // second run today: the recorded SKU is skipped, the one CeX didn't know is retried
+            // second run today: the recorded SKU is skipped; the one CeX didn't know is retried (for its price and its name)
             var calls = _app.Calls;
             Assert.Equal(0, await history.SnapshotAsync(TimeSpan.Zero));
-            Assert.Equal(calls + 1, _app.Calls);
+            Assert.Equal(calls + 2, _app.Calls);
         }
 
         using (var scope = _app.Services.CreateScope())
@@ -71,6 +71,9 @@ public class CexHistoryTests : IClassFixture<FakeCexApp>
             var row = Assert.Single(rows);
             Assert.Equal(("1000000000001", 2m, 3m, 5m), (row.Sku, row.CashPrice, row.ExchangePrice, row.SellPrice));
             Assert.Equal(CexHistoryService.Today, row.Date);
+            // both releases of that product picked up CeX's name
+            var named = await scope.ServiceProvider.GetRequiredService<MoviesDbContext>().Releases.Where(r => r.CexSku == "1000000000001").ToListAsync();
+            Assert.All(named, r => Assert.Equal("Box", r.CexBoxName));
         }
     }
 

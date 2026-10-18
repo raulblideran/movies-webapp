@@ -16,7 +16,10 @@ public static partial class SheetCsv
         "Comments", "Price (£)", "Cex Link",
     ];
 
-    public record ParseResult(List<Title> Titles, List<string> Anomalies);
+    /// <summary>Shelves[i] is what the sheet said Titles[i] is owned on (turned into releases by ReleaseConversion).</summary>
+    public record ParseResult(List<Title> Titles, List<SheetShelf> Shelves, List<string> Anomalies);
+
+    public record SheetShelf(List<string> Formats, decimal? PricePaid, List<string> CexLinks);
 
     /// <param name="rng">Picks the day for month-only dates (the old sheet has no days). Seed it for repeatable results.</param>
     public static ParseResult Parse(TextReader reader, Random? rng = null)
@@ -34,6 +37,7 @@ public static partial class SheetCsv
         csv.ReadHeader();
 
         var titles = new List<Title>();
+        var shelves = new List<SheetShelf>();
         var anomalies = new List<string>();
 
         while (csv.Read())
@@ -83,8 +87,10 @@ public static partial class SheetCsv
             t.EpisodesTotal = ParseInt(Get("Episodes Total"), "Episodes Total", Warn);
 
             t.Genres = SplitList(Get("Genre"), '/');
-            t.PhysicalFormats = SplitList(Get("Physical Format").Trim('"'), ',');
-            t.CexLinks = SplitList(Get("Cex Link"), ',').Where(l => l.StartsWith("http")).ToList();
+            var formats = SplitList(Get("Physical Format").Trim('"'), ',');
+            foreach (var label in formats.Where(l => ReleaseConversion.ParseLabel(l) is null))
+                Warn($"physical format '{label}' isn't DVD, Blu-ray or 4K, skipped");
+            var cexLinks = SplitList(Get("Cex Link"), ',').Where(l => l.StartsWith("http")).ToList();
 
             var bogdan = Get("Bogdan");
             t.WithBogdan = bogdan.Equals("Yes", StringComparison.OrdinalIgnoreCase);
@@ -95,17 +101,17 @@ public static partial class SheetCsv
                 t.ReleaseYear = int.Parse(y.Value, CultureInfo.InvariantCulture);
 
             var price = Get("Price (£)").Replace("£", "").Replace(",", "").Trim();
-            t.PricePaid = ParseDecimal(price, "Price", Warn);
-
             titles.Add(t);
+            shelves.Add(new SheetShelf(formats, ParseDecimal(price, "Price", Warn), cexLinks));
         }
 
         foreach (var dup in titles.GroupBy(t => (t.Name.ToLowerInvariant(), t.Type)).Where(g => g.Count() > 1))
             anomalies.Add($"duplicate name \"{dup.First().Name}\" ×{dup.Count()} (years: {string.Join(", ", dup.Select(d => d.ReleaseYear?.ToString() ?? "?"))})");
 
-        return new ParseResult(titles, anomalies);
+        return new ParseResult(titles, shelves, anomalies);
     }
 
+    /// <summary>Expects each title's ReleaseLinks → Release → TitleLinks loaded. A box set's price is shared between its titles.</summary>
     public static string Write(IEnumerable<Title> titles)
     {
         using var sw = new StringWriter();
@@ -118,10 +124,12 @@ public static partial class SheetCsv
 
         foreach (var t in titles)
         {
+            var releases = t.ReleaseLinks.Select(l => l.Release).OrderBy(r => r.Name).ToList();
+            var paid = releases.Where(r => r.PricePaid is not null).Select(r => r.PricePaid!.Value / Math.Max(1, r.TitleLinks.Count)).ToList();
             csv.WriteField(t.Name);
             csv.WriteField(t.Type.ToString());
             csv.WriteField(Date(t.FirstWatch));
-            csv.WriteField(string.Join(", ", t.PhysicalFormats));
+            csv.WriteField(string.Join(", ", releases.Select(r => ReleaseConversion.Label(r.Format, r.Edition))));
             csv.WriteField(t.Rating?.ToString("0.#", CultureInfo.InvariantCulture) ?? "?");
             csv.WriteField(t.WatchCount);
             csv.WriteField(Date(t.LatestWatch));
@@ -132,8 +140,8 @@ public static partial class SheetCsv
             csv.WriteField(t.WithBogdan ? "Yes" : "No");
             csv.WriteField(t.DateWithBogdan is null ? "" : Date(t.DateWithBogdan));
             csv.WriteField(t.Comments ?? "");
-            csv.WriteField(t.PricePaid?.ToString("0.##", CultureInfo.InvariantCulture) ?? "");
-            csv.WriteField(string.Join(", ", t.CexLinks));
+            csv.WriteField(paid.Count > 0 ? paid.Sum().ToString("0.##", CultureInfo.InvariantCulture) : "");
+            csv.WriteField(string.Join(", ", releases.Select(r => r.CexUrl).OfType<string>()));
             csv.NextRecord();
         }
         return sw.ToString();
