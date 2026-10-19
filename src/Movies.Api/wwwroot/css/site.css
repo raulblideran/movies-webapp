@@ -376,11 +376,18 @@ code,
     color: var(--ink-3);
 }
 
+/* Phones: the picker button can sit anywhere in the wrapped top bar, so anchor the menu to the
+   top bar itself (the nearest positioned ancestor) and span the screen with a 16px margin. */
 @media (max-width: 640px) {
+    .theme-picker {
+        position: static;
+    }
     .theme-menu {
-        right: auto;
-        left: 50%;
-        transform: translateX(-50%);
+        top: calc(100% + 4px);
+        right: 16px;
+        left: 16px;
+        width: auto;
+        max-height: calc(100dvh - 140px);
     }
 }
 
