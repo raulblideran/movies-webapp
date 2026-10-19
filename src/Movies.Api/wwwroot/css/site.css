@@ -1029,16 +1029,23 @@ textarea.code {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 20px 12px;
     }
-    /* The collection: three covers a row. The cards keep cover, rating, title and year; the rest
-       is one tap away in the title sheet. */
-    #cardsGrid {
+}
+
+/* Phones (any width up to 640px, which covers large phones too): the collection and the
+   releases shelf show three covers a row. The cards keep cover, rating, title and format; the
+   rest is one tap away in the title/release sheet. */
+@media (max-width: 640px) {
+    #cardsGrid:not(.is-table),
+    #releasesGrid:not(.is-table) {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px 10px;
     }
-    #cardsGrid .card-body {
+    #cardsGrid .card-body,
+    #releasesGrid .card-body {
         padding-top: 6px;
     }
-    #cardsGrid .card-title {
+    #cardsGrid .card-title,
+    #releasesGrid .card-title {
         display: -webkit-box;
         margin: 0;
         overflow: hidden;
@@ -1047,8 +1054,17 @@ textarea.code {
         -webkit-line-clamp: 2;
     }
     #cardsGrid .tags,
-    #cardsGrid .facts {
+    #cardsGrid .facts,
+    #releasesGrid .facts {
         display: none;
+    }
+    #releasesGrid .tags {
+        margin-top: 4px;
+        gap: 4px;
+    }
+    #releasesGrid .tag {
+        padding: 0 6px;
+        font-size: 11px;
     }
     #cardsGrid .card .rating {
         top: 5px;
@@ -1056,7 +1072,8 @@ textarea.code {
         padding: 2px 7px;
         font-size: 13px;
     }
-    #cardsGrid .card-poster .no-poster {
+    #cardsGrid .card-poster .no-poster,
+    #releasesGrid .card-poster .no-poster {
         padding: 8px;
         font-size: 15px;
     }
