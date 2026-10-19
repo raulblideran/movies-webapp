@@ -1837,6 +1837,11 @@ textarea.code {
     max-height: calc(100dvh - 68px);
 }
 
+/* hidden when the popup was opened on its own, with nothing to step through */
+.modal-nav[hidden] {
+    display: none;
+}
+
 .modal-nav {
     position: fixed;
     top: 50%;

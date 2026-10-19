@@ -92,7 +92,25 @@
         },
         onOpen: (r) => setParam("release", r.id),
         onClose: () => setParam("release", null),
+        // a title on a release opens its popup here instead of leaving for the collection page
+        openTitle(id) {
+            const t = titles.get(id);
+            if (t) TitleModal.open(t);
+        },
     };
+    TitleModal.configure({
+        // a release listed on the title opens over it
+        showRelease(id) {
+            const r = releases.find((x) => x.id === id);
+            if (r) ReleaseDialogs.open(r, ctx);
+        },
+        onOpened(row) {
+            const bar = document.getElementById("modalAdminBar");
+            if (!bar || !Auth.me.canEdit) return;
+            bar.className = "modal-actions";
+            bar.innerHTML = `<a href="/titles/${row.id}/edit" class="btn">Edit</a>`;
+        },
+    });
     const art = (r, opts) => ReleaseDialogs.art(r, ctx, opts);
     const openRelease = (r) => ReleaseDialogs.open(r, ctx);
     const openEditor = (r, presetTitleIds = []) => ReleaseDialogs.edit(r, presetTitleIds, ctx);
