@@ -199,6 +199,20 @@ app.MapGet("/stats", (HttpContext ctx) => Page(ctx, "stats.html"));
 app.MapGet("/stats.html", (HttpContext ctx) => Page(ctx, "stats.html"));
 app.MapGet("/titles/new", (HttpContext ctx) => Page(ctx, "edit.html"));
 app.MapGet("/titles/{id:int}/edit", (HttpContext ctx) => Page(ctx, "edit.html"));
+
+// The service worker carries the build stamp, so each deploy installs a new worker with a fresh cache.
+// It must never be cached for long, or browsers would keep running an old one.
+string RenderServiceWorker() =>
+    File.ReadAllText(Path.Combine(app.Environment.WebRootPath, "sw.js"))
+        .Replace("{{stamp}}", buildStamp)
+        .Replace("{{environment}}", app.Environment.EnvironmentName);
+var serviceWorker = new Lazy<string>(RenderServiceWorker);
+app.MapGet("/sw.js", (HttpContext ctx) =>
+{
+    ctx.Response.Headers.CacheControl = "no-cache";
+    var js = app.Environment.IsDevelopment() ? RenderServiceWorker() : serviceWorker.Value;
+    return Results.Content(js, "text/javascript; charset=utf-8");
+});
 app.MapTitlesEndpoints();
 app.MapReleasesEndpoints();
 app.MapExternalEndpoints();

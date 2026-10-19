@@ -62,6 +62,53 @@ public class ApiTests : IClassFixture<TestApp>
         Assert.Matches(@"js/edit-page\.js\?v=\d{12}", html);
     }
 
+    [Theory]
+    [InlineData("/")]
+    [InlineData("/releases")]
+    [InlineData("/stats")]
+    [InlineData("/cex")]
+    [InlineData("/titles/new")]
+    public async Task Pages_link_the_manifest_and_register_the_service_worker(string path)
+    {
+        var html = await _app.CreateClient().GetStringAsync(path);
+        Assert.Contains("<link rel=\"manifest\" href=\"/manifest.webmanifest\"", html);
+        Assert.Matches(@"js/pwa\.js\?v=\d{12}", html);
+    }
+
+    [Fact]
+    public async Task Manifest_is_installable()
+    {
+        var resp = await _app.CreateClient().GetAsync("/manifest.webmanifest");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal("application/manifest+json", resp.Content.Headers.ContentType?.MediaType);
+        var manifest = JsonDocument.Parse(await resp.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal("standalone", manifest.GetProperty("display").GetString());
+        Assert.Equal("/", manifest.GetProperty("start_url").GetString());
+
+        var icons = manifest.GetProperty("icons").EnumerateArray().ToList();
+        Assert.Contains(icons, i => i.GetProperty("sizes").GetString() == "192x192");
+        Assert.Contains(icons, i => i.GetProperty("sizes").GetString() == "512x512" && i.GetProperty("purpose").GetString() == "any");
+        Assert.Contains(icons, i => i.GetProperty("purpose").GetString() == "maskable");
+        foreach (var icon in icons)
+        {
+            var iconResp = await _app.CreateClient().GetAsync(icon.GetProperty("src").GetString());
+            Assert.Equal(HttpStatusCode.OK, iconResp.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task Service_worker_is_stamped_and_not_cached()
+    {
+        var resp = await _app.CreateClient().GetAsync("/sw.js");
+        var js = await resp.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal("text/javascript", resp.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("no-cache", resp.Headers.CacheControl?.ToString());
+        Assert.DoesNotContain("{{", js);
+        Assert.Matches(@"const VERSION = ""\d{12}""", js);
+        Assert.Equal(HttpStatusCode.OK, (await _app.CreateClient().GetAsync("/offline.html")).StatusCode);
+    }
+
     [Fact]
     public async Task Wrong_password_is_rejected()
     {

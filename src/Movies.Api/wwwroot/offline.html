@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Offline · Movie & Series Collection</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <meta name="theme-color" content="#240509" />
+        <!-- Shown by the service worker when a page isn't cached and there's no connection.
+             Self-contained on purpose: nothing else may be available offline. -->
+        <style>
+            :root {
+                color-scheme: dark;
+            }
+            body {
+                margin: 0;
+                min-height: 100vh;
+                display: grid;
+                place-items: center;
+                padding: 24px;
+                box-sizing: border-box;
+                background: radial-gradient(120% 70% at 50% 0%, #3a0b12 0%, #240509 62%) fixed, #240509;
+                color: #f7ede4;
+                font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+                text-align: center;
+            }
+            img {
+                width: 72px;
+                height: 72px;
+            }
+            h1 {
+                margin: 16px 0 8px;
+                font-size: 1.5rem;
+            }
+            p {
+                margin: 0 0 20px;
+                opacity: 0.8;
+                max-width: 32ch;
+            }
+            .actions {
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            button,
+            a {
+                font: inherit;
+                padding: 10px 18px;
+                border-radius: 999px;
+                border: 1px solid #e94560;
+                background: #e94560;
+                color: #fff;
+                text-decoration: none;
+                cursor: pointer;
+            }
+            a {
+                background: transparent;
+                color: #f7ede4;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <img src="/icons/icon-192.png" alt="" />
+            <h1>You're offline</h1>
+            <p>This page hasn't been saved for offline use yet. Pages you've opened before still work without a connection.</p>
+            <div class="actions">
+                <button type="button" onclick="location.reload()">Try again</button>
+                <a href="/">Collection</a>
+            </div>
+        </main>
+    </body>
+</html>

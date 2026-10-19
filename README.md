@@ -94,7 +94,9 @@ src/Movies.Api/
   wwwroot/                      index.html, js/app.js (public page), js/auth.js (sign-in, 2FA, users),
                                 js/admin.js (edit controls), js/editor.js (the add/edit form),
                                 js/datepicker.js (themed date picker), edit.html + js/edit-page.js
-                                (/titles/new and /titles/{id}/edit: the form on its own page)
+                                (/titles/new and /titles/{id}/edit: the form on its own page),
+                                manifest.webmanifest + icons/ + sw.js + js/pwa.js + offline.html (installable
+                                app; the collection, releases, stats and CeX pages work offline once visited)
 tests/Movies.Api.Tests/         CSV parsing + API/auth integration tests
 ```
 

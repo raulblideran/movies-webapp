@@ -1,0 +1,25 @@
+{
+    "id": "/",
+    "name": "Movie & Series Collection",
+    "short_name": "Movies",
+    "description": "Personal film & series collection, physical releases and stats.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#240509",
+    "theme_color": "#240509",
+    "lang": "en",
+    "categories": ["entertainment"],
+    "icons": [
+        { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ],
+    "shortcuts": [
+        { "name": "Releases", "url": "/releases", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+        { "name": "Stats", "url": "/stats", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+        { "name": "CeX tracker", "url": "/cex", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+    ]
+}
