@@ -43,6 +43,7 @@ public class ReleaseConversionTests
         Assert.Equal((ReleaseFormat.BluRay, ReleaseEdition.BoxSet), (p.Release.Format, p.Release.Edition));
         Assert.Equal(15m, p.Release.PricePaid);
         Assert.Equal("500", p.Release.CexSku);
+        Assert.Equal(PurchasePlace.Cex, p.Release.PurchasedFrom);
         Assert.Equal(Cex + "500", p.Release.CexUrl);
     }
 
@@ -67,6 +68,7 @@ public class ReleaseConversionTests
         var plan = ReleaseConversion.Plan([Shelf(1, "Avatar", ["DVD Box Set", "Blu-Ray Box Set", "4K Blu-Ray"], 10m)]);
         Assert.Equal(3, plan.Count);
         Assert.All(plan, p => Assert.Null(p.Release.CexSku));
+        Assert.All(plan, p => Assert.Equal(PurchasePlace.Other, p.Release.PurchasedFrom));
         Assert.Equal(10m, plan.Sum(p => p.Release.PricePaid));
         Assert.Equal([3.34m, 3.33m, 3.33m], plan.Select(p => p.Release.PricePaid!.Value));
     }
@@ -109,8 +111,9 @@ public class ShelfMigrationTests
             Assert.Equal(2, releases.Count);
             var halloween = releases[0];
             Assert.Equal(("Halloween", ReleaseFormat.UltraHdBluRay, ReleaseEdition.Steelbook, 12m), (halloween.Name, halloween.Format, halloween.Edition, halloween.PricePaid));
+            Assert.Equal(PurchasePlace.Other, halloween.PurchasedFrom);
             var iceAge = releases[1];
-            Assert.Equal(("Ice Age collection", "77", 6m), (iceAge.Name, iceAge.CexSku, iceAge.PricePaid));
+            Assert.Equal(("Ice Age collection", "77", 6m, PurchasePlace.Cex), (iceAge.Name, iceAge.CexSku, iceAge.PricePaid, iceAge.PurchasedFrom));
             Assert.Equal([1, 2], iceAge.TitleLinks.Select(l => l.TitleId).Order());
 
             // the old columns are gone; running again changes nothing
@@ -168,6 +171,7 @@ public class ReleasesApiTests : IClassFixture<TestApp>
         var release = await created.Content.ReadFromJsonAsync<JsonElement>();
         var id = release.GetProperty("id").GetInt32();
         Assert.Equal("BoxSet", release.GetProperty("edition").GetString());
+        Assert.Equal("Other", release.GetProperty("purchasedFrom").GetString()); // not given: Other
         Assert.Equal([lion, lion2], release.GetProperty("titleIds").EnumerateArray().Select(e => e.GetInt32()));
 
         // the title lists its release, with how many titles share it
@@ -176,10 +180,11 @@ public class ReleasesApiTests : IClassFixture<TestApp>
         Assert.Equal((id, 2), (onTitle.GetProperty("id").GetInt32(), onTitle.GetProperty("titleCount").GetInt32()));
 
         var edited = await client.PutAsJsonAsync($"/api/releases/{id}",
-            new { name = "Lion King Trilogy", format = "UltraHdBluRay", edition = "Steelbook", pricePaid = 7.5m, titleIds = new[] { lion2 } });
+            new { name = "Lion King Trilogy", format = "UltraHdBluRay", edition = "Steelbook", pricePaid = 7.5m, purchasedFrom = "ForbiddenPlanet", titleIds = new[] { lion2 } });
         edited.EnsureSuccessStatusCode();
         var after = await edited.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("UltraHdBluRay", after.GetProperty("format").GetString());
+        Assert.Equal("ForbiddenPlanet", after.GetProperty("purchasedFrom").GetString());
         Assert.Equal([lion2], after.GetProperty("titleIds").EnumerateArray().Select(e => e.GetInt32()));
         Assert.Empty((await client.GetFromJsonAsync<JsonElement>($"/api/titles/{lion}")).GetProperty("releases").EnumerateArray());
 

@@ -80,6 +80,7 @@ public static class ReleasesEndpoints
         r.Format = req.Format;
         r.Edition = req.Edition;
         r.PricePaid = req.PricePaid;
+        r.PurchasedFrom = req.PurchasedFrom;
         r.Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim();
 
         r.TitleLinks.RemoveAll(l => !titleIds.Contains(l.TitleId));

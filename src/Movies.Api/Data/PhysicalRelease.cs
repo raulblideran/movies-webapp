@@ -14,6 +14,18 @@ public enum ReleaseEdition
     BoxSet,
 }
 
+/// <summary>Where a release was bought. Other comes first so a request that leaves it out means Other.</summary>
+public enum PurchasePlace
+{
+    Other,
+    Cex,
+    Hmv,
+    Ebay,
+    Zavvi,
+    Amazon,
+    ForbiddenPlanet,
+}
+
 /// <summary>A disc (or set of discs) on the shelf. A box set holds several titles; a title can be owned on several releases.</summary>
 public class PhysicalRelease : ITimestamped
 {
@@ -22,9 +34,13 @@ public class PhysicalRelease : ITimestamped
     public ReleaseFormat Format { get; set; }
     public ReleaseEdition Edition { get; set; }
     public decimal? PricePaid { get; set; }
+    public PurchasePlace PurchasedFrom { get; set; }
     public string? Notes { get; set; }
 
-    /// <summary>The CeX product page; the SKU is kept alongside for lookups and the daily price history.</summary>
+    /// <summary>
+    /// The CeX product page, wherever the release was bought: it's what the CeX value and the daily price history
+    /// use. The SKU is kept alongside for lookups.
+    /// </summary>
     public string? CexUrl { get; set; }
     public string? CexSku { get; set; }
 

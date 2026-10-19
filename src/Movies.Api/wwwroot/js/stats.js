@@ -384,6 +384,21 @@
         const owned = F.filter((r) => r.physicalFormats.length);
         const pack = ["Standard case", "Steelbook", "Box set"].map((p) => ({ label: p, value: owned.filter((r) => r.packaging.includes(p)).length }));
 
+        // where the releases came from: each release once, however many titles it holds
+        const rels = [...new Map(F.flatMap((r) => r.releases).map((x) => [x.id, x])).values()];
+        const places = Object.keys(Shelf.PLACES).map((k, i) => {
+            const rs = rels.filter((x) => x.purchasedFrom === k);
+            const priced = rs.filter((x) => x.pricePaid != null);
+            const spent = sum(priced.map((x) => x.pricePaid));
+            // a fixed colour per shop, so a filter never repaints one; Other stays neutral
+            return { key: k, label: Shelf.PLACES[k], n: rs.length, spent, avg: priced.length ? spent / priced.length : null, priced: priced.length, color: k === "Other" ? OTHER : slot(i) };
+        }).filter((p) => p.n > 0);
+        const shopPie = places.map((p) => ({ label: p.label, value: p.n, color: p.color }));
+        const shopSpend = places.filter((p) => p.spent > 0).sort((a, b) => b.spent - a.spent)
+            .map((p) => ({ label: p.label, value: p.spent, valueLabel: `${gbp(p.spent, 0)}  (${p.priced})`, color: p.color, tip: `${gbp(p.spent)} on ${plural(p.priced, "priced release")} · ${gbp(p.avg)} average`, full: p.label }));
+        const shopAvg = places.filter((p) => p.avg != null).sort((a, b) => b.avg - a.avg)
+            .map((p) => ({ label: p.label, value: p.avg, valueLabel: gbp(p.avg), color: p.color, full: `${p.label} · ${plural(p.priced, "priced release")}` }));
+
         const P = F.filter((r) => r.pricePaid != null);
         const buckets = [[0, 2], [2, 4], [4, 6], [6, 10], [10, 15], [15, 20], [20, Infinity]];
         const hist = buckets.map(([a, b]) => ({
@@ -411,6 +426,18 @@
             card("Format", "Best format owned for each title", (el) => donut(el, { items: media, centerLabel: "titles", label: "Titles by disc format" }), {
                 head: ["Format", "Titles"],
                 rows: media.map((m) => [m.label, m.value]),
+            }),
+            card("Where you buy", "Releases by shop", guard(shopPie.length, (el) => donut(el, { items: shopPie, centerLabel: "releases", label: "Releases by shop" })), {
+                head: ["Shop", "Releases", "Spent", "Average"],
+                rows: places.map((p) => [p.label, p.n, gbp(p.spent), p.avg == null ? "–" : gbp(p.avg)]),
+            }),
+            card("Spend by shop", "Total paid (priced releases)", guard(shopSpend.length, (el) => hbars(el, { items: shopSpend, valueFmt: (v) => gbp(v, 0), label: "Money spent per shop" })), {
+                head: ["Shop", "Spent", "Priced releases"],
+                rows: shopSpend.map((s) => [s.label, gbp(s.value), s.valueLabel.split("(")[1].replace(")", "")]),
+            }),
+            card("Average price by shop", "", guard(shopAvg.length, (el) => hbars(el, { items: shopAvg, valueFmt: (v) => gbp(v), label: "Average price paid per shop" })), {
+                head: ["Shop", "Average"],
+                rows: shopAvg.map((s) => [s.label, s.valueLabel]),
             }),
             card("Packaging", "Titles on disc, by case (a title can be in more than one)", guard(owned.length, (el) => hbars(el, { items: pack, label: "Titles by packaging" })), {
                 head: ["Packaging", "Titles"],
@@ -767,8 +794,8 @@
             tabs.collection.rendered = true;
             render();
             initTabs();
-            const wanted = location.hash.slice(1);
-            if (tabs[wanted] && wanted !== "collection") showTab(wanted, { push: false });
+            const wanted = location.hash.slice(1) === "cex" ? "releases" : location.hash.slice(1); // #cex: the tab's old name
+            if (tabs[wanted] && wanted !== "collection") showTab(wanted, { push: location.hash === "#cex" });
         } catch (e) {
             document.getElementById("statsRoot").innerHTML = `<div class="empty"><h2>Couldn't load the collection</h2><p class="muted">${esc(e.message)}</p></div>`;
         } finally {

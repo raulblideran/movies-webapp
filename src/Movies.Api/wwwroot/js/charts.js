@@ -257,9 +257,9 @@
 
     // ---------- scatter / bubble ----------
     // points: [{ x, y, label, color?, n? }]; bubbles: points share a spot and n sizes the dot
-    function scatter(el, { points, xDomain, yDomain, xLabel = "", yLabel = "", height = 260, label = "", xFmt = fmt, yFmt = fmt, xTicks, yTicks, jitter = 0, bubbles = false, xSqrt = false, ySqrt = false, diagonal = false }) {
+    function scatter(el, { points, xDomain, yDomain, xLabel = "", yLabel = "", height = 260, label = "", xFmt = fmt, yFmt = fmt, xTicks, yTicks, jitter = 0, bubbles = false, xSqrt = false, ySqrt = false, diagonal = false, yLabelW = 40 }) {
         const W = widthOf(el), H = height;
-        const m = { t: 14, r: 14, b: 40, l: 40 };
+        const m = { t: 14, r: 14, b: 40, l: yLabelW };
         const pw = W - m.l - m.r, ph = H - m.t - m.b;
         const [x0, x1] = xDomain, [y0, y1] = yDomain;
         const sx = xSqrt ? (v) => Math.sqrt(Math.max(0, v)) : (v) => v;

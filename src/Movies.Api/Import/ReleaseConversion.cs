@@ -47,7 +47,7 @@ public static class ReleaseConversion
 
     /// <summary>
     /// One release per CeX product (titles sharing a product share the release: a box set), plus one per
-    /// remaining format label. A title's price is split evenly across the releases it's on; a box set's
+    /// remaining format label. The sheet only linked what was bought at CeX, so those are marked as from CeX. A title's price is split evenly across the releases it's on; a box set's
     /// price is the sum of what its titles paid.
     /// </summary>
     public static List<Planned> Plan(IEnumerable<Shelf> shelves)
@@ -83,6 +83,7 @@ public static class ReleaseConversion
                 var p = new Planned(New(format, edition), [s.TitleId]);
                 p.Release.CexSku = sku;
                 p.Release.CexUrl = CexItemsService.CanonicalUrl(sku);
+                p.Release.PurchasedFrom = PurchasePlace.Cex;
                 bySku[sku] = p;
                 planned.Add(p);
                 mine.Add(p);

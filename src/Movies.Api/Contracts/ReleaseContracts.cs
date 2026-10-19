@@ -5,10 +5,11 @@ namespace Movies.Api.Contracts;
 
 /// <summary>A release as listed on a title.</summary>
 public record ReleaseSummaryDto(
-    int Id, string Name, ReleaseFormat Format, ReleaseEdition Edition, decimal? PricePaid, string? CexUrl, string? CexSku, int TitleCount)
+    int Id, string Name, ReleaseFormat Format, ReleaseEdition Edition, decimal? PricePaid, PurchasePlace PurchasedFrom,
+    string? CexUrl, string? CexSku, int TitleCount)
 {
     public static ReleaseSummaryDto From(PhysicalRelease r) =>
-        new(r.Id, r.Name, r.Format, r.Edition, r.PricePaid, r.CexUrl, r.CexSku, r.TitleLinks.Count);
+        new(r.Id, r.Name, r.Format, r.Edition, r.PricePaid, r.PurchasedFrom, r.CexUrl, r.CexSku, r.TitleLinks.Count);
 }
 
 public record ReleaseDto(
@@ -17,6 +18,7 @@ public record ReleaseDto(
     ReleaseFormat Format,
     ReleaseEdition Edition,
     decimal? PricePaid,
+    PurchasePlace PurchasedFrom,
     string? Notes,
     string? CexUrl,
     string? CexSku,
@@ -27,7 +29,7 @@ public record ReleaseDto(
     DateTime UpdatedAt)
 {
     public static ReleaseDto From(PhysicalRelease r) => new(
-        r.Id, r.Name, r.Format, r.Edition, r.PricePaid, r.Notes, r.CexUrl, r.CexSku, r.CexBoxName, r.ImageUrl,
+        r.Id, r.Name, r.Format, r.Edition, r.PricePaid, r.PurchasedFrom, r.Notes, r.CexUrl, r.CexSku, r.CexBoxName, r.ImageUrl,
         r.TitleLinks.Select(l => l.TitleId).Order().ToList(), r.CreatedAt, r.UpdatedAt);
 }
 
@@ -36,6 +38,7 @@ public record ReleaseUpsertRequest(
     ReleaseFormat Format,
     ReleaseEdition Edition,
     decimal? PricePaid,
+    PurchasePlace PurchasedFrom,
     string? Notes,
     string? CexUrl,
     List<int>? TitleIds)
@@ -50,6 +53,7 @@ public record ReleaseUpsertRequest(
         if (!Enum.IsDefined(Format)) Add(nameof(Format), "Format must be Dvd, BluRay or UltraHdBluRay.");
         if (!Enum.IsDefined(Edition)) Add(nameof(Edition), "Edition must be Standard, Steelbook or BoxSet.");
         if (PricePaid is < 0) Add(nameof(PricePaid), "Price cannot be negative.");
+        if (!Enum.IsDefined(PurchasedFrom)) Add(nameof(PurchasedFrom), "Unknown shop.");
         if (Notes?.Length > 2000) Add(nameof(Notes), "Notes are too long.");
         if (!string.IsNullOrWhiteSpace(CexUrl) && CexItemsService.ExtractSku(CexUrl) is null)
             Add(nameof(CexUrl), "That doesn't look like a CeX product link (expected …webuy.com/product-detail?id=…).");

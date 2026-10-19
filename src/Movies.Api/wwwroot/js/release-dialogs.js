@@ -10,7 +10,7 @@
 
 (function () {
     const { api, dialog, busy, esc, CLS } = Auth;
-    const { FORMATS, EDITIONS, money } = Shelf;
+    const { FORMATS, EDITIONS, PLACES, money } = Shelf;
 
     const titlesOf = (r, ctx) =>
         r.titleIds.map((id) => ctx.titles().get(id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
@@ -57,6 +57,7 @@
                     </div>
                     <dl class="facts release-facts">
                         <dt>Paid</dt><dd>${r.pricePaid != null ? money(r.pricePaid) : "–"}${ts.length > 1 && r.pricePaid != null ? ` <span class="faint">(${money(r.pricePaid / ts.length)} a title)</span>` : ""}</dd>
+                        <dt>Bought from</dt><dd>${esc(PLACES[r.purchasedFrom] ?? r.purchasedFrom)}</dd>
                         ${r.cexBoxName ? `<dt>At CeX</dt><dd>${esc(r.cexBoxName)}</dd>` : ""}
                         <dt>Added</dt><dd>${esc(r.createdAt.slice(0, 10).split("-").reverse().join("/"))}</dd>
                         ${r.notes ? `<dt class="sr-only">Notes</dt><dd class="wide release-notes">${esc(r.notes)}</dd>` : ""}
@@ -212,7 +213,7 @@
 
     function edit(r, presetTitleIds, ctx) {
         const isNew = !r;
-        r = r ?? { name: "", format: "BluRay", edition: "Standard", pricePaid: null, notes: "", cexUrl: "", titleIds: presetTitleIds };
+        r = r ?? { name: "", format: "BluRay", edition: "Standard", pricePaid: null, purchasedFrom: "Other", notes: "", cexUrl: "", titleIds: presetTitleIds };
         const v = (x) => (x == null ? "" : esc(x));
         const options = (map, current) => Object.entries(map).map(([k, l]) => `<option value="${k}"${k === current ? " selected" : ""}>${esc(l)}</option>`).join("");
         const d = dialog(
@@ -222,12 +223,13 @@
             <form class="release-form stack">
                 <div><label class="label" for="rel-name">Name</label>
                     <input id="rel-name" name="name" maxlength="300" class="input" value="${v(r.name)}" placeholder="Leave empty to use CeX's name"></div>
-                <div class="row row-3">
+                <div class="row row-4">
                     <div><label class="label" for="rel-format">Format</label><select id="rel-format" name="format" class="input">${options(FORMATS, r.format)}</select></div>
                     <div><label class="label" for="rel-edition">Edition</label><select id="rel-edition" name="edition" class="input">${options(EDITIONS, r.edition)}</select></div>
+                    <div><label class="label" for="rel-place">Bought from</label><select id="rel-place" name="purchasedFrom" class="input">${options(PLACES, r.purchasedFrom)}</select></div>
                     <div><label class="label" for="rel-price">Price paid (£)</label><input id="rel-price" name="pricePaid" type="number" min="0" step="0.01" class="input" value="${v(r.pricePaid)}"></div>
                 </div>
-                <div><label class="label" for="rel-cex">CeX link</label>
+                <div><label class="label" for="rel-cex">CeX link <span class="faint">(for its CeX value: it doesn't have to be where you bought it)</span></label>
                     <input id="rel-cex" name="cexUrl" class="input code" value="${v(r.cexUrl)}" placeholder="https://uk.webuy.com/product-detail?id=…"></div>
                 <div><span class="label">Titles on it</span><div data-titles></div></div>
                 <div><label class="label" for="rel-notes">Notes</label><textarea id="rel-notes" name="notes" rows="2" maxlength="2000" class="input">${v(r.notes)}</textarea></div>
@@ -249,6 +251,7 @@
                 format: form.format.value,
                 edition: form.edition.value,
                 pricePaid: form.pricePaid.value === "" ? null : Number(form.pricePaid.value),
+                purchasedFrom: form.purchasedFrom.value,
                 cexUrl: form.cexUrl.value.trim() || null,
                 notes: form.notes.value,
                 titleIds: picker.get(),

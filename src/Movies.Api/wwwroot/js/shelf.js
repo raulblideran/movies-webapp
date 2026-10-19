@@ -7,6 +7,8 @@
 
     const FORMATS = { Dvd: "DVD", BluRay: "Blu-ray", UltraHdBluRay: "4K Blu-ray" };
     const EDITIONS = { Standard: "Standard", Steelbook: "Steelbook", BoxSet: "Box set" };
+    // where a release was bought, in the order the editor lists them
+    const PLACES = { Cex: "CeX", Hmv: "HMV", Ebay: "eBay", Zavvi: "Zavvi", Amazon: "Amazon", ForbiddenPlanet: "Forbidden Planet", Other: "Other" };
     // "4K Blu-ray Steelbook"; a standard edition is just the format
     const label = (r) => `${FORMATS[r.format] ?? r.format}${r.edition && r.edition !== "Standard" ? ` ${EDITIONS[r.edition] ?? r.edition}` : ""}`;
     // A title's part of what its releases cost (a box set's price is shared between its titles). Null when nothing has a price.
@@ -110,5 +112,5 @@
         return { get: () => view };
     }
 
-    window.Shelf = { FORMATS, EDITIONS, label, titleShare, money, esc, renderTable, viewToggle };
+    window.Shelf = { FORMATS, EDITIONS, PLACES, label, titleShare, money, esc, renderTable, viewToggle };
 })();

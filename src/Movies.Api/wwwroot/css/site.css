@@ -70,6 +70,22 @@
 html {
     -webkit-text-size-adjust: 100%;
     overflow-x: clip;
+    /* scroll bars in the theme's colours (inherited by every scrolling element) instead of the browser's grey */
+    scrollbar-color: color-mix(in srgb, var(--ink) 32%, var(--bg)) var(--bg);
+}
+
+/* scroll areas inside the page: thin, on a clear track */
+.data-table-wrap,
+.viz-table-wrap,
+.viz-body,
+.modal-scroll,
+.panel,
+.suggest,
+.menu,
+.dropdown,
+.theme-menu {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ink) 30%, transparent) transparent;
 }
 
 body {

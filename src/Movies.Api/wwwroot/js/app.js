@@ -92,9 +92,11 @@ async function calculateCollectionValue() {
     const btn = document.getElementById("calcCexBtn");
     const totalsEl = document.getElementById("cexTotals");
 
-    // Phase 1: every release once (a box set is shared by its titles), split by where it came from
+    // Phase 1: every release once (a box set is shared by its titles). The value counts every release with a
+    // CeX link, wherever it was bought (two copies of the same product count twice); what was paid is split by
+    // where it was bought.
     const releases = new Map(allData.flatMap((row) => row.releases.map((r) => [r.id, r])));
-    const uniqueSkus = new Set();
+    const copies = new Map(); // sku → how many releases have it
     let totalPaidCex = 0;
     let totalPaidOther = 0;
     let itemCount = 0;
@@ -103,12 +105,9 @@ async function calculateCollectionValue() {
         const paidPrice = r.pricePaid || 0;
         if (!r.cexSku && paidPrice <= 0) continue;
         itemCount++;
-        if (r.cexSku) {
-            totalPaidCex += paidPrice;
-            uniqueSkus.add(r.cexSku);
-        } else {
-            totalPaidOther += paidPrice;
-        }
+        if (r.cexSku) copies.set(r.cexSku, (copies.get(r.cexSku) ?? 0) + 1);
+        if (r.purchasedFrom === "Cex") totalPaidCex += paidPrice;
+        else totalPaidOther += paidPrice;
     }
 
     if (itemCount === 0) {
@@ -116,7 +115,7 @@ async function calculateCollectionValue() {
         return;
     }
 
-    const skuList = [...uniqueSkus];
+    const skuList = [...copies.keys()];
 
     btn.disabled = true;
     btn.classList.add("is-busy");
@@ -146,9 +145,10 @@ async function calculateCollectionValue() {
             const sku = queue.shift();
             const details = await fetchCexDetails(sku);
             if (details) {
-                totalSell += details.sellPrice || 0;
-                totalCash += details.cashPrice || 0;
-                totalVoucher += details.exchangePrice || 0;
+                const n = copies.get(sku);
+                totalSell += (details.sellPrice || 0) * n;
+                totalCash += (details.cashPrice || 0) * n;
+                totalVoucher += (details.exchangePrice || 0) * n;
             }
             fetched++;
             document.getElementById("totalCexItems").textContent = `${fetched}/${skuList.length}`;
@@ -213,20 +213,6 @@ async function loadTitles({ quiet = false } = {}) {
     } finally {
         showLoading(false);
     }
-}
-
-async function refreshData() {
-    const refreshButton = document.getElementById("refreshButton");
-    refreshButton.disabled = true;
-    refreshButton.classList.add("is-busy");
-
-    cexCache = {};
-    if (await loadTitles({ quiet: true })) {
-        showSuccess(`Collection refreshed: ${allData.length} titles`);
-    }
-
-    refreshButton.disabled = false;
-    refreshButton.classList.remove("is-busy");
 }
 
 // "/?title=12" opens that title (the full-page editor lands here after saving).
@@ -593,7 +579,7 @@ function stubHtml(row) {
                 .map((r) => `
                 <li>
                     <a href="/releases?release=${r.id}" class="link" data-release-link="${r.id}">${escapeHtml(r.name)}</a>
-                    <span class="stub-release-meta">${escapeHtml(Shelf.label(r))}${r.titleCount > 1 ? ` · ${r.titleCount} titles` : ""}${r.pricePaid != null ? ` · ${money(r.pricePaid)}` : ""}</span>
+                    <span class="stub-release-meta">${escapeHtml(Shelf.label(r))}${r.purchasedFrom !== "Other" ? ` · ${escapeHtml(Shelf.PLACES[r.purchasedFrom])}` : ""}${r.titleCount > 1 ? ` · ${r.titleCount} titles` : ""}${r.pricePaid != null ? ` · ${money(r.pricePaid)}` : ""}</span>
                 </li>`)
                 .join("")}</ul>` : ""}
             ${cex ? `<h3>At CeX today</h3><div id="cexPricing" class="stub-cex"><p class="muted pulse">Checking prices…</p></div>` : ""}

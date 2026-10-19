@@ -33,18 +33,28 @@ public static class Startup
     public static async Task MigrateAsync(MoviesDbContext db)
     {
         var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+        List<ReleaseConversion.Shelf>? shelves = null;
         if (pending.Any(m => m.EndsWith("_DropTitleShelfColumns")))
         {
             await db.GetService<IMigrator>().MigrateAsync("PhysicalReleases");
-            await ConvertShelvesAsync(db);
+            shelves = await ReadShelvesAsync(db);
         }
         await db.Database.MigrateAsync();
+        // inserted with the schema complete, so later columns on releases are there too
+        if (shelves is not null && !await db.Releases.AnyAsync())
+        {
+            foreach (var p in ReleaseConversion.Plan(shelves))
+            {
+                p.Release.TitleLinks = p.TitleIds.Select(id => new TitleRelease { TitleId = id }).ToList();
+                db.Releases.Add(p.Release);
+            }
+            await db.SaveChangesAsync();
+        }
     }
 
-    private static async Task ConvertShelvesAsync(MoviesDbContext db)
+    /// <summary>The titles' old formats, prices and CeX links, read while their columns still exist.</summary>
+    private static async Task<List<ReleaseConversion.Shelf>> ReadShelvesAsync(MoviesDbContext db)
     {
-        if (await db.Releases.AnyAsync()) return;
-
         var shelves = new List<ReleaseConversion.Shelf>();
         var conn = db.Database.GetDbConnection();
         await db.Database.OpenConnectionAsync();
@@ -64,12 +74,6 @@ public static class Startup
         {
             await db.Database.CloseConnectionAsync();
         }
-
-        foreach (var p in ReleaseConversion.Plan(shelves))
-        {
-            p.Release.TitleLinks = p.TitleIds.Select(id => new TitleRelease { TitleId = id }).ToList();
-            db.Releases.Add(p.Release);
-        }
-        await db.SaveChangesAsync();
+        return shelves;
     }
 }

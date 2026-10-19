@@ -5,11 +5,11 @@
 
 (function () {
     const { api, esc } = Auth;
-    const { label, FORMATS, EDITIONS, money, renderTable, viewToggle } = Shelf;
+    const { label, FORMATS, EDITIONS, PLACES, money, renderTable, viewToggle } = Shelf;
 
     let releases = [];
     let titles = new Map(); // id → title
-    const filter = { q: "", format: "all", edition: "all", sort: "name" };
+    const filter = { q: "", format: "all", edition: "all", place: "all", sort: "name" };
     let tableSort = { key: "name", dir: "asc" };
     let shown = [];
     const view = viewToggle(document.getElementById("viewToggle"), "releases", () => show());
@@ -23,7 +23,7 @@
         releases = rs;
         titles = new Map(ts.map((t) => [t.id, t]));
         for (const r of releases)
-            r._search = [r.name, r.cexBoxName, r.notes, label(r), ...titlesOf(r).map((t) => t.name)].filter(Boolean).join(" ").toLowerCase();
+            r._search = [r.name, r.cexBoxName, r.notes, label(r), PLACES[r.purchasedFrom], ...titlesOf(r).map((t) => t.name)].filter(Boolean).join(" ").toLowerCase();
         hero();
         filters();
         show();
@@ -62,6 +62,7 @@
         const count = (pred) => releases.filter(pred).length;
         chips("formatFilters", "format", [["all", "All formats"], ...Object.entries(FORMATS).filter(([k]) => count((r) => r.format === k)).map(([k, l]) => [k, `${l} (${count((r) => r.format === k)})`])]);
         chips("editionFilters", "edition", [["all", "All editions"], ...Object.entries(EDITIONS).filter(([k]) => count((r) => r.edition === k)).map(([k, l]) => [k, `${l} (${count((r) => r.edition === k)})`])]);
+        chips("placeFilters", "place", [["all", "All shops"], ...Object.entries(PLACES).filter(([k]) => count((r) => r.purchasedFrom === k)).map(([k, l]) => [k, `${l} (${count((r) => r.purchasedFrom === k)})`])]);
     }
 
     const sorters = {
@@ -106,6 +107,7 @@
         { key: "titles", label: "Titles", value: (r) => titlesOf(r).map((t) => t.name).join(", "), wrap: true },
         { key: "count", label: "No.", value: (r) => r.titleIds.length, num: true },
         { key: "paid", label: "Paid", value: (r) => r.pricePaid, html: (r) => money(r.pricePaid), num: true },
+        { key: "place", label: "Bought from", value: (r) => PLACES[r.purchasedFrom] },
         { key: "cex", label: "CeX product", wrap: true, value: (r) => r.cexBoxName ?? (r.cexSku ? r.cexSku : ""), html: (r) => (r.cexUrl ? `<a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link" onclick="event.stopPropagation()">${esc(r.cexBoxName ?? r.cexSku)}</a>` : "") },
         { key: "notes", label: "Notes", value: (r) => r.notes ?? "", wrap: true },
         { key: "added", label: "Added", value: (r) => r.createdAt, html: (r) => esc(r.createdAt.slice(0, 10).split("-").reverse().join("/")) },
@@ -113,7 +115,7 @@
 
     function show() {
         const list = releases
-            .filter((r) => (filter.format === "all" || r.format === filter.format) && (filter.edition === "all" || r.edition === filter.edition) && (!filter.q || r._search.includes(filter.q)))
+            .filter((r) => (filter.format === "all" || r.format === filter.format) && (filter.edition === "all" || r.edition === filter.edition) && (filter.place === "all" || r.purchasedFrom === filter.place) && (!filter.q || r._search.includes(filter.q)))
             .sort(sorters[filter.sort]);
         document.getElementById("releaseCount").textContent = list.length === releases.length ? "" : `${list.length} of ${releases.length}`;
         const grid = document.getElementById("releasesGrid");
@@ -153,6 +155,7 @@
                         </div>
                         <dl class="facts">
                             ${r.pricePaid != null ? `<dt>Paid</dt><dd>${money(r.pricePaid)}</dd>` : ""}
+                            ${r.purchasedFrom !== "Other" ? `<dt>From</dt><dd>${esc(PLACES[r.purchasedFrom])}</dd>` : ""}
                             ${ts.length > 1 ? `<dt class="sr-only">Titles</dt><dd class="wide">${esc(ts.map((t) => t.name).join(", "))}</dd>` : ""}
                         </dl>
                     </div>
