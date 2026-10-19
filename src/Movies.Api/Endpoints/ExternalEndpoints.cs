@@ -31,6 +31,25 @@ public static partial class ExternalEndpoints
                 PosterUrl = Contracts.TitleDto.PosterBaseUrl + r.PosterPath,
             }));
         }).RequireAuthorization(Policies.Editor);
+
+        // Fill the add/edit form from a pasted TMDB link.
+        app.MapGet("/api/tmdb/details", async (string? link, TmdbClient tmdb, CancellationToken ct) =>
+        {
+            if (TmdbClient.ParseLink(link) is not { } parsed)
+                return Results.Problem("That isn't a TMDB film or series link, e.g. https://www.themoviedb.org/movie/603-the-matrix", statusCode: 400);
+            var (mediaType, id) = parsed;
+            if (!tmdb.Enabled) return Results.Problem("TMDB API key is not configured.", statusCode: 503);
+            try
+            {
+                return await tmdb.GetDetailsAsync(mediaType, id, ct) is { } d
+                    ? Results.Ok(d)
+                    : Results.Problem("TMDB has nothing at that link.", statusCode: 404);
+            }
+            catch (TmdbUnavailableException)
+            {
+                return Results.Problem("TMDB couldn't be reached. Try again in a moment.", statusCode: 502);
+            }
+        }).RequireAuthorization(Policies.Editor);
     }
 
     [GeneratedRegex(@"^[A-Za-z0-9\-]{1,40}$")]

@@ -2271,6 +2271,27 @@ textarea.code {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* TMDB link: paste a themoviedb.org link to fill the form */
+.tmdb-link {
+    display: flex;
+    gap: 8px;
+}
+
+.tmdb-link .input {
+    flex: 1;
+    min-width: 0;
+}
+
+.tmdb-note {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.tmdb-note.is-warning {
+    color: var(--warn);
+}
+
 /* Name takes three of the four columns used by the rows below, so Type lines up with them */
 .row-name {
     grid-template-columns: repeat(4, minmax(0, 1fr));

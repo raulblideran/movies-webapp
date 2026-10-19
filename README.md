@@ -76,6 +76,7 @@ If the app is running, these commands `exec` into it; otherwise they run in a th
 | `GET /api/export.csv` | Editor + 2FA; same columns as the old sheet |
 | `GET /api/cex/{sku}` | public; server-side CeX lookup, cached 6h (replaces the CORS proxies and Cloudflare worker) |
 | `GET /api/tmdb/search?q=&year=&anime=` | Editor + 2FA |
+| `GET /api/tmdb/details?link=` | Editor + 2FA; film/series details from a pasted themoviedb.org link (fills the add/edit form) |
 | `POST /api/auth/login`, `/login/mfa`, `/logout`, `GET /api/auth/me` | |
 | `/api/account/password`, `/api/account/mfa/*` | signed in |
 | `/api/users/*` | Admin + 2FA |

@@ -127,7 +127,13 @@
         container.addEventListener("click", () => input.focus());
         container.insertBefore(input, list);
         render();
-        return { get: () => (commit(), values) };
+        return {
+            get: () => (commit(), values),
+            addAll(list) {
+                list.forEach(add);
+                render();
+            },
+        };
     }
 
     /** Distinct values of a list field across all titles, for the chip suggestions. */
@@ -152,6 +158,25 @@
                     : `<a href="/releases?new=1&title=${row.id}" class="btn btn-small">Add a release with this title</a>`}
             </div>`;
     }
+
+    // TMDB genre names → the names this collection already uses, when it has an equivalent.
+    const GENRE_ALIASES = {
+        "science fiction": ["Sci-Fi", "Sci-fi", "SciFi"],
+        "sci-fi": ["Science Fiction"],
+        animation: ["Animated"],
+        music: ["Musical"],
+    };
+    // TMDB genres that describe the format rather than the film.
+    const GENRE_SKIP = new Set(["tv movie", "kids", "news", "reality", "soap", "talk"]);
+    function mapGenres(tmdbGenres, isAnime, vocab) {
+        const known = new Map(vocab.map((g) => [g.toLowerCase(), g]));
+        const pick = (g) => known.get(g.toLowerCase()) ?? (GENRE_ALIASES[g.toLowerCase()] ?? []).map((a) => known.get(a.toLowerCase())).find(Boolean) ?? g;
+        const out = tmdbGenres.filter((g) => !GENRE_SKIP.has(g.toLowerCase())).map(pick);
+        if (isAnime) out.push(pick("Anime"));
+        return out;
+    }
+    // Loose check before calling the server, so pasting random text doesn't fire a request.
+    const looksLikeTmdb = (s) => /themoviedb\.org\/.*\b(movie|tv)\/\d/i.test(s) || /^\/?(movie|tv)\/\d+/i.test(s.trim());
 
     /**
      * Render the form into container.
@@ -193,6 +218,10 @@
                     <button type="button" data-clear-poster class="btn btn-small btn-block">Remove poster</button>
                 </div>
                 <div class="stack">
+                    <div>
+                        ${f("TMDB link", `<div class="tmdb-link"><input name="tmdbLink" type="text" inputmode="url" autocomplete="off" spellcheck="false" class="input" placeholder="Paste a themoviedb.org link to fill the form"><button type="button" data-tmdb-fill class="btn">Fill</button></div>`)}
+                        <p data-tmdb-note class="tmdb-note hidden" role="status"></p>
+                    </div>
                     <div class="row row-name">
                         ${f("Name", `<input name="name" required maxlength="300" class="input" value="${v(row.name)}">`)}
                         ${f("Type", `<select name="type" class="input">${["Film", "Series"].map((t) => `<option ${t === row.type ? "selected" : ""}>${t}</option>`).join("")}</select>`)}
@@ -287,6 +316,51 @@
                 });
             });
         };
+
+        const fillButton = d.$("[data-tmdb-fill]");
+        const note = (html, warn = false) => {
+            const el = d.$("[data-tmdb-note]");
+            el.innerHTML = html;
+            el.classList.toggle("hidden", !html);
+            el.classList.toggle("is-warning", warn);
+        };
+        const fillFromTmdb = () => {
+            const link = form.tmdbLink.value.trim();
+            if (!link) return d.error("Paste a TMDB link first, e.g. https://www.themoviedb.org/movie/603-the-matrix");
+            busy(d, fillButton, async () => {
+                const t = await api("GET", `/api/tmdb/details?link=${encodeURIComponent(link)}`);
+                form.name.value = t.title;
+                form.type.value = t.type;
+                form.type.dispatchEvent(new Event("change")); // the themed dropdown (select.js) follows "change"
+                if (t.year) form.releaseYear.value = t.year;
+                if (t.seasons != null) form.seasons.value = t.seasons;
+                if (t.episodes != null) form.episodesTotal.value = t.episodes;
+                genres.addAll(mapGenres(t.genres, t.isAnime, unique(allRows, (r) => r.genres)));
+                Object.assign(poster, { tmdbId: t.id, tmdbMediaType: t.mediaType, posterPath: t.posterPath ?? poster.posterPath });
+                renderPoster();
+                d.$("[data-results]").classList.add("hidden");
+                const dupe = allRows.find((r) => r.tmdbId === t.id && r.tmdbMediaType === t.mediaType && r.id !== row.id);
+                note(
+                    dupe
+                        ? `Already in your collection as <strong>${esc(dupe.name)}</strong>${dupe.releaseYear ? ` (${dupe.releaseYear})` : ""}.`
+                        : `Filled from TMDB: <strong>${esc(t.title)}</strong>${t.year ? ` (${t.year})` : ""}. Add your rating and watch dates.`,
+                    !!dupe,
+                );
+                if (!dupe) form.rating.focus();
+            });
+        };
+        fillButton.onclick = fillFromTmdb;
+        form.tmdbLink.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault(); // fill, don't submit the form
+            fillFromTmdb();
+        });
+        // Pasting a link fills straight away.
+        form.tmdbLink.addEventListener("paste", () =>
+            setTimeout(() => {
+                if (looksLikeTmdb(form.tmdbLink.value)) fillFromTmdb();
+            }),
+        );
 
         d.$("[data-cancel]").onclick = () => onCancel?.();
 
