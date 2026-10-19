@@ -5,7 +5,7 @@
 //   titles()          Map of title id → title
 //   find(id)          the release with that id
 //   onChanged(saved)  after a save (saved) or delete (null): reload, return the fresh release to show
-//   openTitle(id)     optional: show a title in place instead of following its link
+//   openTitle(id)     optional: show a title over the release instead of following its link
 //   onOpen(r), onClose(r)   optional
 
 (function () {
@@ -82,13 +82,12 @@
         );
         ctx.onOpen?.(r);
         photoFallback(d.root, ctx);
-        // where the page can show a title itself (the collection page), a plain click does that instead of navigating
+        // where the page can show a title itself, a plain click opens it over the release (which stays open)
         if (ctx.openTitle)
             d.$$("[data-title]").forEach((a) =>
                 a.addEventListener("click", (e) => {
                     if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
                     e.preventDefault();
-                    d.close();
                     ctx.openTitle(Number(a.dataset.title));
                 }),
             );

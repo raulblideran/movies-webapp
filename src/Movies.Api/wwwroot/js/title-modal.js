@@ -7,10 +7,18 @@
 //   onStep(i)       after stepping to rows()[i], e.g. to keep the grid behind in step
 //   showRelease(id) open a release over the popup; without it a release link goes to its page
 //   onOpened(row)   after the popup renders (the collection page's admin bar)
+//
+// The popup shares a layer with the release popups and other dialogs (js/auth.js), and whichever
+// was opened last is on top. TitleModal.open(row, { front: true }) brings it over an open release;
+// if it was already showing another title further down, that title comes back when this one closes.
 
 (function () {
     let config = {};
     let current = null;
+    // titles this popup showed further down before it was brought to the front: [{ row, below }],
+    // where below is the dialog that sat on top of it
+    const covered = [];
+    let opener = null;
     const cexCache = new Map();
 
     const esc = (value) =>
@@ -153,12 +161,37 @@
     // Releases with a CeX product, each product once.
     const cexReleases = (row) => [...new Map(row.releases.filter((r) => r.cexSku).map((r) => [r.cexSku, r])).values()];
 
-    async function open(row) {
+    // ---------- stacking ----------
+
+    const visibleOverlays = () => [...document.querySelectorAll(".overlay:not(.hidden)")];
+    const isOnTop = (el) => visibleOverlays().pop() === el;
+
+    // open(row): show the title, refreshing it where it is if the popup is already open.
+    // open(row, { front: true }): also bring the popup over anything opened on top of it.
+    async function open(row, { front = false } = {}) {
         ensureMarkup();
-        current = row;
         const modal = $("modal");
-        const scroll = $("modalScroll");
         const panel = $("modalPanel");
+        const wasOpen = !modal.classList.contains("hidden");
+        if (!wasOpen || (front && !isOnTop(modal))) {
+            if (wasOpen && current) {
+                const above = visibleOverlays();
+                covered.push({ row: current, below: above[above.indexOf(modal) + 1] });
+            }
+            opener = document.activeElement;
+            document.body.appendChild(modal); // last in the page = on top
+            modal.classList.remove("hidden");
+            render(row);
+            panel.querySelector(".close").focus();
+        } else {
+            render(row);
+        }
+        document.body.style.overflow = "hidden";
+    }
+
+    async function render(row) {
+        current = row;
+        const scroll = $("modalScroll");
 
         const tags = [
             `<span class="tag tag-${row.type === "Film" ? "film" : "series"}">${esc(row.type)}</span>`,
@@ -183,12 +216,8 @@
             </div>
         </div>`;
 
-        const wasOpen = !modal.classList.contains("hidden");
-        modal.classList.remove("hidden");
-        if (!wasOpen) panel.querySelector(".close").focus();
         scroll.scrollTop = 0;
         fitPoster();
-        document.body.style.overflow = "hidden";
 
         updateNav();
         config.onOpened?.(row);
@@ -252,11 +281,21 @@
     }
 
     function close() {
-        current = null;
         const modal = $("modal");
         if (!modal || modal.classList.contains("hidden")) return;
+        if (opener?.isConnected) opener.focus();
+        opener = null;
+        // the title this one covered goes back where it was, under the dialog that was over it
+        let back = covered.pop();
+        while (back && !back.below?.isConnected) back = covered.pop();
+        if (back) {
+            back.below.before(modal);
+            render(back.row);
+            return;
+        }
+        current = null;
         modal.classList.add("hidden");
-        document.body.style.overflow = "";
+        if (!visibleOverlays().length) document.body.style.overflow = "";
     }
 
     function wire() {
@@ -284,11 +323,17 @@
     }
 
     document.addEventListener("keydown", function (event) {
-        // Admin dialogs handle their own keys.
-        if (document.querySelector("[data-admin-dialog]:not(.hidden)")) return;
-        if (event.key === "Escape") close();
+        // Only while the popup is on top; dialogs over it handle their own keys.
+        const modal = $("modal");
+        if (!current || !modal || !isOnTop(modal)) return;
+        if (event.key === "Escape") {
+            // stop here, or the dialog underneath would see the same Escape once this is closed
+            event.stopImmediatePropagation();
+            close();
+            return;
+        }
         const typing = event.target.closest?.("input, textarea, select, [contenteditable]");
-        if (current && !typing && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+        if (!typing && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
             event.preventDefault();
             step(event.key === "ArrowLeft" ? -1 : 1);
         }

@@ -92,10 +92,10 @@
         },
         onOpen: (r) => setParam("release", r.id),
         onClose: () => setParam("release", null),
-        // a title on a release opens its popup here instead of leaving for the collection page
+        // a title on a release opens over it here instead of leaving for the collection page
         openTitle(id) {
             const t = titles.get(id);
-            if (t) TitleModal.open(t);
+            if (t) TitleModal.open(t, { front: true });
         },
     };
     TitleModal.configure({

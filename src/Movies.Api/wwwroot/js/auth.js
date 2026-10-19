@@ -118,7 +118,8 @@
         };
         const opener = document.activeElement;
         const onKey = (e) => {
-            if (e.key === "Escape" && root === [...document.querySelectorAll("[data-admin-dialog]")].pop()) d.close();
+            // only the popup on top: a title popup (js/title-modal.js) can sit over a dialog
+            if (e.key === "Escape" && root === [...document.querySelectorAll(".overlay:not(.hidden)")].pop()) d.close();
         };
         root.querySelector("[data-close]").onclick = () => d.close();
         root.addEventListener("mousedown", (e) => {

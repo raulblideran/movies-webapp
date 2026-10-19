@@ -545,10 +545,10 @@ const releaseCtx = {
         if (row) openModal(row);
         return saved ? fetchRelease(saved.id) : null;
     },
-    // a title on the release replaces the one in the popup underneath
+    // a title on the release opens over it; the release stays open underneath
     openTitle(id) {
         const row = allData.find((r) => r.id === id);
-        if (row) openModal(row);
+        if (row) TitleModal.open(row, { front: true });
     },
 };
 

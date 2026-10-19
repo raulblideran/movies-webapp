@@ -1829,6 +1829,8 @@ textarea.code {
 
 /* Previous / next arrows either side of the title modal */
 #modal {
+    /* same layer as the dialogs: whichever was opened last is on top (js/title-modal.js) */
+    z-index: 1100;
     padding: 20px 80px 44px;
 }
 
