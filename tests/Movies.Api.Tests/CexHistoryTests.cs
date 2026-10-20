@@ -36,6 +36,56 @@ public class FakeCexApp : TestApp
     }
 }
 
+/// <summary>The app with CeX refusing every request, as it does when it has blocked us.</summary>
+public class RefusingCexApp : TestApp
+{
+    public int Calls;
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(s =>
+            s.AddHttpClient<CexClient>().ConfigurePrimaryHttpMessageHandler(() => new RefusingCex(this)));
+    }
+
+    private class RefusingCex(RefusingCexApp app) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Interlocked.Increment(ref app.Calls);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+        }
+    }
+}
+
+public class CexRefusedTests(RefusingCexApp app) : IClassFixture<RefusingCexApp>
+{
+    [Fact]
+    public async Task A_refusal_pauses_cex_calls_instead_of_trying_every_item()
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MoviesDbContext>();
+            db.Releases.AddRange(
+                new PhysicalRelease { Name = "A", CexSku = "3000000000001" },
+                new PhysicalRelease { Name = "B", CexSku = "3000000000002" },
+                new PhysicalRelease { Name = "C", CexSku = "3000000000003" });
+            await db.SaveChangesAsync();
+        }
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var history = scope.ServiceProvider.GetRequiredService<CexHistoryService>();
+            Assert.Equal(0, await history.SnapshotAsync(TimeSpan.Zero));
+            Assert.Equal(1, app.Calls);
+            // the next run, and lookups from the site, don't call CeX while paused
+            Assert.Equal(0, await history.SnapshotAsync(TimeSpan.Zero));
+            Assert.Null(await scope.ServiceProvider.GetRequiredService<CexClient>().GetAsync("3000000000001"));
+            Assert.Equal(1, app.Calls);
+        }
+    }
+}
+
 public class CexHistoryTests : IClassFixture<FakeCexApp>
 {
     private readonly FakeCexApp _app;

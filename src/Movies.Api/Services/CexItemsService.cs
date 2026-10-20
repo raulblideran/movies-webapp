@@ -106,11 +106,13 @@ public class CexRefreshService(IServiceScopeFactory scopes, IConfiguration confi
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MoviesDbContext>();
         var service = scope.ServiceProvider.GetRequiredService<CexItemsService>();
+        var cex = scope.ServiceProvider.GetRequiredService<CexClient>();
         var cutoff = DateTime.UtcNow - Interval + TimeSpan.FromMinutes(5);
         var stale = await db.CexItems.Where(i => i.RefreshedAt == null || i.RefreshedAt < cutoff).ToListAsync(ct);
         var refreshed = 0;
         foreach (var item in stale)
         {
+            if (cex.Refused) break;
             if (await service.RefreshAsync(item, ct)) refreshed++;
             await Task.Delay(TimeSpan.FromSeconds(1), ct); // be gentle with CeX
         }

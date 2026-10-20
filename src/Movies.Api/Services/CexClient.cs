@@ -32,6 +32,13 @@ public class CexClient(HttpClient http, IMemoryCache cache, Microsoft.Extensions
     private static readonly TimeSpan DetailsCacheFor = TimeSpan.FromHours(6);
     private static readonly TimeSpan StoresCacheFor = TimeSpan.FromHours(24);
     private static readonly TimeSpan StockCacheFor = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan RefusedPauseFor = TimeSpan.FromHours(6);
+    private const string RefusedKey = "cex:refused";
+
+    /// <summary>
+    /// True for a while after CeX refuses us (403/429). Calls are skipped until then, so retries don't keep a block alive.
+    /// </summary>
+    public bool Refused => cache.TryGetValue(RefusedKey, out _);
 
     public Task<CexDetails?> GetAsync(string sku, CancellationToken ct = default) =>
         GetAsync(sku, bypassCache: false, ct);
@@ -113,6 +120,7 @@ public class CexClient(HttpClient http, IMemoryCache cache, Microsoft.Extensions
 
     private async Task<JsonElement?> GetResponseAsync(string url, CancellationToken ct)
     {
+        if (Refused) return null;
         try
         {
             var target = new Uri(http.BaseAddress!, url);
@@ -121,6 +129,12 @@ public class CexClient(HttpClient http, IMemoryCache cache, Microsoft.Extensions
                 ? target
                 : new Uri($"{proxy.TrimEnd('/')}/?url={Uri.EscapeDataString(target.AbsoluteUri)}");
             using var resp = await http.GetAsync(requestUri, ct);
+            if (resp.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests)
+            {
+                cache.Set(RefusedKey, true, RefusedPauseFor);
+                logger.LogWarning("CeX refused us ({Status}) for {Url}; pausing CeX calls for {Pause}", (int)resp.StatusCode, url, RefusedPauseFor);
+                return null;
+            }
             if (!resp.IsSuccessStatusCode)
             {
                 logger.LogWarning("CeX returned {Status} for {Url}", (int)resp.StatusCode, url);

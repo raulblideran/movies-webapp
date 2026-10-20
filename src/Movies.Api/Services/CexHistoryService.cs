@@ -24,6 +24,7 @@ public class CexHistoryService(MoviesDbContext db, CexClient cex, ILogger<CexHis
         var recorded = 0;
         foreach (var sku in todo)
         {
+            if (cex.Refused) break; // try again on a later run rather than item by item
             var d = await cex.GetAsync(sku, bypassCache: true, ct);
             if (d is not null)
             {
@@ -53,6 +54,7 @@ public class CexHistoryService(MoviesDbContext db, CexClient cex, ILogger<CexHis
         // Releases still without CeX's name and picture (new links, converted releases) get them now rather than tomorrow.
         foreach (var r in await db.Releases.Where(r => r.CexSku != null && r.CexBoxName == null).ToListAsync(ct))
         {
+            if (cex.Refused) break;
             if (await cex.GetAsync(r.CexSku!, ct) is { } d)
             {
                 r.CexBoxName = d.BoxName;
