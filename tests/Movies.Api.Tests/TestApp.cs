@@ -31,6 +31,7 @@ public class TestApp : WebApplicationFactory<Program>
         builder.UseSetting("Tmdb:ApiKey", "");
         builder.UseSetting("Auth:RequireMfa", "true");
         builder.UseSetting("Cex:BackgroundRefresh", "false");
+        builder.UseSetting("Cex:ProxyUrl", "");
     }
 
     public async Task CreateUserAsync(string userName, string password, string role)

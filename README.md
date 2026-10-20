@@ -25,6 +25,10 @@ Settings live in `.env.dev`, which is git-ignored and created from `.env.dev.exa
 | `Tmdb__ApiKey` | TMDB key, used for the poster search and poster lookup on import |
 | `Auth__RequireMfa` | `true` (default): users must enrol 2FA before they can edit anything |
 
+Locally, CeX calls go through the `cex-proxy` Cloudflare Worker and the background CeX price jobs are off
+(`appsettings.Development.json`), so your home connection never calls CeX's API directly. CeX blocks
+addresses that call it a lot, and it blocks a whole home IPv6 range at once.
+
 ## dev.sh
 
 | Command | |
