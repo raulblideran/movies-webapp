@@ -22,6 +22,7 @@
         const [rs, ts] = await Promise.all([api("GET", "/api/releases"), api("GET", "/api/titles")]);
         releases = rs;
         titles = new Map(ts.map((t) => [t.id, t]));
+        TitleEditor.refreshReleases((id) => titles.get(id));
         for (const r of releases)
             r._search = [r.name, r.cexBoxName, r.notes, label(r), PLACES[r.purchasedFrom], ...titlesOf(r).map((t) => t.name)].filter(Boolean).join(" ").toLowerCase();
         hero();
@@ -108,9 +109,41 @@
             const bar = document.getElementById("modalAdminBar");
             if (!bar || !Auth.me.canEdit) return;
             bar.className = "modal-actions";
-            bar.innerHTML = `<a href="/titles/${row.id}/edit" class="btn">Edit</a>`;
+            bar.innerHTML = `
+                <span class="split">
+                    <a href="/titles/${row.id}/edit" data-edit class="btn">Edit</a>
+                    <a href="/titles/${row.id}/edit" class="btn split-end" title="Edit on its own page" aria-label="Edit on its own page">↗</a>
+                </span>`;
+            // a plain click edits over the popup; Ctrl/Cmd/Shift/middle click opens the edit page
+            bar.querySelector("[data-edit]").onclick = (e) => {
+                if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                editTitle(row);
+            };
         },
     });
+
+    // The title form (js/editor.js) over the title popup. Its releases, and a new one, open over the form.
+    function editTitle(row) {
+        const d = Auth.dialog(`Edit ${esc(row.name)}`, "", { wide: true });
+        TitleEditor.mount(d.body, row, {
+            allRows: [...titles.values()],
+            pageLink: `/titles/${row.id}/edit`,
+            openRelease: (id) => {
+                const r = releases.find((x) => x.id === id);
+                if (r) openRelease(r);
+            },
+            addRelease: () => openEditor(null, [row.id]),
+            onCancel: () => d.close(),
+            async onSaved(saved) {
+                d.close();
+                await load();
+                const fresh = titles.get(saved.id);
+                if (fresh && TitleModal.current()?.id === saved.id) TitleModal.open(fresh);
+                Auth.showSuccess(`Saved ${saved.name}`);
+            },
+        });
+    }
     const art = (r, opts) => ReleaseDialogs.art(r, ctx, opts);
     const openRelease = (r) => ReleaseDialogs.open(r, ctx);
     const openEditor = (r, presetTitleIds = []) => ReleaseDialogs.edit(r, presetTitleIds, ctx);

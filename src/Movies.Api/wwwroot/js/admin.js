@@ -49,6 +49,9 @@
         TitleEditor.mount(d.body, row, {
             allRows: App.getAll(),
             pageLink: row ? `/titles/${row.id}/edit` : "/titles/new",
+            // its releases, and a new one, open over the form
+            openRelease: (id) => App.showRelease(id),
+            addRelease: () => App.addRelease(row.id),
             onCancel: () => d.close(),
             async onSaved(saved, isNew) {
                 d.close();

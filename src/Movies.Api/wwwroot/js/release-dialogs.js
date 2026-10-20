@@ -116,7 +116,7 @@
     }
 
     async function remove(r, d, ctx) {
-        if (!window.confirm(`Delete "${r.name}"? Its titles stay in the collection.`)) return;
+        if (!window.confirm(`Delete "${r.name}"? Its titles stay in the watchlog.`)) return;
         try {
             await api("DELETE", `/api/releases/${r.id}`);
             d.close();

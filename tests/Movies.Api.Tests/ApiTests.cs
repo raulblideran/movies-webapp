@@ -45,7 +45,7 @@ public class ApiTests : IClassFixture<TestApp>
     public async Task Stats_page_is_served()
     {
         var html = await _app.CreateClient().GetStringAsync("/stats");
-        Assert.Contains("Collection Stats", html);
+        Assert.Contains("<h1 class=\"hero-title\">Stats</h1>", html);
         Assert.Matches(@"js/charts\.js\?v=\d{12}", html);
         Assert.Matches(@"js/stats\.js\?v=\d{12}", html);
     }

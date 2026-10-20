@@ -15,7 +15,7 @@
 
     function setHeading(text) {
         heading.textContent = text;
-        document.title = `${text} · Movie & Series Collection`;
+        document.title = `${text} · Movie & Series Watchlog`;
     }
     setHeading(id ? "Edit title" : "Add a title");
 
@@ -40,7 +40,7 @@
         try {
             rows ??= await titles;
         } catch (e) {
-            return message(`<p class="status-bad">Couldn't load the collection: ${esc(e.message)}</p>`);
+            return message(`<p class="status-bad">Couldn't load the watchlog: ${esc(e.message)}</p>`);
         }
         const row = id ? rows.find((r) => r.id === id) : null;
         if (id && !row) {

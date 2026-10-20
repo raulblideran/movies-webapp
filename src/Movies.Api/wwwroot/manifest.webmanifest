@@ -1,8 +1,8 @@
 {
     "id": "/",
-    "name": "Movie & Series Collection",
+    "name": "Movie & Series Watchlog",
     "short_name": "Movies",
-    "description": "Personal film & series collection, physical releases and stats.",
+    "description": "Personal film & series watchlog, physical releases and stats.",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",

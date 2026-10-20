@@ -144,20 +144,21 @@
     }
 
     // Copies on the shelf are releases, edited on the releases page; the title form lists them.
-    function releasesHtml(row, isNew) {
+    function releasesInner(row, isNew) {
         const label = window.Shelf?.label ?? ((r) => r.format);
         const items = row.releases
-            .map((r) => `<li><a href="/releases?release=${r.id}" class="link">${esc(r.name)}</a> <span class="faint">${esc(label(r))}${r.pricePaid != null ? ` · £${Number(r.pricePaid).toFixed(2)}` : ""}</span></li>`)
+            .map((r) => `<li><a href="/releases?release=${r.id}" class="link" data-release-link="${r.id}">${esc(r.name)}</a> <span class="faint">${esc(label(r))}${r.pricePaid != null ? ` · £${Number(r.pricePaid).toFixed(2)}` : ""}</span></li>`)
             .join("");
         return `
-            <div class="editor-releases">
                 <span class="label">On the shelf</span>
                 ${items ? `<ul>${items}</ul>` : `<p class="faint">Not on any release.</p>`}
                 ${isNew
                     ? `<p class="faint">Save the title first, then add the discs it's on from the releases page.</p>`
-                    : `<a href="/releases?new=1&title=${row.id}" class="btn btn-small">Add a release with this title</a>`}
-            </div>`;
+                    : `<a href="/releases?new=1&title=${row.id}" class="btn btn-small" data-add-release>Add a release with this title</a>`}`;
     }
+
+    // Open editors (in dialogs), so a page can refresh their shelf list after a release changes.
+    const live = new Set();
 
     // TMDB genre names → the names this collection already uses, when it has an equivalent.
     const GENRE_ALIASES = {
@@ -185,8 +186,10 @@
      *   onSaved    (saved, isNew) => …   after a successful POST/PUT
      *   onCancel   () => …
      *   pageLink   optional href shown as "Open as page" (the dialog uses it)
+     *   openRelease(id)   optional: open a release over the form instead of following its link
+     *   addRelease()      optional: open "Add a release" over the form instead of going to the releases page
      */
-    function mount(container, row, { allRows = [], onSaved, onCancel, pageLink } = {}) {
+    function mount(container, row, { allRows = [], onSaved, onCancel, pageLink, openRelease, addRelease } = {}) {
         const isNew = !row;
         row = row ?? {
             name: "",
@@ -244,7 +247,7 @@
                         <label class="check" style="padding-bottom:10px"><input type="checkbox" name="withBogdan" ${row.withBogdan ? "checked" : ""}> Watched with Bogdan</label>
                         ${f("Date with Bogdan", date("dateWithBogdan", row.dateWithBogdan))}
                     </div>
-                    ${releasesHtml(row, isNew)}
+                    <div class="editor-releases" data-releases>${releasesInner(row, isNew)}</div>
                     ${f("Comments", `<textarea name="comments" rows="3" maxlength="4000" class="input">${v(row.comments)}</textarea>`)}
                     <div class="actions">
                         ${pageLink ? `<a href="${esc(pageLink)}" class="btn push" title="Open this form on its own page">Open as page ↗</a>` : ""}
@@ -342,7 +345,7 @@
                 const dupe = allRows.find((r) => r.tmdbId === t.id && r.tmdbMediaType === t.mediaType && r.id !== row.id);
                 note(
                     dupe
-                        ? `Already in your collection as <strong>${esc(dupe.name)}</strong>${dupe.releaseYear ? ` (${dupe.releaseYear})` : ""}.`
+                        ? `Already in your watchlog as <strong>${esc(dupe.name)}</strong>${dupe.releaseYear ? ` (${dupe.releaseYear})` : ""}.`
                         : `Filled from TMDB: <strong>${esc(t.title)}</strong>${t.year ? ` (${t.year})` : ""}. Add your rating and watch dates.`,
                     !!dupe,
                 );
@@ -363,6 +366,29 @@
         );
 
         d.$("[data-cancel]").onclick = () => onCancel?.();
+
+        // a plain click stays on the page; Ctrl/Cmd/Shift/middle click still opens the releases page
+        const plain = (e) => e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
+        const releasesBox = d.$("[data-releases]");
+        releasesBox.addEventListener("click", (e) => {
+            const link = e.target.closest("[data-release-link]");
+            if (link && openRelease && plain(e)) {
+                e.preventDefault();
+                openRelease(Number(link.dataset.releaseLink));
+            } else if (e.target.closest("[data-add-release]") && addRelease && plain(e)) {
+                e.preventDefault();
+                addRelease();
+            }
+        });
+        const editor = {
+            id: row.id,
+            showReleases(releases) {
+                row = { ...row, releases };
+                releasesBox.innerHTML = releasesInner(row, isNew);
+            },
+            isOpen: () => container.isConnected,
+        };
+        if (!isNew) live.add(editor);
 
         form.onsubmit = (e) => {
             e.preventDefault();
@@ -398,8 +424,21 @@
         };
 
         form.name.focus();
-        return { form };
+        return { form, ...editor };
     }
 
-    window.TitleEditor = { mount, todayIso };
+    // After the page reloads its titles: every open editor shows its title's releases as they are now.
+    // find(id) returns the fresh title.
+    function refreshReleases(find) {
+        for (const ed of live) {
+            if (!ed.isOpen()) {
+                live.delete(ed);
+                continue;
+            }
+            const fresh = find(ed.id);
+            if (fresh) ed.showReleases(fresh.releases);
+        }
+    }
+
+    window.TitleEditor = { mount, todayIso, refreshReleases };
 })();

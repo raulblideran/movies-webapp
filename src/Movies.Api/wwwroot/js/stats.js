@@ -616,7 +616,7 @@
                 <div class="records">${recs
                     .map(
                         ([label, r, value]) => `
-                    <a class="record" href="/?title=${r.id}">
+                    <a class="record" href="/?title=${r.id}" data-title="${r.id}">
                         ${r.posterUrl ? `<img src="${esc(r.posterUrl.replace("/w500/", "/w185/"))}" alt="" loading="lazy">` : `<span class="record-noposter">${esc(r.name)}</span>`}
                         <span class="record-text">
                             <span class="record-label">${esc(label)}</span>
@@ -783,6 +783,53 @@
         pending = setTimeout(drawAll, 120);
     }).observe(document.querySelector(".stats-page"));
 
+    // ---------- a title, and its releases, over the page ----------
+
+    // A record opens its title's popup here (js/title-modal.js) instead of leaving for the watchlog;
+    // the releases listed on it open over it (js/release-dialogs.js).
+    const releaseCache = new Map();
+    async function fetchRelease(id) {
+        const resp = await fetch(`/api/releases/${id}`, { cache: "no-store" });
+        if (!resp.ok) return null;
+        const r = await resp.json();
+        releaseCache.set(id, r);
+        return r;
+    }
+    const releaseCtx = {
+        titles: () => new Map(all.map((t) => [t.id, t])),
+        find: (id) => releaseCache.get(id),
+        // after an edit or delete: fresh numbers, and the title popup underneath shown as it is now
+        async onChanged(saved) {
+            const resp = await fetch("/api/titles", { cache: "no-store" });
+            if (resp.ok) {
+                all = (await resp.json()).map(shape);
+                if (current === "collection") render();
+                const shown = TitleModal.current();
+                const row = shown && all.find((t) => t.id === shown.id);
+                if (row) TitleModal.open(row);
+            }
+            return saved ? fetchRelease(saved.id) : null;
+        },
+        openTitle(id) {
+            const row = all.find((t) => t.id === id);
+            if (row) TitleModal.open(row, { front: true });
+        },
+    };
+    TitleModal.configure({
+        async showRelease(id) {
+            const r = await fetchRelease(id);
+            if (r) ReleaseDialogs.open(r, releaseCtx);
+        },
+    });
+    document.getElementById("statsRoot").addEventListener("click", (e) => {
+        const a = e.target.closest("[data-title]");
+        if (!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; // new tab: the watchlog
+        const row = all.find((t) => t.id === Number(a.dataset.title));
+        if (!row) return;
+        e.preventDefault();
+        TitleModal.open(row);
+    });
+
     async function load() {
         const overlay = document.getElementById("loadingOverlay");
         try {
@@ -797,7 +844,7 @@
             const wanted = location.hash.slice(1) === "cex" ? "releases" : location.hash.slice(1); // #cex: the tab's old name
             if (tabs[wanted] && wanted !== "collection") showTab(wanted, { push: location.hash === "#cex" });
         } catch (e) {
-            document.getElementById("statsRoot").innerHTML = `<div class="empty"><h2>Couldn't load the collection</h2><p class="muted">${esc(e.message)}</p></div>`;
+            document.getElementById("statsRoot").innerHTML = `<div class="empty"><h2>Couldn't load the watchlog</h2><p class="muted">${esc(e.message)}</p></div>`;
         } finally {
             overlay.classList.add("hidden");
         }

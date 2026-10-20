@@ -270,7 +270,6 @@
     font-style: italic;
 }
 
-[data-theme="back-to-the-future"] .tally-figures dd,
 [data-theme="back-to-the-future"] .prices dd,
 [data-theme="back-to-the-future"] .price-paid {
     font-family: "Orbitron", monospace;

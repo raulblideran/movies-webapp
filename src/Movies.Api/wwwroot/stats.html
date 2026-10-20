@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Collection Stats</title>
+        <title>Stats</title>
         <link rel="icon" href="favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -37,7 +37,7 @@
     <body>
         <nav class="topbar" id="topBar" aria-label="Site">
             <div class="topbar-nav">
-                <a href="/">Collection</a>
+                <a href="/">Watchlog</a>
                 <a href="/releases">Releases</a>
                 <a href="/stats" aria-current="page">Stats</a>
                 <a href="/cex">CeX tracker</a>
@@ -53,7 +53,7 @@
             <div class="marquee">
                 <div class="marquee-board">
                     <p class="hero-tagline">By the numbers</p>
-                    <h1 class="hero-title">Collection Stats</h1>
+                    <h1 class="hero-title">Stats</h1>
                     <dl class="hero-stats" id="stats">
                         <div class="stat stat-placeholder"><dt>titles</dt><dd>000</dd></div>
                     </dl>
@@ -63,7 +63,7 @@
 
         <main class="page stats-page">
             <div class="stats-tabs" role="tablist" aria-label="Stats">
-                <button type="button" role="tab" id="tab-collection" data-tab="collection" aria-controls="panel-collection" aria-selected="true">Collection</button>
+                <button type="button" role="tab" id="tab-collection" data-tab="collection" aria-controls="panel-collection" aria-selected="true">Watchlog</button>
                 <button type="button" role="tab" id="tab-releases" data-tab="releases" aria-controls="panel-releases" aria-selected="false" tabindex="-1">Releases</button>
             </div>
             <div role="tabpanel" id="panel-collection" aria-labelledby="tab-collection">
@@ -94,6 +94,8 @@
         <script src="js/select.js"></script>
         <script src="js/auth.js"></script>
         <script src="js/shelf.js"></script>
+        <script src="js/release-dialogs.js"></script>
+        <script src="js/title-modal.js"></script>
         <script src="js/charts.js"></script>
         <script src="js/stats.js"></script>
         <script src="js/stats-cex.js"></script>

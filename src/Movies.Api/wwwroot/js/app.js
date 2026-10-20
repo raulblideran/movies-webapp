@@ -1,4 +1,4 @@
-// Public collection page. Data comes from /api/titles; admin features live in admin.js.
+// Public watchlog page. Data comes from /api/titles; admin features live in admin.js.
 // Physical copies are releases (their own page, releases.html); each title lists the ones it's on.
 
 let allData = [];
@@ -34,10 +34,6 @@ function formatRating(rating) {
     return rating == null ? "" : String(rating);
 }
 
-function money(value) {
-    return `£${value.toFixed(2)}`;
-}
-
 // Detail rows shown on cards and in the modal, in the original sheet's column order and labels.
 function detailFields(row) {
     return [
@@ -68,87 +64,6 @@ function searchTextFor(row) {
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-}
-
-// ---------- CeX ----------
-
-// One cache with the title popup (js/title-modal.js).
-const fetchCexDetails = (sku) => TitleModal.fetchCex(sku);
-
-async function calculateCollectionValue() {
-    const btn = document.getElementById("calcCexBtn");
-    const totalsEl = document.getElementById("cexTotals");
-
-    // Phase 1: every release once (a box set is shared by its titles). The value counts every release with a
-    // CeX link, wherever it was bought (two copies of the same product count twice); what was paid is split by
-    // where it was bought.
-    const releases = new Map(allData.flatMap((row) => row.releases.map((r) => [r.id, r])));
-    const copies = new Map(); // sku → how many releases have it
-    let totalPaidCex = 0;
-    let totalPaidOther = 0;
-    let itemCount = 0;
-
-    for (const r of releases.values()) {
-        const paidPrice = r.pricePaid || 0;
-        if (!r.cexSku && paidPrice <= 0) continue;
-        itemCount++;
-        if (r.cexSku) copies.set(r.cexSku, (copies.get(r.cexSku) ?? 0) + 1);
-        if (r.purchasedFrom === "Cex") totalPaidCex += paidPrice;
-        else totalPaidOther += paidPrice;
-    }
-
-    if (itemCount === 0) {
-        showError("No releases with CeX links or prices in your collection");
-        return;
-    }
-
-    const skuList = [...copies.keys()];
-
-    btn.disabled = true;
-    btn.classList.add("is-busy");
-    totalsEl.classList.remove("hidden");
-    document.getElementById("totalSell").textContent = "...";
-    document.getElementById("totalCash").textContent = "...";
-    document.getElementById("totalVoucher").textContent = "...";
-    const totalPaidAll = totalPaidCex + totalPaidOther;
-    document.getElementById("totalPaidCex").textContent =
-        totalPaidCex > 0 ? money(totalPaidCex) : "-";
-    document.getElementById("totalPaidOther").textContent =
-        totalPaidOther > 0 ? money(totalPaidOther) : "-";
-    document.getElementById("totalPaidAll").textContent =
-        totalPaidAll > 0 ? money(totalPaidAll) : "-";
-    document.getElementById("totalCexItems").textContent =
-        skuList.length > 0 ? `0/${skuList.length}` : `${itemCount}`;
-
-    // Phase 2: Fetch all unique CeX SKUs (a few at a time; the server caches results)
-    let totalSell = 0;
-    let totalCash = 0;
-    let totalVoucher = 0;
-    let fetched = 0;
-
-    const queue = [...skuList];
-    async function worker() {
-        while (queue.length > 0) {
-            const sku = queue.shift();
-            const details = await fetchCexDetails(sku);
-            if (details) {
-                const n = copies.get(sku);
-                totalSell += (details.sellPrice || 0) * n;
-                totalCash += (details.cashPrice || 0) * n;
-                totalVoucher += (details.exchangePrice || 0) * n;
-            }
-            fetched++;
-            document.getElementById("totalCexItems").textContent = `${fetched}/${skuList.length}`;
-            document.getElementById("totalSell").textContent = money(totalSell);
-            document.getElementById("totalCash").textContent = money(totalCash);
-            document.getElementById("totalVoucher").textContent = money(totalVoucher);
-        }
-    }
-    await Promise.all([worker(), worker(), worker(), worker()]);
-
-    btn.disabled = false;
-    btn.classList.remove("is-busy");
-    document.getElementById("totalCexItems").textContent = `${itemCount}`;
 }
 
 // ---------- notifications / UI toggles ----------
@@ -189,13 +104,14 @@ async function loadTitles({ quiet = false } = {}) {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         allData = await resp.json();
         for (const row of allData) row._search = searchTextFor(row);
+        window.TitleEditor?.refreshReleases((id) => allData.find((r) => r.id === id));
 
         displayStats();
         createFilters();
         applyFilters();
         return true;
     } catch (error) {
-        showError("Error loading the collection: " + error.message);
+        showError("Error loading the watchlog: " + error.message);
         return false;
     } finally {
         showLoading(false);
@@ -558,12 +474,17 @@ async function showRelease(id) {
     else showError("Couldn't load that release.");
 }
 
+// "Add a release" with the title already picked, over the title's editor
+const addRelease = (titleId) => ReleaseDialogs.edit(null, [titleId], releaseCtx);
+
 // Used by admin.js
 window.App = {
     reload: () => loadTitles({ quiet: true }),
     getAll: () => allData,
     openModal,
     closeModal,
+    showRelease,
+    addRelease,
     showError,
     showSuccess,
     escapeHtml,

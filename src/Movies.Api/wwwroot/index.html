@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Movie & Series Collection</title>
+        <title>Movie & Series Watchlog</title>
         <link rel="icon" href="favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -37,7 +37,7 @@
     <body data-export-url="/api/export.csv">
         <nav class="topbar" id="topBar" aria-label="Site">
             <div class="topbar-nav">
-                <a href="/" aria-current="page">Collection</a>
+                <a href="/" aria-current="page">Watchlog</a>
                 <a href="/releases">Releases</a>
                 <a href="/stats">Stats</a>
                 <a href="/cex">CeX tracker</a>
@@ -53,7 +53,7 @@
             <div class="marquee">
                 <div class="marquee-board">
                     <p class="hero-tagline" id="heroTagline">Now showing</p>
-                    <h1 class="hero-title">Movie &amp; Series Collection</h1>
+                    <h1 class="hero-title">Movie &amp; Series Watchlog</h1>
                     <dl class="hero-stats" id="stats">
                         <div class="stat stat-placeholder"><dt>titles</dt><dd>000</dd></div>
                     </dl>
@@ -62,25 +62,10 @@
         </header>
 
         <main class="page">
-            <section class="tally" id="cexValueSection" aria-label="Collection value at CeX">
-                <button type="button" id="calcCexBtn" class="btn" onclick="calculateCollectionValue()">
-                    Calculate CeX value
-                </button>
-                <dl id="cexTotals" class="tally-figures hidden" aria-live="polite">
-                    <div><dt>CeX sells for</dt><dd id="totalSell">-</dd></div>
-                    <div><dt>Cash</dt><dd id="totalCash" class="is-cash">-</dd></div>
-                    <div><dt>Voucher</dt><dd id="totalVoucher" class="is-voucher">-</dd></div>
-                    <div class="tally-break"><dt>Paid at CeX</dt><dd id="totalPaidCex" class="is-paid">-</dd></div>
-                    <div><dt>Paid elsewhere</dt><dd id="totalPaidOther" class="is-other">-</dd></div>
-                    <div><dt>Total paid</dt><dd id="totalPaidAll" class="is-total">-</dd></div>
-                    <div class="tally-break"><dt>Items</dt><dd id="totalCexItems">-</dd></div>
-                </dl>
-            </section>
-
             <div class="toolbar" id="controls">
                 <div class="toolbar-row">
                     <label class="search">
-                        <span class="sr-only">Search the collection</span>
+                        <span class="sr-only">Search the watchlog</span>
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <circle cx="8.5" cy="8.5" r="6" />
                             <path d="m13 13 5 5" stroke-linecap="round" />
@@ -163,7 +148,7 @@
         <div class="loading hidden" id="loadingOverlay">
             <div>
                 <div class="leader" aria-hidden="true"><span>3</span></div>
-                <p>Loading your collection…</p>
+                <p>Loading your watchlog…</p>
             </div>
         </div>
 
