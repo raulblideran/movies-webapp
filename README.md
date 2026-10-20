@@ -29,6 +29,10 @@ Locally, CeX calls go through the `cex-proxy` Cloudflare Worker and the backgrou
 (`appsettings.Development.json`), so your home connection never calls CeX's API directly. CeX blocks
 addresses that call it a lot, and it blocks a whole home IPv6 range at once.
 
+Locally, CeX calls go through the `cex-proxy` Cloudflare Worker and the background CeX price jobs are off
+(`appsettings.Development.json`), so your home connection never calls CeX's API directly. CeX blocks
+addresses that call it a lot, and it blocks a whole home IPv6 range at once.
+
 ## dev.sh
 
 | Command | |
