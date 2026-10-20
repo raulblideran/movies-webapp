@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- BuildVersion is shown in the page footer (build date and time, yyMMdd.HHmm UTC).
+    <!-- BuildVersion is shown in the page footer (build date and time, yyMMdd.HHmm; stamped in UTC, shown in UK time).
          BuildStamp is unique per build and versions the script URLs so browsers/Cloudflare fetch new ones after a deploy. -->
     <AssemblyMetadata Include="BuildVersion" Value="$([System.DateTime]::UtcNow.ToString(yyMMdd.HHmm))" />
     <AssemblyMetadata Include="BuildStamp" Value="$([System.DateTime]::UtcNow.ToString(yyMMddHHmmss))" />

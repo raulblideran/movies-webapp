@@ -169,7 +169,15 @@ var buildInfo = typeof(Program).Assembly
     .GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
     .OfType<System.Reflection.AssemblyMetadataAttribute>()
     .ToDictionary(a => a.Key, a => a.Value);
-var buildVersion = buildInfo.GetValueOrDefault("BuildVersion") ?? "dev";
+// BuildVersion is stamped in UTC; the footer shows it in UK time (BST in summer).
+TimeZoneInfo ukTime;
+try { ukTime = TimeZoneInfo.FindSystemTimeZoneById("Europe/London"); }
+catch (TimeZoneNotFoundException) { ukTime = TimeZoneInfo.Utc; }
+var buildVersion = DateTime.TryParseExact(buildInfo.GetValueOrDefault("BuildVersion"), "yyMMdd.HHmm",
+        System.Globalization.CultureInfo.InvariantCulture,
+        System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var builtUtc)
+    ? TimeZoneInfo.ConvertTimeFromUtc(builtUtc, ukTime).ToString("yyMMdd.HHmm", System.Globalization.CultureInfo.InvariantCulture)
+    : "dev";
 var buildStamp = buildInfo.GetValueOrDefault("BuildStamp") ?? buildVersion;
 app.MapGet("/api/version", () => Results.Ok(new { version = buildVersion }));
 
