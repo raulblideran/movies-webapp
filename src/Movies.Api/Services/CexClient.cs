@@ -16,7 +16,7 @@ public record CexDetails(
 public class CexOptions
 {
     /// <summary>
-    /// Optional relay for CeX API calls, e.g. the Cloudflare Worker at cex-proxy.….workers.dev
+    /// Optional relay for CeX API calls, e.g. cex-proxy-movies-prod.bliraul.deno.net on Deno Deploy
     /// (called as {ProxyUrl}/?url={target}). CeX blocks some data-centre IPs, including the VPS.
     /// </summary>
     public string? ProxyUrl { get; set; }
