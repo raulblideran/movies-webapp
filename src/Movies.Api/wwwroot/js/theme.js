@@ -139,6 +139,17 @@
             photos: [],
         },
         {
+            id: "gruvbox",
+            name: "Gruvbox",
+            note: "Retro groove, in a Vim buffer",
+            swatch: "linear-gradient(135deg,#fabd2f 0 25%,#fe8019 25% 50%,#8ec07c 50% 75%,#282828 75%)",
+            thumbStyle: "background:linear-gradient(180deg,transparent 0 30%,#3c3836 30% 46%,transparent 46% 80%,#504945 80%),linear-gradient(90deg,#32302f 0 18%,#282828 18%)",
+            color: "#1d2021",
+            tagline: "Press play",
+            art: `<div class="gb-tree"><p class="gb-help">" Press ? for help</p><p class="gb-root">~/watchlog/</p><p class="gb-dir">▾ genres/</p>${["drama", "comedy", "horror", "animation", "action", "fantasy", "adventure", "anime", "sci-fi", "family"].map((g) => `<p class="gb-dir">    ▸ ${g}/</p>`).join("")}<p class="gb-dir">▸ series/</p><p class="gb-dir">▸ releases/</p></div>`,
+            photos: [],
+        },
+        {
             id: "hocus-pocus",
             name: "Hocus Pocus",
             note: "The Sanderson sisters, 1993 and 2022",
