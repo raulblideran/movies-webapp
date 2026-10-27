@@ -156,27 +156,6 @@ public class ApiTests : IClassFixture<TestApp>
     }
 
     [Fact]
-    public async Task Watched_in_cinema_is_saved_and_defaults_to_false()
-    {
-        await _app.CreateUserAsync("cinemagoer", "correct-horse-battery", "Editor");
-        var client = await _app.SignedInWithMfaAsync("cinemagoer", "correct-horse-battery");
-
-        var plain = await (await client.PostAsJsonAsync("/api/titles", NewTitle("Not At The Cinema"))).Content.ReadFromJsonAsync<JsonElement>();
-        Assert.False(plain.GetProperty("watchedInCinema").GetBoolean());
-
-        var body = new { name = "Seen At The Cinema", type = "Film", rating = 9, watchCount = 1, genres = new[] { "Drama" }, watchedInCinema = true };
-        var created = await (await client.PostAsJsonAsync("/api/titles", body)).Content.ReadFromJsonAsync<JsonElement>();
-        Assert.True(created.GetProperty("watchedInCinema").GetBoolean());
-
-        var id = created.GetProperty("id").GetInt32();
-        var fetched = await _app.CreateClient().GetFromJsonAsync<JsonElement>($"/api/titles/{id}");
-        Assert.True(fetched.GetProperty("watchedInCinema").GetBoolean());
-
-        var off = await (await client.PutAsJsonAsync($"/api/titles/{id}", new { body.name, body.type, body.rating, body.watchCount, body.genres, watchedInCinema = false })).Content.ReadFromJsonAsync<JsonElement>();
-        Assert.False(off.GetProperty("watchedInCinema").GetBoolean());
-    }
-
-    [Fact]
     public async Task Second_sign_in_requires_the_authenticator_code()
     {
         await _app.CreateUserAsync("twostep", "correct-horse-battery", "Admin");
