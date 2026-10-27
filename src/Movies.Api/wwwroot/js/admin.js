@@ -19,6 +19,7 @@
             episodesTotal: row.episodesTotal,
             withBogdan: row.withBogdan,
             dateWithBogdan: row.dateWithBogdan,
+            watchedInCinema: row.watchedInCinema,
             comments: row.comments,
             releaseYear: row.releaseYear,
             tmdbId: row.tmdbId,

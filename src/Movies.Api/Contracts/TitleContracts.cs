@@ -16,6 +16,7 @@ public record TitleDto(
     int? EpisodesTotal,
     bool WithBogdan,
     DateOnly? DateWithBogdan,
+    bool WatchedInCinema,
     string? Comments,
     int? ReleaseYear,
     int? TmdbId,
@@ -30,7 +31,7 @@ public record TitleDto(
     /// <summary>Expects ReleaseLinks → Release → TitleLinks loaded (see TitlesEndpoints.WithReleases).</summary>
     public static TitleDto From(Title t) => new(
         t.Id, t.Name, t.Type, t.FirstWatch, t.LatestWatch, t.WatchCount, t.Rating, t.RewatchPotential,
-        t.Genres, t.Seasons, t.EpisodesTotal, t.WithBogdan, t.DateWithBogdan,
+        t.Genres, t.Seasons, t.EpisodesTotal, t.WithBogdan, t.DateWithBogdan, t.WatchedInCinema,
         t.Comments, t.ReleaseYear, t.TmdbId, t.TmdbMediaType, t.PosterPath,
         t.PosterPath is null ? null : PosterBaseUrl + t.PosterPath,
         t.ReleaseLinks.Select(l => ReleaseSummaryDto.From(l.Release)).OrderBy(r => r.Name).ToList(),
@@ -54,7 +55,8 @@ public record TitleUpsertRequest(
     int? ReleaseYear,
     int? TmdbId,
     string? TmdbMediaType,
-    string? PosterPath)
+    string? PosterPath,
+    bool WatchedInCinema = false)
 {
     public Dictionary<string, string[]> Validate()
     {
@@ -94,6 +96,7 @@ public record TitleUpsertRequest(
         t.EpisodesTotal = EpisodesTotal;
         t.WithBogdan = WithBogdan;
         t.DateWithBogdan = DateWithBogdan;
+        t.WatchedInCinema = WatchedInCinema;
         t.Comments = string.IsNullOrWhiteSpace(Comments) ? null : Comments.Trim();
         t.ReleaseYear = ReleaseYear;
         t.TmdbId = TmdbId;

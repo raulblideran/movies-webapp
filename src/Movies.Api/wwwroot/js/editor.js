@@ -200,6 +200,7 @@
             genres: [],
             releases: [],
             withBogdan: false,
+            watchedInCinema: false,
         };
         const poster = { tmdbId: row.tmdbId ?? null, tmdbMediaType: row.tmdbMediaType ?? null, posterPath: row.posterPath ?? null };
         const uid = Math.random().toString(36).slice(2, 8);
@@ -246,6 +247,7 @@
                     <div class="row row-3" style="align-items:end">
                         <label class="check" style="padding-bottom:10px"><input type="checkbox" name="withBogdan" ${row.withBogdan ? "checked" : ""}> Watched with Bogdan</label>
                         ${f("Date with Bogdan", date("dateWithBogdan", row.dateWithBogdan))}
+                        <label class="check" style="padding-bottom:10px"><input type="checkbox" name="watchedInCinema" ${row.watchedInCinema ? "checked" : ""}> Watched in cinema</label>
                     </div>
                     <div class="editor-releases" data-releases>${releasesInner(row, isNew)}</div>
                     ${f("Comments", `<textarea name="comments" rows="3" maxlength="4000" class="input">${v(row.comments)}</textarea>`)}
@@ -412,6 +414,7 @@
                 episodesTotal: numOrNull(form.episodesTotal.value),
                 genres: genres.get(),
                 withBogdan: form.withBogdan.checked,
+                watchedInCinema: form.watchedInCinema.checked,
                 comments: form.comments.value,
                 ...poster,
             };

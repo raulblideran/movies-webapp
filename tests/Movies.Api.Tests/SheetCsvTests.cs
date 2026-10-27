@@ -79,6 +79,7 @@ public class SheetCsvTests
             p.Release.TitleLinks.Add(link);
             original[0].ReleaseLinks.Add(link);
         }
+        original[0].WatchedInCinema = true;
         var reparsed = SheetCsv.Parse(new StringReader(SheetCsv.Write(original)));
         var (a, b) = (original[0], reparsed.Titles[0]);
         Assert.Equal(a.Name, b.Name);
@@ -92,6 +93,14 @@ public class SheetCsvTests
         Assert.Equal(["https://uk.webuy.com/product-detail?id=1"], reparsed.Shelves[0].CexLinks);
         Assert.Equal(a.WithBogdan, b.WithBogdan);
         Assert.Equal(a.DateWithBogdan, b.DateWithBogdan);
+        Assert.True(b.WatchedInCinema);
+    }
+
+    [Fact]
+    public void Old_sheet_without_a_cinema_column_means_not_in_cinema()
+    {
+        var t = Parse("Film,Film,15/04/2020,,8,2,03/05/2021,N/a,N/a,Drama,8,Yes,03/05/2021,,,\n").Titles[0];
+        Assert.False(t.WatchedInCinema);
     }
 
     [Fact]

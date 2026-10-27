@@ -54,6 +54,7 @@ function searchTextFor(row) {
         row.name,
         row.type,
         row.genres.join(" "),
+        row.watchedInCinema ? "cinema" : "",
         row.releases.map((r) => `${r.name} ${Shelf.label(r)}`).join(" "),
         row.comments,
         formatRating(row.rating),
@@ -194,7 +195,7 @@ function createFilters() {
     fill(
         "specialFilters",
         "special",
-        ["All", "Watched w/ Bogdan", "Not w/ Bogdan", "Physical Copy", "High Rewatch"].map((s) => [s.toLowerCase(), s]),
+        ["All", "Watched w/ Bogdan", "Not w/ Bogdan", "Seen in cinema", "Physical Copy", "High Rewatch"].map((s) => [s.toLowerCase(), s]),
     );
 }
 
@@ -239,6 +240,9 @@ function applyFilters() {
                 break;
             case "not w/ bogdan":
                 if (row.withBogdan) return false;
+                break;
+            case "seen in cinema":
+                if (!row.watchedInCinema) return false;
                 break;
             case "physical copy":
                 if (row.releases.length === 0) return false;
@@ -325,6 +329,7 @@ const ratingHtml = (row, large = false) => TitleModal.ratingHtml(row, large);
 function tagsHtml(row, { formats = false } = {}) {
     const tags = [`<span class="tag tag-${row.type === "Film" ? "film" : "series"}">${escapeHtml(row.type)}</span>`];
     if (row.withBogdan) tags.push(`<span class="tag tag-bogdan">With Bogdan</span>`);
+    if (row.watchedInCinema) tags.push(`<span class="tag tag-cinema">In cinema</span>`);
     if (formats) for (const r of row.releases) tags.push(`<span class="tag tag-physical">${escapeHtml(Shelf.label(r))}</span>`);
     else if (row.releases.length > 0) tags.push(`<span class="tag tag-physical">On the shelf</span>`);
     if ((row.rewatchPotential ?? 0) >= 9) tags.push(`<span class="tag tag-rewatch">High rewatch</span>`);
@@ -362,6 +367,7 @@ const titleColumns = [
     { key: "releases", label: "On the shelf", value: (r) => r.releases.map(Shelf.label).join(", "), wrap: true },
     { key: "paid", label: "Paid", value: (r) => Shelf.titleShare(r), html: (r) => Shelf.money(Shelf.titleShare(r)), num: true },
     { key: "bogdan", label: "Bogdan", value: (r) => (r.withBogdan ? "Yes" : "") },
+    { key: "cinema", label: "Cinema", value: (r) => (r.watchedInCinema ? "Yes" : "") },
     { key: "rewatch", label: "Rewatch", value: (r) => r.rewatchPotential, num: true },
 ];
 const view = Shelf.viewToggle(document.getElementById("viewToggle"), "titles", () => filterCards());

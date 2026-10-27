@@ -35,6 +35,9 @@ public class Title : ITimestamped
     public bool WithBogdan { get; set; }
     public DateOnly? DateWithBogdan { get; set; }
 
+    /// <summary>Seen at the cinema (at least once).</summary>
+    public bool WatchedInCinema { get; set; }
+
     public string? Comments { get; set; }
     public int? ReleaseYear { get; set; }
 

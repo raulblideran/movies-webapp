@@ -1150,6 +1150,9 @@ textarea.code {
 .tag-bogdan {
     --tag: var(--tag-bogdan);
 }
+.tag-cinema {
+    --tag: var(--accent);
+}
 .tag-physical {
     --tag: var(--tag-physical);
 }
