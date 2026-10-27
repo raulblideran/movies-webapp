@@ -78,8 +78,22 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
         });
     }
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    // Both overloads: SaveChanges() and SaveChangesAsync(ct) end up here, so every save path is covered.
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        BeforeSave();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        BeforeSave();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void BeforeSave()
+    {
+        TrimText();
         var now = DateTime.UtcNow;
         foreach (var entry in ChangeTracker.Entries<ITimestamped>())
         {
@@ -94,6 +108,34 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
                 entity.UpdatedAt = now;
             }
         }
-        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Trims every text field of the app's own records before they're written, whichever endpoint,
+    /// import or background job wrote them. Optional fields left blank become null; lists of text
+    /// (genres) lose blank entries. Identity's tables (users, roles, keys) are left alone.
+    /// </summary>
+    private void TrimText()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            if (entry.Metadata.ClrType.Namespace != typeof(Title).Namespace) continue;
+            // keys are left alone: EF won't let a tracked record's key change
+            foreach (var prop in entry.Properties.Where(p => !p.Metadata.IsPrimaryKey()))
+            {
+                switch (prop.CurrentValue)
+                {
+                    case string text:
+                        var trimmed = text.Trim();
+                        var value = trimmed.Length == 0 && prop.Metadata.IsNullable ? null : trimmed;
+                        if (!Equals(value, text)) prop.CurrentValue = value;
+                        break;
+                    case List<string> list when list.Any(x => x.Length == 0 || x.Trim().Length != x.Length):
+                        prop.CurrentValue = list.Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                        break;
+                }
+            }
+        }
     }
 }
