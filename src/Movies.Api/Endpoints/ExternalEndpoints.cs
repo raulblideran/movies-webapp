@@ -21,14 +21,15 @@ public static partial class ExternalEndpoints
             var best = TmdbClient.PickBest(results, year, anime == true);
             // Put the heuristic's pick first, keep the rest in TMDB order.
             var ordered = best is null ? results : results.Where(r => r != best).Prepend(best);
-            return Results.Ok(ordered.Where(r => r.PosterPath is not null).Take(20).Select(r => new
+            // Results without a poster stay: picking one still fills the year, type and genres.
+            return Results.Ok(ordered.Take(20).Select(r => new
             {
                 r.Id,
                 r.MediaType,
                 Title = r.DisplayTitle,
                 Year = r.Date is { Length: >= 4 } d ? d[..4] : null,
                 r.PosterPath,
-                PosterUrl = Contracts.TitleDto.PosterBaseUrl + r.PosterPath,
+                PosterUrl = r.PosterPath is null ? null : Contracts.TitleDto.PosterBaseUrl + r.PosterPath,
             }));
         }).RequireAuthorization(Policies.Editor);
 

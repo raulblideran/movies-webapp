@@ -129,6 +129,7 @@
         render();
         return {
             get: () => (commit(), values),
+            has: (v) => values.some((x) => x.toLowerCase() === v.toLowerCase()),
             addAll(list) {
                 list.forEach(add);
                 render();
@@ -218,19 +219,19 @@
             <form class="editor">
                 <div class="editor-poster">
                     <div data-poster class="poster-slot">No poster</div>
-                    <button type="button" data-find class="btn btn-block">Find poster</button>
+                    <button type="button" data-find class="btn btn-block" title="Search TMDB for the name above">Search TMDB</button>
                     <button type="button" data-clear-poster class="btn btn-small btn-block">Remove poster</button>
                 </div>
                 <div class="stack">
                     <div>
-                        ${f("TMDB link", `<div class="tmdb-link"><input name="tmdbLink" type="text" inputmode="url" autocomplete="off" spellcheck="false" class="input" placeholder="Paste a themoviedb.org link to fill the form"><button type="button" data-tmdb-fill class="btn">Fill</button></div>`)}
+                        ${f("Find on TMDB", `<div class="tmdb-link"><input name="tmdbQuery" type="search" autocomplete="off" spellcheck="false" class="input" placeholder="Search by title, or paste a themoviedb.org link"><button type="button" data-tmdb-go class="btn">Search</button></div>`)}
                         <p data-tmdb-note class="tmdb-note hidden" role="status"></p>
+                        <div data-results class="tmdb-results hidden"></div>
                     </div>
                     <div class="row row-name">
                         ${f("Name", `<input name="name" required maxlength="300" class="input" value="${v(row.name)}">`)}
                         ${f("Type", `<select name="type" class="input">${["Film", "Series"].map((t) => `<option ${t === row.type ? "selected" : ""}>${t}</option>`).join("")}</select>`)}
                     </div>
-                    <div data-results class="hidden"></div>
                     <div class="row row-4">
                         ${f("Rating out of 10", `<input name="rating" type="number" min="0" max="11" step="0.5" placeholder="?" class="input" value="${v(row.rating)}">`)}
                         ${f("Rewatch out of 10", `<input name="rewatchPotential" type="number" min="0" max="10" step="1" class="input" value="${v(row.rewatchPotential)}">`)}
@@ -243,7 +244,10 @@
                         ${f("Seasons", `<input name="seasons" type="number" min="0" class="input" value="${v(row.seasons)}">`)}
                         ${f("Episodes", `<input name="episodesTotal" type="number" min="0" class="input" value="${v(row.episodesTotal)}">`)}
                     </div>
-                    ${f("Genres", `<div data-genres data-label="Add a genre"></div>`)}
+                    <div>
+                        ${f("Genres", `<div data-genres data-label="Add a genre"></div>`)}
+                        <div data-genre-suggest class="genre-suggest hidden"></div>
+                    </div>
                     <div class="row row-3" style="align-items:end">
                         <label class="check" style="padding-bottom:10px"><input type="checkbox" name="withBogdan" ${row.withBogdan ? "checked" : ""}> Watched with Bogdan</label>
                         ${f("Date with Bogdan", date("dateWithBogdan", row.dateWithBogdan))}
@@ -288,84 +292,129 @@
             renderPoster();
         };
 
-        d.$("[data-find]").onclick = (e) => {
-            const name = form.name.value.trim();
-            if (!name) return d.error("Enter a name first.");
-            const params = new URLSearchParams({ q: name });
-            if (form.releaseYear.value) params.set("year", form.releaseYear.value);
-            if (genres.get().some((g) => g.toLowerCase().includes("anime"))) params.set("anime", "true");
-            busy(d, e.currentTarget, async () => {
-                const results = await api("GET", `/api/tmdb/search?${params}`);
-                const box = d.$("[data-results]");
-                box.classList.remove("hidden");
-                box.innerHTML = results.length
-                    ? `<div class="poster-results">${results
-                          .map(
-                              (r, i) => `
-                        <button type="button" data-pick="${i}" title="${esc(r.title)} (${esc(r.year ?? "?")})">
-                            <img src="${esc(r.posterUrl)}" alt="">
-                            <span>${esc(r.title)}</span>
-                            <span>${esc(r.year ?? "?")}, ${r.mediaType === "tv" ? "TV" : "film"}</span>
-                        </button>`,
-                          )
-                          .join("")}</div>`
-                    : `<p class="muted">No posters found. Check the name or the release year.</p>`;
-                box.querySelectorAll("[data-pick]").forEach((b) => {
-                    b.onclick = () => {
-                        const r = results[Number(b.dataset.pick)];
-                        Object.assign(poster, { tmdbId: r.id, tmdbMediaType: r.mediaType, posterPath: r.posterPath });
-                        if (!form.releaseYear.value && r.year) form.releaseYear.value = r.year;
-                        renderPoster();
-                        box.classList.add("hidden");
-                    };
-                });
-            });
-        };
+        // ---------- TMDB: search by title or paste a link, pick a result, fill the form ----------
 
-        const fillButton = d.$("[data-tmdb-fill]");
+        const tmdbBox = form.tmdbQuery;
+        const goButton = d.$("[data-tmdb-go]");
+        const resultsBox = d.$("[data-results]");
         const note = (html, warn = false) => {
             const el = d.$("[data-tmdb-note]");
             el.innerHTML = html;
             el.classList.toggle("hidden", !html);
             el.classList.toggle("is-warning", warn);
         };
-        const fillFromTmdb = () => {
-            const link = form.tmdbLink.value.trim();
-            if (!link) return d.error("Paste a TMDB link first, e.g. https://www.themoviedb.org/movie/603-the-matrix");
-            busy(d, fillButton, async () => {
+        const inWatchlog = (mediaType, id) => allRows.find((r) => r.tmdbId === id && r.tmdbMediaType === mediaType && r.id !== row.id);
+
+        // TMDB's genres, matched to the collection's names, offered as chips to add (nothing is added for you).
+        const suggestBox = d.$("[data-genre-suggest]");
+        let suggested = [];
+        const renderSuggestions = () => {
+            const left = suggested.filter((g) => !genres.has(g));
+            suggestBox.classList.toggle("hidden", left.length === 0);
+            suggestBox.innerHTML = left.length
+                ? `<span class="faint">From TMDB:</span>
+                   ${left.map((g) => `<button type="button" class="genre-chip" data-genre="${esc(g)}">+ ${esc(g)}</button>`).join("")}
+                   ${left.length > 1 ? `<button type="button" class="btn btn-small" data-genre-all>Add all</button>` : ""}`
+                : "";
+        };
+        suggestBox.addEventListener("click", (e) => {
+            const chip = e.target.closest("[data-genre]");
+            if (chip) genres.addAll([chip.dataset.genre]);
+            else if (e.target.closest("[data-genre-all]")) genres.addAll(suggested);
+            else return;
+            renderSuggestions();
+        });
+
+        // Picking a result or pasting a link. A new title takes TMDB's name, type, year and episode counts;
+        // an existing one keeps what's already filled in and only gets the poster and the empty fields.
+        const fill = (link, button) =>
+            busy(d, button, async () => {
                 const t = await api("GET", `/api/tmdb/details?link=${encodeURIComponent(link)}`);
-                form.name.value = t.title;
-                form.type.value = t.type;
-                form.type.dispatchEvent(new Event("change")); // the themed dropdown (select.js) follows "change"
-                if (t.year) form.releaseYear.value = t.year;
-                if (t.seasons != null) form.seasons.value = t.seasons;
-                if (t.episodes != null) form.episodesTotal.value = t.episodes;
-                genres.addAll(mapGenres(t.genres, t.isAnime, unique(allRows, (r) => r.genres)));
+                const take = (input, value) => {
+                    if (value == null || value === "") return;
+                    if (isNew || input.value === "") input.value = value;
+                };
+                take(form.name, t.title);
+                if (isNew && form.type.value !== t.type) {
+                    form.type.value = t.type;
+                    form.type.dispatchEvent(new Event("change")); // the themed dropdown (select.js) follows "change"
+                }
+                take(form.releaseYear, t.year);
+                take(form.seasons, t.seasons);
+                take(form.episodesTotal, t.episodes);
                 Object.assign(poster, { tmdbId: t.id, tmdbMediaType: t.mediaType, posterPath: t.posterPath ?? poster.posterPath });
                 renderPoster();
-                d.$("[data-results]").classList.add("hidden");
-                const dupe = allRows.find((r) => r.tmdbId === t.id && r.tmdbMediaType === t.mediaType && r.id !== row.id);
+                suggested = mapGenres(t.genres, t.isAnime, unique(allRows, (r) => r.genres));
+                renderSuggestions();
+                resultsBox.classList.add("hidden");
+                const dupe = inWatchlog(t.mediaType, t.id);
                 note(
                     dupe
                         ? `Already in your watchlog as <strong>${esc(dupe.name)}</strong>${dupe.releaseYear ? ` (${dupe.releaseYear})` : ""}.`
-                        : `Filled from TMDB: <strong>${esc(t.title)}</strong>${t.year ? ` (${t.year})` : ""}. Add your rating and watch dates.`,
+                        : `From TMDB: <strong>${esc(t.title)}</strong>${t.year ? ` (${t.year})` : ""}.${suggested.some((g) => !genres.has(g)) ? " Pick genres from the suggestions." : ""}`,
                     !!dupe,
                 );
-                if (!dupe) form.rating.focus();
+                if (!dupe) (isNew ? form.rating : form.name).focus();
+            });
+
+        const search = (query, button) => {
+            if (!query) {
+                tmdbBox.focus();
+                return d.error("Type a title to search for, or paste a TMDB link.");
+            }
+            const params = new URLSearchParams({ q: query });
+            if (form.releaseYear.value) params.set("year", form.releaseYear.value);
+            if (genres.get().some((g) => g.toLowerCase().includes("anime"))) params.set("anime", "true");
+            return busy(d, button, async () => {
+                const results = await api("GET", `/api/tmdb/search?${params}`);
+                note("");
+                resultsBox.classList.remove("hidden");
+                resultsBox.innerHTML = results.length
+                    ? `<div class="poster-results">${results
+                          .map((r, i) => {
+                              const owned = inWatchlog(r.mediaType, r.id);
+                              return `
+                        <button type="button" data-pick="${i}" title="${esc(r.title)} (${esc(r.year ?? "?")})${owned ? " · already in your watchlog" : ""}">
+                            ${r.posterUrl ? `<img src="${esc(r.posterUrl.replace("/w500/", "/w185/"))}" alt="" loading="lazy">` : `<div class="no-poster">${esc(r.title)}</div>`}
+                            <span>${esc(r.title)}</span>
+                            <span>${esc(r.year ?? "?")} · ${r.mediaType === "tv" ? "Series" : "Film"}${owned ? " · ✓" : ""}</span>
+                        </button>`;
+                          })
+                          .join("")}</div>`
+                    : `<p class="muted">Nothing on TMDB for “${esc(query)}”. Try a shorter title, or check the release year.</p>`;
+                resultsBox.querySelectorAll("[data-pick]").forEach((b) => {
+                    b.onclick = () => {
+                        const r = results[Number(b.dataset.pick)];
+                        fill(`${r.mediaType}/${r.id}`, b);
+                    };
+                });
             });
         };
-        fillButton.onclick = fillFromTmdb;
-        form.tmdbLink.addEventListener("keydown", (e) => {
+
+        // The box: a link fills straight away; text searches; empty searches for the name.
+        const go = () => {
+            const q = tmdbBox.value.trim();
+            if (looksLikeTmdb(q)) fill(q, goButton);
+            else search(q || form.name.value.trim(), goButton);
+        };
+        goButton.onclick = go;
+        tmdbBox.addEventListener("keydown", (e) => {
             if (e.key !== "Enter") return;
-            e.preventDefault(); // fill, don't submit the form
-            fillFromTmdb();
+            e.preventDefault(); // search, don't submit the form
+            go();
         });
         // Pasting a link fills straight away.
-        form.tmdbLink.addEventListener("paste", () =>
+        tmdbBox.addEventListener("paste", () =>
             setTimeout(() => {
-                if (looksLikeTmdb(form.tmdbLink.value)) fillFromTmdb();
+                if (looksLikeTmdb(tmdbBox.value)) fill(tmdbBox.value.trim(), goButton);
             }),
         );
+        // The poster column's button searches for the name.
+        d.$("[data-find]").onclick = (e) => {
+            const name = form.name.value.trim();
+            if (name) tmdbBox.value = name;
+            search(name, e.currentTarget);
+        };
 
         d.$("[data-cancel]").onclick = () => onCancel?.();
 
