@@ -35,6 +35,8 @@ public static partial class SheetCsv
         using var csv = new CsvReader(reader, config);
         csv.Read();
         csv.ReadHeader();
+        // added after the old sheet, so older exports don't have it
+        var hasCinema = csv.HeaderRecord?.Contains("Cinema") == true;
 
         var titles = new List<Title>();
         var shelves = new List<SheetShelf>();
@@ -94,8 +96,7 @@ public static partial class SheetCsv
 
             var bogdan = Get("Bogdan");
             t.WithBogdan = bogdan.Equals("Yes", StringComparison.OrdinalIgnoreCase);
-            // added after the old sheet, so older exports simply don't have it
-            t.WatchedInCinema = Get("Cinema").Equals("Yes", StringComparison.OrdinalIgnoreCase);
+            t.WatchedInCinema = hasCinema && Get("Cinema").Equals("Yes", StringComparison.OrdinalIgnoreCase);
 
             var comments = Get("Comments");
             t.Comments = comments.Length == 0 ? null : comments;
