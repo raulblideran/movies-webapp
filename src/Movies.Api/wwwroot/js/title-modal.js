@@ -7,6 +7,8 @@
 //   onStep(i)       after stepping to rows()[i], e.g. to keep the grid behind in step
 //   showRelease(id) open a release over the popup; without it a release link goes to its page
 //   onOpened(row)   after the popup renders (the collection page's admin bar)
+//   lookup(mediaType, tmdbId)   the title with that TMDB id, if you have it (franchise progress)
+//   addToWatchlist(parts)       optional, for editors: add a franchise's films ({ id, title }) to the watchlist
 //
 // The popup shares a layer with the release popups and other dialogs (js/auth.js), and whichever
 // was opened last is on top. TitleModal.open(row, { front: true }) brings it over an open release;
@@ -208,6 +210,74 @@
         d.root.classList.add("trailer-dialog");
     }
 
+    // ---------- franchise progress: the film's TMDB collection, and which of its films you have ----------
+
+    const collections = new Map(); // id → Promise of the collection (or null)
+    function fetchCollection(id) {
+        if (!collections.has(id))
+            collections.set(id, fetch(`/api/tmdb/collection/${id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+        return collections.get(id);
+    }
+
+    const todayText = () => todayIso();
+    // where a part stands: yours (watched / on the watchlist), still to come, or not yours yet
+    function partStatus(part) {
+        const mine = config.lookup?.("movie", part.id);
+        if (mine) return { mine, kind: mine.list === "watchlist" && !mine.watchCount ? "watchlist" : "watched" };
+        if (!part.releaseDate || part.releaseDate > todayText()) return { kind: "coming" };
+        return { kind: "missing" };
+    }
+
+    async function showFranchise(row) {
+        const c = await fetchCollection(row.collectionId);
+        const box = document.getElementById("franchise");
+        if (current !== row || !box) return; // switched or closed meanwhile
+        if (!c || c.parts.length < 2) return box.remove();
+        const parts = c.parts.map((p) => ({ ...p, ...partStatus(p) }));
+        const released = parts.filter((p) => p.kind !== "coming");
+        const watched = released.filter((p) => p.kind === "watched").length;
+        const canAdd = config.addToWatchlist && window.Auth?.me?.canEdit;
+        const missing = parts.filter((p) => p.kind === "missing" || p.kind === "coming");
+        const badge = (p) =>
+            p.mine?.id === row.id ? "This one"
+            : p.kind === "watched" ? "Watched"
+            : p.kind === "watchlist" ? "On your watchlist"
+            : p.kind === "coming" ? (p.year ? `Coming ${p.year}` : "Coming soon")
+            : "";
+        box.innerHTML = `
+            <h3>${esc(c.name)}</h3>
+            <p class="franchise-count">${watched} of ${released.length} watched</p>
+            <div class="franchise-bar" role="progressbar" aria-label="Films watched" aria-valuemin="0" aria-valuemax="${released.length}" aria-valuenow="${watched}"><span style="width:${released.length ? (watched / released.length) * 100 : 0}%"></span></div>
+            <ol class="franchise-parts">${parts
+                .map((p, i) => `
+                <li class="franchise-part is-${p.kind}${p.mine?.id === row.id ? " is-current" : ""}">
+                    <a ${p.mine ? `href="${window.Lists ? Lists.link(p.mine) : "#"}" data-part-title="${i}"` : `href="https://www.themoviedb.org/movie/${p.id}" target="_blank" rel="noopener"`} title="${esc(p.title)}${p.year ? ` (${p.year})` : ""}">
+                        ${p.posterUrl ? `<img src="${esc(p.posterUrl.replace("/w500/", "/w185/"))}" alt="" loading="lazy">` : `<span class="franchise-noposter">${esc(p.title)}</span>`}
+                        <span class="franchise-name">${esc(p.title)}</span>
+                        <span class="franchise-meta">${p.year ?? ""}${badge(p) ? `${p.year ? " · " : ""}<strong>${badge(p)}</strong>` : ""}</span>
+                    </a>
+                    ${canAdd && !p.mine ? `<button type="button" class="btn btn-small" data-part-add="${i}">+ Watchlist</button>` : ""}
+                </li>`)
+                .join("")}</ol>
+            ${canAdd && missing.length > 1 ? `<button type="button" class="btn btn-small" data-parts-add>Add all ${missing.length} to the watchlist</button>` : ""}`;
+        // yours open here; a click on one you don't have goes to TMDB
+        box.querySelectorAll("[data-part-title]").forEach((a) => {
+            a.onclick = (e) => {
+                if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                const mine = parts[Number(a.dataset.partTitle)].mine;
+                if (mine.id !== row.id) open(mine);
+            };
+        });
+        const add = async (list, button) => {
+            button.disabled = true;
+            button.textContent = "Adding…";
+            await config.addToWatchlist(list.map((p) => ({ id: p.id, title: p.title })));
+        };
+        box.querySelectorAll("[data-part-add]").forEach((b) => (b.onclick = () => add([parts[Number(b.dataset.partAdd)]], b)));
+        box.querySelector("[data-parts-add]")?.addEventListener("click", (e) => add(missing, e.currentTarget));
+    }
+
     // The poster is never cropped, so when the ticket is taller than the poster, the poster column
     // widens (up to a limit) until the poster fills the height instead of leaving a gap under it.
     function fitPoster() {
@@ -278,11 +348,12 @@
             </header>
             <div class="ticket-actions"><div id="modalAdminBar"></div></div>
             ${stubHtml(row)}
-            ${watchLogHtml(row) || row.comments || row.overview ? `
+            ${watchLogHtml(row) || row.comments || row.overview || row.collectionId ? `
             <div class="ticket-body">
                 ${row.overview ? `<p class="modal-overview">${esc(row.overview)}</p>` : ""}
                 ${watchLogHtml(row)}
                 ${row.comments ? `<blockquote class="modal-note">${esc(row.comments)}</blockquote>` : ""}
+                ${row.collectionId ? `<section class="modal-section franchise" id="franchise" aria-live="polite"><h3>${esc(row.collectionName ?? "Collection")}</h3><p class="muted pulse">Looking up the collection…</p></section>` : ""}
             </div>` : ""}
         </div>`;
 
@@ -300,6 +371,8 @@
                     config.showRelease(Number(a.dataset.releaseLink));
                 };
             });
+
+        if (row.collectionId) showFranchise(row);
 
         // CeX pricing loads after the modal is visible
         if (cexReleases(row).length > 0) {

@@ -540,7 +540,33 @@ TitleModal.configure({
     },
     showRelease: (id) => showRelease(id),
     onOpened: (row) => window.Admin?.onModalOpened(row),
+    lookup: (type, id) => everyTitle().find((r) => r.tmdbId === id && r.tmdbMediaType === type),
+    addToWatchlist: (parts) => addToWatchlist(parts),
 });
+
+// A franchise's missing films, from the popup: each one's TMDB details, onto the watchlist.
+async function addToWatchlist(parts) {
+    const vocab = [...new Set(everyTitle().flatMap((r) => r.genres))];
+    const added = [];
+    for (const p of parts) {
+        try {
+            const d = await Auth.api("GET", `/api/tmdb/details?link=movie/${p.id}`);
+            await Auth.api("POST", "/api/titles", {
+                name: d.title, type: d.type, list: "Watchlist", watchCount: 0, releaseYear: d.year,
+                genres: TitleEditor.mapGenres(d.genres, d.isAnime, vocab), seasons: d.seasons, episodesTotal: d.episodes,
+                tmdbId: d.id, tmdbMediaType: d.mediaType, posterPath: d.posterPath,
+            });
+            added.push(d.title);
+        } catch (e) {
+            showError(`Couldn't add ${p.title}: ${e.message}`);
+        }
+    }
+    await loadTitles({ quiet: true });
+    if (added.length) showSuccess(added.length === 1 ? `Added ${added[0]} to your watchlist` : `Added ${added.length} films to your watchlist`);
+    const shown = TitleModal.current();
+    const fresh = shown && everyTitle().find((r) => r.id === shown.id);
+    if (fresh) TitleModal.open(fresh);
+}
 
 // ---------- a release, over the title popup (js/release-dialogs.js) ----------
 

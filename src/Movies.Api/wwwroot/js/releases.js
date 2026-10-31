@@ -100,6 +100,7 @@
         },
     };
     TitleModal.configure({
+        lookup: (type, id) => [...titles.values()].find((t) => t.tmdbId === id && t.tmdbMediaType === type),
         // a release listed on the title opens over it
         showRelease(id) {
             const r = releases.find((x) => x.id === id);

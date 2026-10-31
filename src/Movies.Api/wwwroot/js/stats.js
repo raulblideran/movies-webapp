@@ -954,6 +954,7 @@
         },
     };
     TitleModal.configure({
+        lookup: (type, id) => everything.find((t) => t.tmdbId === id && t.tmdbMediaType === type),
         async showRelease(id) {
             const r = await fetchRelease(id);
             if (r) ReleaseDialogs.open(r, releaseCtx);
