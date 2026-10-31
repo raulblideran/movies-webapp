@@ -615,6 +615,8 @@ window.App = {
     reload: () => loadTitles({ quiet: true }),
     getAll: () => allData,
     getOther: () => otherData,
+    // what's on screen, in order (search and filters applied): Pick for me picks from these
+    getShown: () => shownRows,
     openModal,
     closeModal,
     showRelease,
