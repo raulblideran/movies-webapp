@@ -9,6 +9,14 @@
     const heading = document.getElementById("pageTitle");
     let rows = null; // every title on both lists, once loaded
     let mounted = false;
+    let editor = null;
+
+    // leaving with unsaved changes (closing the tab, Back, a link) asks first
+    window.addEventListener("beforeunload", (e) => {
+        if (!editor?.isDirty()) return;
+        e.preventDefault();
+        e.returnValue = "";
+    });
 
     const titles = Lists.loadAll();
 
@@ -57,10 +65,14 @@
             setList(row.list);
         }
         mounted = true;
-        TitleEditor.mount(root, row, {
+        editor = TitleEditor.mount(root, row, {
             list: newList,
             allRows: rows,
-            onCancel: () => (history.length > 1 && document.referrer.startsWith(location.origin) ? history.back() : (location.href = Lists[row?.list ?? newList].page)),
+            onCancel() {
+                if (editor.isDirty() && !window.confirm("Discard your changes?")) return;
+                editor.markClean(); // asked already: don't ask again on the way out
+                history.length > 1 && document.referrer.startsWith(location.origin) ? history.back() : (location.href = Lists[row?.list ?? newList].page);
+            },
             onSaved: (saved) => (location.href = Lists.link(saved)),
             onMoved: (saved) => (location.href = Lists.link(saved)),
         });

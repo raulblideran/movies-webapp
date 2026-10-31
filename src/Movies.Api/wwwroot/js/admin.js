@@ -30,7 +30,7 @@
         const list = row?.list ?? App.list;
         const heading = markWatched ? `Watched ${esc(row.name)}` : row ? `Edit ${esc(row.name)}` : list === "watchlist" ? "Add to watchlist" : "Add a title";
         const d = dialog(heading, "", { wide: true });
-        TitleEditor.mount(d.body, row, {
+        const editor = TitleEditor.mount(d.body, row, {
             list,
             markWatched,
             allRows: everything(),
@@ -38,7 +38,7 @@
             // its releases, and a new one, open over the form
             openRelease: (id) => App.showRelease(id),
             addRelease: () => App.addRelease(row.id),
-            onCancel: () => d.close(),
+            onCancel: () => d.requestClose(),
             async onSaved(saved, isNew) {
                 d.close();
                 const message = markWatched
@@ -56,6 +56,7 @@
                 await afterSave(saved, `Moved ${saved.name} to your watchlist`);
             },
         });
+        d.guard(editor.isDirty);
     }
 
     async function save(row, changes, message, action) {

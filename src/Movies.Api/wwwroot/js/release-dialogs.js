@@ -242,7 +242,10 @@
         d.error("");
         const picker = titlePicker(d.$("[data-titles]"), r.titleIds, ctx.titles());
         const form = d.$("form");
-        d.$("[data-cancel]").onclick = () => d.close();
+        const snapshot = () => JSON.stringify([[...new FormData(form)], picker.get()]);
+        const initial = snapshot();
+        d.guard(() => snapshot() !== initial);
+        d.$("[data-cancel]").onclick = () => d.requestClose();
         form.onsubmit = (e) => {
             e.preventDefault();
             const body = {

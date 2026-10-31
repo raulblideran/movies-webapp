@@ -10,8 +10,49 @@
     let releases = [];
     let titles = new Map(); // id → title
     const filter = { q: "", format: "all", edition: "all", place: "all", sort: "name" };
+    const DEFAULTS = { ...filter };
     let tableSort = { key: "name", dir: "asc" };
     let shown = [];
+
+    // Search, filters, sort and grid/table live in the URL too (?q=&format=&edition=&place=&sort=&view=),
+    // so Back, a refresh or a shared link land on the same view.
+    (function readUrl() {
+        const p = new URLSearchParams(location.search);
+        for (const k of Object.keys(filter)) if (p.get(k)) filter[k] = k === "q" ? p.get(k).toLowerCase() : p.get(k);
+        if (p.get("q")) document.getElementById("releaseSearch").value = p.get("q");
+        const sort = sortSelect();
+        if ([...sort.options].some((o) => o.value === filter.sort)) {
+            sort.value = filter.sort;
+            sort.dispatchEvent(new Event("change")); // the themed dropdown (select.js) follows "change"
+        } else filter.sort = DEFAULTS.sort;
+        if (["grid", "table"].includes(p.get("view")))
+            try {
+                localStorage.setItem("view:releases", p.get("view"));
+            } catch {
+                // storage unavailable
+            }
+    })();
+    // the native <select>: select.js gives its id to the themed button that replaces it on screen
+    function sortSelect() {
+        return document.querySelector("select[data-release-sort]");
+    }
+
+    let urlTimer = null;
+    function writeUrl() {
+        clearTimeout(urlTimer);
+        urlTimer = setTimeout(() => {
+            const p = new URLSearchParams(location.search);
+            for (const k of Object.keys(filter)) {
+                const v = k === "q" ? document.getElementById("releaseSearch").value.trim() : filter[k];
+                if (v && v !== DEFAULTS[k]) p.set(k, v);
+                else p.delete(k);
+            }
+            if (view.get() !== "grid") p.set("view", view.get());
+            else p.delete("view");
+            history.replaceState(history.state, "", location.pathname + (p.size ? `?${p}` : "") + location.hash);
+        }, 250);
+    }
+
     const view = viewToggle(document.getElementById("viewToggle"), "releases", () => show());
 
     const titlesOf = (r) => r.titleIds.map((id) => titles.get(id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
@@ -78,7 +119,7 @@
         filter.q = e.target.value.trim().toLowerCase();
         show();
     });
-    document.getElementById("releaseSort").addEventListener("change", (e) => {
+    sortSelect().addEventListener("change", (e) => {
         filter.sort = e.target.value;
         show();
     });
@@ -166,6 +207,7 @@
     ];
 
     function show() {
+        if (releases.length) writeUrl();
         const list = releases
             .filter((r) => (filter.format === "all" || r.format === filter.format) && (filter.edition === "all" || r.edition === filter.edition) && (filter.place === "all" || r.purchasedFrom === filter.place) && (!filter.q || r._search.includes(filter.q)))
             .sort(sorters[filter.sort]);

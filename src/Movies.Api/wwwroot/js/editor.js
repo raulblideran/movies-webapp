@@ -130,6 +130,8 @@
         render();
         return {
             get: () => (commit(), values),
+            // what it holds, plus anything typed but not yet added (doesn't add it)
+            peek: () => [...values, input.value.trim()].filter(Boolean),
             addAll(list) {
                 list.forEach(add);
                 render();
@@ -368,7 +370,9 @@
             d.$("[data-move-instead]")?.addEventListener("click", (e) =>
                 busy(d, e.currentTarget, async () => {
                     const body = { ...toRequest(dupe), list: "Watchlist", watchlistAddedOn: DatePicker.iso(form.watchlistAddedOn) || today };
-                    onMoved(normalise(await api("PUT", `/api/titles/${dupe.id}`, body)));
+                    const moved = await api("PUT", `/api/titles/${dupe.id}`, body);
+                    markClean();
+                    onMoved(normalise(moved));
                 }),
             );
         }
@@ -571,13 +575,24 @@
                 };
             }
             busy(d, form.querySelector("button[type=submit]"), async () => {
-                const saved = isNew ? await api("POST", "/api/titles", body) : await api("PUT", `/api/titles/${row.id}`, body);
-                await onSaved?.(normalise(saved), isNew);
+                const result = isNew ? await api("POST", "/api/titles", body) : await api("PUT", `/api/titles/${row.id}`, body);
+                markClean();
+                await onSaved?.(normalise(result), isNew);
             });
         };
 
+        // Unsaved changes: anything different from how the form opened (the TMDB search box doesn't count).
+        const snapshot = () =>
+            JSON.stringify([[...new FormData(form)].filter(([k]) => k !== "tmdbQuery"), genres.peek(), poster]);
+        let initial = snapshot();
+        let saved = false;
+        const isDirty = () => !saved && snapshot() !== initial;
+        const markClean = () => {
+            saved = true;
+        };
+
         (isNew ? query : form.name).focus();
-        return { form, ...editor };
+        return { form, ...editor, isDirty, markClean };
     }
 
     // After the page reloads its titles: every open editor shows its title's releases as they are now.

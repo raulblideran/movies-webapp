@@ -18,7 +18,48 @@ let activeFilters = {
     runtime: "all",
 };
 // the page's sort menu marks its default
-let currentSort = document.querySelector('#sortDropdown [aria-checked="true"]')?.dataset.sort ?? "name";
+const DEFAULT_SORT = document.querySelector('#sortDropdown [aria-checked="true"]')?.dataset.sort ?? "name";
+let currentSort = DEFAULT_SORT;
+
+// ---------- the view in the URL: search, sort, filters and grid/table, so Back, a refresh or a shared
+// link land on the same view, e.g. /watchlist?type=film&runtime=under-90 ----------
+
+const URL_FILTERS = { type: "type", genre: "genre", rating: "rating", format: "physicalFormat", special: "special", runtime: "runtime" };
+const VIEW_KEY = `view:${LIST === "watchlist" ? "watchlist" : "titles"}`;
+
+(function readUrl() {
+    const p = new URLSearchParams(location.search);
+    for (const [param, key] of Object.entries(URL_FILTERS)) if (p.get(param)) activeFilters[key] = p.get(param).toLowerCase();
+    const sortOption = p.get("sort") && document.querySelector(`#sortDropdown [data-sort="${CSS.escape(p.get("sort"))}"]`);
+    if (sortOption) {
+        currentSort = sortOption.dataset.sort;
+        document.getElementById("sortButtonText").textContent = sortOption.textContent;
+        document.querySelectorAll("#sortDropdown [data-sort]").forEach((o) => o.setAttribute("aria-checked", String(o === sortOption)));
+    }
+    if (p.get("q")) document.getElementById("searchBox").value = p.get("q");
+    // the grid/table switch remembers its choice in this browser; a link's choice wins
+    if (["grid", "table"].includes(p.get("view")))
+        try {
+            localStorage.setItem(VIEW_KEY, p.get("view"));
+        } catch {
+            // storage unavailable: the grid it is
+        }
+    const active = Object.values(activeFilters).filter((v) => v !== "all").length;
+    document.getElementById("filterCount").textContent = active ? `(${active})` : "";
+})();
+
+let urlTimer = null;
+function writeUrl({ now = false } = {}) {
+    clearTimeout(urlTimer);
+    if (!now) return (urlTimer = setTimeout(() => writeUrl({ now: true }), 300)); // typing: once it settles
+    const p = new URLSearchParams(location.search);
+    const set = (k, v, fallback) => (v && v !== fallback ? p.set(k, v) : p.delete(k));
+    set("q", document.getElementById("searchBox").value.trim(), "");
+    set("sort", currentSort, DEFAULT_SORT);
+    for (const [param, key] of Object.entries(URL_FILTERS)) set(param, activeFilters[key], "all");
+    set("view", view.get(), "grid"); // only called once the page is loaded, so view exists
+    history.replaceState(history.state, "", location.pathname + (p.size ? `?${p}` : "") + location.hash);
+}
 
 // ---------- helpers ----------
 
@@ -274,6 +315,7 @@ function setFilter(category, value, button) {
     document.getElementById("filterCount").textContent = active ? `(${active})` : "";
 
     applyFilters();
+    writeUrl({ now: true });
 }
 
 function applyFilters() {
@@ -333,6 +375,7 @@ function applyFilters() {
 
 function filterCards() {
     const searchTerm = document.getElementById("searchBox").value.toLowerCase().trim();
+    if (allData.length) writeUrl();
     const filtered = searchTerm ? filteredData.filter((row) => row._search.includes(searchTerm)) : filteredData;
     document.getElementById("resultCount").textContent =
         filtered.length === allData.length ? "" : `${filtered.length} of ${allData.length}`;
@@ -358,6 +401,7 @@ function selectSort(element) {
         .forEach((opt) => opt.setAttribute("aria-checked", String(opt === element)));
     setSortMenu(false);
     sortCards();
+    writeUrl({ now: true });
 }
 
 document.querySelectorAll("#sortDropdown [data-sort]").forEach((opt) => {

@@ -98,11 +98,21 @@
             <h2 class="panel-heading" id="${titleId}">${title}</h2>
             <div data-body>${bodyHtml}</div>
         </div>`;
+        let isDirty = null;
         const d = {
             root,
             $: (sel) => root.querySelector(sel),
             $$: (sel) => [...root.querySelectorAll(sel)],
             body: root.querySelector("[data-body]"),
+            // a form in the dialog: × , Esc and Cancel (requestClose) ask before throwing its changes away
+            guard(fn) {
+                isDirty = fn;
+            },
+            requestClose() {
+                if (isDirty?.() && !window.confirm("Discard your changes?")) return false;
+                d.close();
+                return true;
+            },
             close() {
                 root.remove();
                 document.removeEventListener("keydown", onKey);
@@ -119,10 +129,10 @@
         const opener = document.activeElement;
         const onKey = (e) => {
             // only the popup on top: a title popup (js/title-modal.js) can sit over a dialog
-            if (e.key === "Escape" && root === [...document.querySelectorAll(".overlay:not(.hidden)")].pop()) d.close();
+            if (e.key === "Escape" && root === [...document.querySelectorAll(".overlay:not(.hidden)")].pop()) d.requestClose();
         };
         // only × and Esc close a dialog: a click on the backdrop does nothing, so a form isn't lost by accident
-        root.querySelector("[data-close]").onclick = () => d.close();
+        root.querySelector("[data-close]").onclick = () => d.requestClose();
         document.addEventListener("keydown", onKey);
         document.body.appendChild(root);
         root.querySelector("input:not([type=hidden]), select, textarea")?.focus();
@@ -525,7 +535,12 @@
                 footer.querySelector("[data-logout]").onclick = signOut;
             }
         }
-        document.dispatchEvent(new CustomEvent("auth-changed", { detail: me }));
+        // The page's own scripts come after this one and listen for this event. If /api/auth/me answers
+        // before the browser has run them all, wait for them, or a page would miss it (and, say, the
+        // editor page would sit on "Loading…").
+        const announce = () => document.dispatchEvent(new CustomEvent("auth-changed", { detail: me }));
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", announce, { once: true });
+        else announce();
     }
 
     window.Auth = {

@@ -374,7 +374,10 @@
             render();
             if (saved.sku !== item.sku) loadStock([saved]);
         };
-        d.$("[data-cancel]").onclick = () => d.close();
+        const snapshot = () => JSON.stringify([...new FormData(form)]);
+        const initial = snapshot();
+        d.guard(() => snapshot() !== initial);
+        d.$("[data-cancel]").onclick = () => d.requestClose();
         d.$("[data-refresh]").onclick = (e) =>
             Auth.busy(d, e.currentTarget, async () => {
                 const saved = await Auth.api("POST", `/api/cex-items/${item.id}/refresh`);
