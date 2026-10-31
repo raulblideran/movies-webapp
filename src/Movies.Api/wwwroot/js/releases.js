@@ -21,7 +21,7 @@
     async function load() {
         const [rs, ts] = await Promise.all([api("GET", "/api/releases"), api("GET", "/api/titles")]);
         releases = rs;
-        titles = new Map(ts.map((t) => [t.id, t]));
+        titles = new Map(ts.map((t) => [t.id, Lists.normalise(t)])); // both lists: a disc can hold one you haven't seen
         TitleEditor.refreshReleases((id) => titles.get(id));
         for (const r of releases)
             r._search = [r.name, r.cexBoxName, r.notes, label(r), PLACES[r.purchasedFrom], ...titlesOf(r).map((t) => t.name)].filter(Boolean).join(" ").toLowerCase();

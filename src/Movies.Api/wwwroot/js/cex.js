@@ -230,10 +230,7 @@
         const onEscape = (e) => {
             if (e.key === "Escape") close();
         };
-        document.getElementById("modalClose").onclick = close;
-        overlay.onclick = (e) => {
-            if (e.target === overlay) close();
-        };
+        document.getElementById("modalClose").onclick = close; // × or Esc, not the backdrop
         document.addEventListener("keydown", onEscape);
     }
 

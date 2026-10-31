@@ -7,7 +7,7 @@ const CACHE = `movies-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
 // Pages that are worth keeping for offline use. Editor pages need the network anyway.
-const PAGES = new Set(["/", "/index.html", "/releases", "/releases.html", "/stats", "/stats.html", "/cex", "/cex.html"]);
+const PAGES = new Set(["/", "/index.html", "/watchlist", "/watchlist.html", "/releases", "/releases.html", "/stats", "/stats.html", "/cex", "/cex.html"]);
 // Read-only, anonymous collection data, so the shelves still show offline. Everything else under
 // /api/ (sign-in, account, users, export, edits) always goes straight to the network.
 const CACHED_API = [/^\/api\/titles\/?$/, /^\/api\/releases\/?$/];

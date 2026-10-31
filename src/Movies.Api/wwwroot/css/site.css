@@ -270,6 +270,28 @@ code,
     }
 }
 
+/* five links on a phone: closer together, and onto a second line if they still don't fit */
+@media (max-width: 480px) {
+    .topbar-nav {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 2px;
+    }
+    .topbar-nav a {
+        padding: 6px 8px;
+    }
+    .nav-long {
+        display: none;
+    }
+}
+
+@media (max-width: 400px) {
+    .topbar-nav a {
+        padding: 6px;
+        font-size: 13px;
+    }
+}
+
 /* ---------- theme picker ---------- */
 
 .theme-picker {
@@ -1153,6 +1175,9 @@ textarea.code {
 .tag-physical {
     --tag: var(--tag-physical);
 }
+.tag-watchlist {
+    --tag: var(--accent);
+}
 .tag-rewatch {
     --tag: var(--tag-rewatch);
 }
@@ -1379,6 +1404,36 @@ textarea.code {
     color: var(--ink-3);
 }
 
+/* a watchlist entry: how long it's been waiting, where a watched title shows its rating */
+.stub-waiting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin: 0;
+}
+
+.stub-waiting-label {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.stub-waiting-time {
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    font-size: 30px;
+    line-height: 1.1;
+    color: var(--accent);
+}
+
+.stub-waiting-since {
+    font-size: 14px;
+    color: var(--ink-3);
+}
+
 .stub-facts {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1478,6 +1533,11 @@ textarea.code {
 .watch-log li.is-bogdan::after {
     background: var(--tag-bogdan);
     box-shadow: 0 0 0 2px var(--tag-bogdan);
+}
+
+/* the day it went on the watchlist: a hollow point, before it was watched */
+.watch-log li.is-watchlist::after {
+    background: var(--surface);
 }
 
 .watch-log time {
@@ -1643,6 +1703,13 @@ textarea.code {
     .stub > .rating {
         font-size: 24px;
         padding: 4px 14px;
+    }
+    .stub-waiting {
+        align-items: flex-start;
+        text-align: left;
+    }
+    .stub-waiting-time {
+        font-size: 24px;
     }
     .stub-facts {
         grid-row: 3;
@@ -2067,6 +2134,22 @@ textarea.code {
     border-left-color: var(--danger);
 }
 
+.toast-action {
+    margin-left: 8px;
+    padding: 2px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.toast-action:hover {
+    border-color: var(--accent);
+}
+
 /* ---------- loading: film leader countdown ---------- */
 
 .loading {
@@ -2226,6 +2309,16 @@ textarea.code {
     color: var(--warn);
 }
 
+/* the TMDB search's results, under the search box */
+.tmdb-results {
+    margin-top: 8px;
+}
+
+.tmdb-note .link {
+    color: inherit;
+    font-weight: 700;
+}
+
 /* Name takes three of the four columns used by the rows below, so Type lines up with them */
 .row-name {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2356,6 +2449,13 @@ textarea.code {
     padding-top: 0;
     padding-bottom: 4px;
     color: var(--ink-3);
+}
+
+/* a result that's already on one of your lists */
+.poster-results .poster-result-have {
+    padding: 0 5px 5px;
+    font-weight: 700;
+    color: var(--accent);
 }
 
 .chip-input {

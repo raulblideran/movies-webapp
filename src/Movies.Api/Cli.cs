@@ -67,7 +67,8 @@ public static class Cli
 
         var parsed = SheetCsv.Parse(new StringReader(csvText));
         var db = sp.GetRequiredService<MoviesDbContext>();
-        var existing = await db.Titles.CountAsync();
+        // the sheet is the Watchlog: --replace leaves the watchlist alone
+        var existing = await db.Titles.CountAsync(t => t.List == TitleList.Watched);
         if (existing > 0 && !args.Contains("--replace"))
             throw new CliException($"The database already has {existing} titles. Re-run with --replace to delete them and import again.");
 
@@ -100,7 +101,7 @@ public static class Cli
         await using var tx = await db.Database.BeginTransactionAsync();
         if (existing > 0)
         {
-            await db.Titles.ExecuteDeleteAsync();
+            await db.Titles.Where(t => t.List == TitleList.Watched).ExecuteDeleteAsync();
             await db.Releases.ExecuteDeleteAsync();
         }
         db.Titles.AddRange(parsed.Titles);

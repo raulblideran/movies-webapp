@@ -87,6 +87,22 @@
         return longDateFormat.format(new Date(y, m - 1, d));
     }
 
+    const pad = (n) => String(n).padStart(2, "0");
+    function todayIso() {
+        const d = new Date();
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+    // How long something has been on the watchlist: "today", "12 days", "5 months", "2 years"
+    function waitText(iso) {
+        const [y, m, d] = iso.split("-").map(Number);
+        const [ty, tm, td] = todayIso().split("-").map(Number);
+        const days = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86400000);
+        if (days <= 0) return "today";
+        if (days < 45) return days === 1 ? "1 day" : `${days} days`;
+        if (days < 730) return `${Math.round(days / 30.44)} months`;
+        return `${Math.floor(days / 365.25)} years`;
+    }
+
     // First watch, the watch with Bogdan and the latest watch, in date order. A date shared by two
     // of them is one point on the line.
     function watchLogHtml(row) {
@@ -95,11 +111,14 @@
         add(row.firstWatch, row.watchCount > 1 ? "First watch" : "Watched");
         if (row.latestWatch !== row.firstWatch) add(row.latestWatch, "Latest watch");
         add(row.dateWithBogdan, "With Bogdan");
+        add(row.watchlistAddedOn, "Added to watchlist");
         if (points.size === 0) return "";
+        const cls = (labels) =>
+            labels.includes("With Bogdan") ? ' class="is-bogdan"' : labels.length === 1 && labels[0] === "Added to watchlist" ? ' class="is-watchlist"' : "";
         const items = [...points]
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([iso, labels]) => `
-                <li${labels.includes("With Bogdan") ? ' class="is-bogdan"' : ""}>
+                <li${cls(labels)}>
                     <time datetime="${iso}">${formatLongDate(iso)}</time>
                     <span>${labels.join(", ")}</span>
                 </li>`)
@@ -111,11 +130,28 @@
         </section>`;
     }
 
+    // On the watchlist: how long it's been waiting, where a watched title shows its rating.
+    function waitingHtml(row) {
+        const since = row.watchlistAddedOn;
+        return `
+            <p class="stub-waiting">
+                <span class="stub-waiting-label">On your watchlist</span>
+                ${!since ? "" : waitText(since) === "today"
+                    ? `<span class="stub-waiting-time">since today</span>`
+                    : `<span class="stub-waiting-time">${esc(waitText(since))}</span>
+                       <span class="stub-waiting-since">since <time datetime="${since}">${formatLongDate(since)}</time></span>`}
+            </p>`;
+    }
+
     // The stub: the verdict, then what your copy cost and what CeX would give for it.
+    // A watchlist title gets how long it's been waiting instead of the verdict (and its old rating, if
+    // it's waiting for a rewatch).
     function stubHtml(row) {
+        const W = row.list === "watchlist";
         const facts = [];
+        if (W && row.rating != null) facts.push(["Rated", `${row.rating}/10`]);
         if (row.watchCount) facts.push(["Seen", row.watchCount === 1 ? "once" : `${row.watchCount} times`]);
-        if (row.rewatchPotential != null) facts.push(["Rewatch", `${row.rewatchPotential}/10`]);
+        if (!W && row.rewatchPotential != null) facts.push(["Rewatch", `${row.rewatchPotential}/10`]);
         if (row.type === "Series") {
             if (row.seasons != null) facts.push(["Seasons", String(row.seasons)]);
             if (row.episodesTotal != null) facts.push(["Episodes", String(row.episodesTotal)]);
@@ -125,8 +161,8 @@
         const formats = row.releases.length > 0;
         const cex = row.releases.some((r) => r.cexSku);
         return `
-        <aside class="stub" aria-label="Verdict and value">
-            ${ratingHtml(row, true) || `<p class="stub-unrated">Not rated yet</p>`}
+        <aside class="stub" aria-label="${W ? "On your watchlist" : "Verdict and value"}">
+            ${W ? waitingHtml(row) : ratingHtml(row, true) || `<p class="stub-unrated">Not rated yet</p>`}
             ${facts.length ? `<dl class="stub-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>` : ""}
             ${paid || formats || cex ? `
             <section class="stub-copy" aria-label="Your copy">
@@ -195,6 +231,7 @@
 
         const tags = [
             `<span class="tag tag-${row.type === "Film" ? "film" : "series"}">${esc(row.type)}</span>`,
+            row.list === "watchlist" ? `<span class="tag tag-watchlist">Watchlist</span>` : "",
             ...row.genres.map((g) => `<span class="tag">${esc(g)}</span>`),
             row.withBogdan ? `<span class="tag tag-bogdan">With Bogdan</span>` : "",
         ].join("");
@@ -210,10 +247,11 @@
             </header>
             <div class="ticket-actions"><div id="modalAdminBar"></div></div>
             ${stubHtml(row)}
+            ${watchLogHtml(row) || row.comments ? `
             <div class="ticket-body">
                 ${watchLogHtml(row)}
                 ${row.comments ? `<blockquote class="modal-note">${esc(row.comments)}</blockquote>` : ""}
-            </div>
+            </div>` : ""}
         </div>`;
 
         scroll.scrollTop = 0;
@@ -301,10 +339,8 @@
     function wire() {
         $("modalPrev").onclick = () => step(-1);
         $("modalNext").onclick = () => step(1);
+        // only × and Esc close it: a click on the backdrop does nothing
         $("modalPanel").querySelector(".close").onclick = close;
-        $("modal").onclick = function (event) {
-            if (event.target === this) close();
-        };
 
         // Swipe left/right on touch screens
         let x0 = null;
@@ -346,5 +382,8 @@
         current: () => current,
         ratingHtml,
         fetchCex,
+        todayIso,
+        waitText,
+        formatLongDate,
     };
 })();

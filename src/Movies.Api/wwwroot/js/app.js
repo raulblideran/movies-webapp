@@ -1,7 +1,13 @@
-// Public watchlog page. Data comes from /api/titles; admin features live in admin.js.
-// Physical copies are releases (their own page, releases.html); each title lists the ones it's on.
+// The Watchlog (/, titles you've watched) and the Watchlist (/watchlist, to watch) share this page code.
+// Every title is on one of the two (its .list, see js/lists.js); <body data-list> says which page this
+// is. Admin features live in admin.js. Physical copies are releases (their own page, releases.html);
+// each title lists the ones it's on.
 
+const LIST = document.body.dataset.list === "watchlist" ? "watchlist" : "watched";
+const IS_WATCHLIST = LIST === "watchlist";
 let allData = [];
+// the titles on the other list (the editor's duplicate check, a disc's other titles)
+let otherData = [];
 let filteredData = [];
 let activeFilters = {
     type: "all",
@@ -10,7 +16,8 @@ let activeFilters = {
     physicalFormat: "all",
     special: "all",
 };
-let currentSort = "name";
+// the page's sort menu marks its default
+let currentSort = document.querySelector('#sortDropdown [aria-checked="true"]')?.dataset.sort ?? "name";
 
 // ---------- helpers ----------
 
@@ -36,6 +43,16 @@ function formatRating(rating) {
 
 // Detail rows shown on cards and in the modal, in the original sheet's column order and labels.
 function detailFields(row) {
+    if (row.list === "watchlist")
+        return [
+            ["Added", formatDate(row.watchlistAddedOn)],
+            ["Seen", row.watchCount ? (row.watchCount === 1 ? "Once" : `${row.watchCount} times`) : ""],
+            ["Seasons", row.seasons != null ? String(row.seasons) : ""],
+            ["Episodes", row.episodesTotal != null ? String(row.episodesTotal) : ""],
+            ["Genre", row.genres.join("/")],
+            ["Comments", row.comments || ""],
+            ["Price (£)", Shelf.titleShare(row) != null ? Shelf.titleShare(row).toFixed(2) : ""],
+        ].filter(([, v]) => v !== "");
     return [
         ["First watch", formatDate(row.firstWatch)],
         ["Watch count", row.watchCount ? String(row.watchCount) : ""],
@@ -59,6 +76,7 @@ function searchTextFor(row) {
         formatRating(row.rating),
         formatDate(row.firstWatch),
         formatDate(row.latestWatch),
+        formatDate(row.watchlistAddedOn),
         row.releaseYear,
     ]
         .filter(Boolean)
@@ -76,12 +94,24 @@ function showError(message) {
     errorEl._timer = setTimeout(() => errorEl.classList.add("hidden"), 8000);
 }
 
-function showSuccess(message) {
+// action: optional { label, run }, a button on the toast (e.g. Undo), which then stays up longer
+function showSuccess(message, action) {
     const successEl = document.getElementById("success");
     successEl.textContent = message;
+    if (action) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "toast-action";
+        button.textContent = action.label;
+        button.onclick = () => {
+            successEl.classList.add("hidden");
+            action.run();
+        };
+        successEl.append(" ", button);
+    }
     successEl.classList.remove("hidden");
     clearTimeout(successEl._timer);
-    successEl._timer = setTimeout(() => successEl.classList.add("hidden"), 3000);
+    successEl._timer = setTimeout(() => successEl.classList.add("hidden"), action ? 8000 : 3000);
 }
 
 function toggleFilters() {
@@ -100,18 +130,18 @@ function showLoading(show) {
 async function loadTitles({ quiet = false } = {}) {
     if (!quiet) showLoading(true);
     try {
-        const resp = await fetch("/api/titles", { cache: "no-store" });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        allData = await resp.json();
+        const everything = await Lists.loadAll();
+        allData = everything.filter((r) => r.list === LIST);
+        otherData = everything.filter((r) => r.list !== LIST);
         for (const row of allData) row._search = searchTextFor(row);
-        window.TitleEditor?.refreshReleases((id) => allData.find((r) => r.id === id));
+        window.TitleEditor?.refreshReleases((id) => everything.find((r) => r.id === id));
 
         displayStats();
         createFilters();
         applyFilters();
         return true;
     } catch (error) {
-        showError("Error loading the watchlog: " + error.message);
+        showError(`Error loading the ${Lists[LIST].name.toLowerCase()}: ${error.message}`);
         return false;
     } finally {
         showLoading(false);
@@ -130,6 +160,10 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (row) {
         document.getElementById("cardsGrid").children[shownRows.indexOf(row)]?.scrollIntoView({ block: "center" });
         openModal(row);
+    } else {
+        // on the other list (an old link, or one from a release): go there instead
+        const there = otherData.find((r) => r.id === id);
+        if (there) location.replace(Lists.link(there));
     }
 });
 
@@ -140,6 +174,20 @@ function displayStats() {
     const totalCount = allData.length;
     const films = allData.filter((r) => r.type === "Film").length;
     const series = allData.filter((r) => r.type === "Series").length;
+    if (IS_WATCHLIST) {
+        const today = TitleModal.todayIso();
+        const thisMonth = allData.filter((r) => r.watchlistAddedOn?.slice(0, 7) === today.slice(0, 7)).length;
+        const oldest = allData.reduce((min, r) => (r.watchlistAddedOn && (!min || r.watchlistAddedOn < min) ? r.watchlistAddedOn : min), null);
+        const stats = [
+            [totalCount, "to watch"],
+            [films, films === 1 ? "film" : "films"],
+            [series, "series"],
+            [thisMonth, "added this month"],
+            [oldest ? TitleModal.waitText(oldest).replace("today", "0 days") : "-", "longest wait"],
+        ];
+        statsEl.innerHTML = stats.map(([value, label]) => `<div class="stat"><dt>${label}</dt><dd>${value}</dd></div>`).join("");
+        return;
+    }
     const rated = allData.filter((r) => r.rating != null);
     const avgRating = rated.length
         ? (rated.reduce((sum, r) => sum + r.rating, 0) / rated.length).toFixed(1)
@@ -183,6 +231,7 @@ function uniqueValues(getList) {
 function createFilters() {
     const fill = (id, category, entries) => {
         const container = document.getElementById(id);
+        if (!container) return; // the watchlist has no rating, format or special filters
         container.innerHTML = "";
         for (const [value, label] of entries) container.appendChild(filterButton(category, value, label));
     };
@@ -194,7 +243,10 @@ function createFilters() {
     fill(
         "specialFilters",
         "special",
-        ["All", "Watched w/ Bogdan", "Not w/ Bogdan", "Physical Copy", "High Rewatch"].map((s) => [s.toLowerCase(), s]),
+        (IS_WATCHLIST
+            ? ["All", "On the shelf", "Not on the shelf", "Seen before"]
+            : ["All", "Watched w/ Bogdan", "Not w/ Bogdan", "Physical Copy", "High Rewatch"]
+        ).map((s) => [s.toLowerCase(), s]),
     );
 }
 
@@ -241,7 +293,14 @@ function applyFilters() {
                 if (row.withBogdan) return false;
                 break;
             case "physical copy":
+            case "on the shelf":
                 if (row.releases.length === 0) return false;
+                break;
+            case "not on the shelf":
+                if (row.releases.length > 0) return false;
+                break;
+            case "seen before":
+                if (!row.watchCount) return false;
                 break;
             case "high rewatch":
                 if ((row.rewatchPotential ?? 0) < 9) return false;
@@ -302,6 +361,14 @@ function sortCards() {
                 return (b.latestWatch || "").localeCompare(a.latestWatch || "");
             case "date-first":
                 return (b.firstWatch || "").localeCompare(a.firstWatch || "");
+            case "added-desc":
+                return (b.watchlistAddedOn || "").localeCompare(a.watchlistAddedOn || "") || b.id - a.id;
+            case "added-asc":
+                return (a.watchlistAddedOn || "").localeCompare(b.watchlistAddedOn || "") || a.id - b.id;
+            case "year-desc":
+                return (b.releaseYear ?? 0) - (a.releaseYear ?? 0) || a.name.localeCompare(b.name);
+            case "year-asc":
+                return (a.releaseYear ?? 9999) - (b.releaseYear ?? 9999) || a.name.localeCompare(b.name);
             default:
                 return 0;
         }
@@ -324,6 +391,8 @@ const ratingHtml = (row, large = false) => TitleModal.ratingHtml(row, large);
 
 function tagsHtml(row, { formats = false } = {}) {
     const tags = [`<span class="tag tag-${row.type === "Film" ? "film" : "series"}">${escapeHtml(row.type)}</span>`];
+    // on the watchlist with watches already: waiting to be watched again
+    if (row.list === "watchlist" && row.watchCount > 0) tags.push(`<span class="tag tag-rewatch">Rewatch</span>`);
     if (row.withBogdan) tags.push(`<span class="tag tag-bogdan">With Bogdan</span>`);
     if (formats) for (const r of row.releases) tags.push(`<span class="tag tag-physical">${escapeHtml(Shelf.label(r))}</span>`);
     else if (row.releases.length > 0) tags.push(`<span class="tag tag-physical">On the shelf</span>`);
@@ -349,7 +418,16 @@ function factsHtml(row, { skip = [] } = {}) {
 let shownRows = [];
 
 // Admins can switch the grid for a sortable table (js/shelf.js).
-let tableSort = { key: "name", dir: "asc" };
+let tableSort = IS_WATCHLIST ? { key: "added", dir: "desc" } : { key: "name", dir: "asc" };
+const watchlistColumns = [
+    { key: "name", label: "Name", value: (r) => r.name },
+    { key: "type", label: "Type", value: (r) => r.type },
+    { key: "year", label: "Year", value: (r) => r.releaseYear, num: true },
+    { key: "added", label: "Added", value: (r) => r.watchlistAddedOn, html: (r) => escapeHtml(formatDate(r.watchlistAddedOn)) },
+    { key: "genres", label: "Genres", value: (r) => r.genres.join(", "), wrap: true },
+    { key: "seen", label: "Seen", value: (r) => r.watchCount || null, num: true },
+    { key: "releases", label: "On the shelf", value: (r) => r.releases.map(Shelf.label).join(", "), wrap: true },
+];
 const titleColumns = [
     { key: "name", label: "Name", value: (r) => r.name },
     { key: "type", label: "Type", value: (r) => r.type },
@@ -364,7 +442,7 @@ const titleColumns = [
     { key: "bogdan", label: "Bogdan", value: (r) => (r.withBogdan ? "Yes" : "") },
     { key: "rewatch", label: "Rewatch", value: (r) => r.rewatchPotential, num: true },
 ];
-const view = Shelf.viewToggle(document.getElementById("viewToggle"), "titles", () => filterCards());
+const view = Shelf.viewToggle(document.getElementById("viewToggle"), IS_WATCHLIST ? "watchlist" : "titles", () => filterCards());
 
 function displayCards(data) {
     const grid = document.getElementById("cardsGrid");
@@ -376,9 +454,9 @@ function displayCards(data) {
         // the modal's previous/next follow the table's order
         shownRows = Shelf.renderTable(grid, {
             rows: data,
-            columns: titleColumns,
+            columns: IS_WATCHLIST ? watchlistColumns : titleColumns,
             sort: tableSort,
-            caption: "Titles",
+            caption: IS_WATCHLIST ? "Watchlist" : "Titles",
             onSort: (s) => {
                 tableSort = s;
                 displayCards(data);
@@ -391,7 +469,9 @@ function displayCards(data) {
     if (data.length === 0) {
         grid.innerHTML = allData.length
             ? `<div class="empty"><h2>Nothing matches</h2><p class="muted">Try a shorter search or clear some filters.</p></div>`
-            : "";
+            : IS_WATCHLIST
+              ? `<div class="empty"><h2>Nothing on your watchlist</h2><p class="muted">Add the films and series you want to watch, and mark them as watched from here.</p></div>`
+              : "";
         return;
     }
 
@@ -450,20 +530,22 @@ async function fetchRelease(id) {
     return r;
 }
 
+const everyTitle = () => [...allData, ...otherData];
+
 const releaseCtx = {
-    titles: () => new Map(allData.map((t) => [t.id, t])),
+    titles: () => new Map(everyTitle().map((t) => [t.id, t])),
     find: (id) => releaseCache.get(id),
     // after an edit or delete: refresh the collection and the title popup underneath
     async onChanged(saved) {
         await loadTitles({ quiet: true });
         const shown = TitleModal.current();
-        const row = shown && allData.find((r) => r.id === shown.id);
+        const row = shown && everyTitle().find((r) => r.id === shown.id);
         if (row) openModal(row);
         return saved ? fetchRelease(saved.id) : null;
     },
     // a title on the release opens over it; the release stays open underneath
     openTitle(id) {
-        const row = allData.find((r) => r.id === id);
+        const row = everyTitle().find((r) => r.id === id);
         if (row) TitleModal.open(row, { front: true });
     },
 };
@@ -479,8 +561,10 @@ const addRelease = (titleId) => ReleaseDialogs.edit(null, [titleId], releaseCtx)
 
 // Used by admin.js
 window.App = {
+    list: LIST,
     reload: () => loadTitles({ quiet: true }),
     getAll: () => allData,
+    getOther: () => otherData,
     openModal,
     closeModal,
     showRelease,

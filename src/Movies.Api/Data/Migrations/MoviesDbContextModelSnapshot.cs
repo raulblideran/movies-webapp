@@ -407,6 +407,11 @@ namespace Movies.Api.Data.Migrations
                     b.Property<DateOnly?>("LatestWatch")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("List")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(300)
@@ -447,10 +452,15 @@ namespace Movies.Api.Data.Migrations
                     b.Property<int>("WatchCount")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateOnly?>("WatchlistAddedOn")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("WithBogdan")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("List");
 
                     b.HasIndex("Name");
 

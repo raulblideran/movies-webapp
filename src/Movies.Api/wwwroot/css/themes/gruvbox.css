@@ -509,6 +509,15 @@
     color: #fabd2f;
 }
 
+/* five buffers on a phone's tabline */
+@media (max-width: 480px) {
+    [data-theme="gruvbox"] .topbar-nav a,
+    [data-theme="gruvbox"] .topbar-nav::after {
+        padding: 0 7px;
+        font-size: 13px;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     [data-theme="gruvbox"] .hero-title::after {
         animation: none;

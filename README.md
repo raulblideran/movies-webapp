@@ -75,9 +75,9 @@ If the app is running, these commands `exec` into it; otherwise they run in a th
 
 | | Auth |
 |---|---|
-| `GET /api/titles`, `GET /api/titles/{id}` | public |
+| `GET /api/titles[?list=watched\|watchlist]`, `GET /api/titles/{id}` | public; each title has a `list` (Watched = the Watchlog, Watchlist = to watch) |
 | `POST /api/titles`, `PUT /api/titles/{id}`, `DELETE /api/titles/{id}` | Editor + 2FA |
-| `GET /api/export.csv` | Editor + 2FA; same columns as the old sheet |
+| `GET /api/export.csv` | Editor + 2FA; same columns as the old sheet (the Watchlog only) |
 | `GET /api/cex/{sku}` | public; server-side CeX lookup, cached 6h (replaces the CORS proxies and Cloudflare worker) |
 | `GET /api/tmdb/search?q=&year=&anime=` | Editor + 2FA |
 | `GET /api/tmdb/details?link=` | Editor + 2FA; film/series details from a pasted themoviedb.org link (fills the add/edit form) |
@@ -92,16 +92,17 @@ Containerfile, dev.sh           dev environment
 src/Movies.Api/
   Program.cs                    DI, Identity, policies, rate limits
   Cli.cs                        import / create-user commands
-  Data/                         Title entity, DbContext (Identity tables + Titles), migrations
-  Endpoints/                    titles, auth/account, users, CeX/TMDB
+  Data/                         Title (on the Watchlog or the Watchlist), releases, DbContext, migrations
+  Endpoints/                    titles, releases, auth/account, users, CeX/TMDB
   Import/SheetCsv.cs            sheet CSV ⇄ Title
   Services/                     TMDB + CeX clients
-  wwwroot/                      index.html, js/app.js (public page), js/auth.js (sign-in, 2FA, users),
+  wwwroot/                      index.html (Watchlog) and watchlist.html (Watchlist), both run by js/app.js,
+                                with js/lists.js saying where each list lives; js/auth.js (sign-in, 2FA, users),
                                 js/admin.js (edit controls), js/editor.js (the add/edit form),
                                 js/datepicker.js (themed date picker), edit.html + js/edit-page.js
-                                (/titles/new and /titles/{id}/edit: the form on its own page),
+                                (/titles/new, /watchlist/new and /titles/{id}/edit: the form on its own page),
                                 manifest.webmanifest + icons/ + sw.js + js/pwa.js + offline.html (installable
-                                app; the collection, releases, stats and CeX pages work offline once visited)
+                                app; the Watchlog, Watchlist, releases, stats and CeX pages work offline once visited)
 tests/Movies.Api.Tests/         CSV parsing + API/auth integration tests
 ```
 

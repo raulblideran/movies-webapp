@@ -23,6 +23,8 @@ public record TitleDto(
     string? PosterPath,
     string? PosterUrl,
     List<ReleaseSummaryDto> Releases,
+    TitleList List,
+    DateOnly? WatchlistAddedOn,
     DateTime UpdatedAt)
 {
     public const string PosterBaseUrl = "https://image.tmdb.org/t/p/w500";
@@ -34,6 +36,8 @@ public record TitleDto(
         t.Comments, t.ReleaseYear, t.TmdbId, t.TmdbMediaType, t.PosterPath,
         t.PosterPath is null ? null : PosterBaseUrl + t.PosterPath,
         t.ReleaseLinks.Select(l => ReleaseSummaryDto.From(l.Release)).OrderBy(r => r.Name).ToList(),
+        t.List,
+        t.WatchlistAddedOn,
         t.UpdatedAt);
 }
 
@@ -54,7 +58,9 @@ public record TitleUpsertRequest(
     int? ReleaseYear,
     int? TmdbId,
     string? TmdbMediaType,
-    string? PosterPath)
+    string? PosterPath,
+    TitleList List = TitleList.Watched,
+    DateOnly? WatchlistAddedOn = null)
 {
     public Dictionary<string, string[]> Validate()
     {
@@ -74,6 +80,9 @@ public record TitleUpsertRequest(
         if (PosterPath is not null && !System.Text.RegularExpressions.Regex.IsMatch(PosterPath, @"^/[A-Za-z0-9_\-]+\.(jpg|jpeg|png|webp)$"))
             Add(nameof(PosterPath), "Poster path must be a TMDB image path like /abc.jpg.");
         if (TmdbMediaType is not null and not ("movie" or "tv")) Add(nameof(TmdbMediaType), "Media type must be movie or tv.");
+        if (!Enum.IsDefined(List)) Add(nameof(List), "List must be Watched or Watchlist.");
+        if (WatchlistAddedOn is { } added && (added.Year < 1900 || added > UkTime.Today().AddDays(1)))
+            Add(nameof(WatchlistAddedOn), "The date it went on the watchlist can't be in the future.");
         return errors;
     }
 
@@ -99,5 +108,9 @@ public record TitleUpsertRequest(
         t.TmdbId = TmdbId;
         t.TmdbMediaType = TmdbMediaType;
         t.PosterPath = PosterPath;
+        t.List = List;
+        // The date is saved as sent (so Undo can clear it), except that something on the watchlist always
+        // has one: the date it already had, or today.
+        t.WatchlistAddedOn = WatchlistAddedOn ?? (List == TitleList.Watchlist ? t.WatchlistAddedOn ?? UkTime.Today() : null);
     }
 }

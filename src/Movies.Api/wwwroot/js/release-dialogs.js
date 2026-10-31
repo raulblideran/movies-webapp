@@ -71,7 +71,7 @@
                 ${ts.length
                     ? `<ul class="release-title-list">${ts
                           .map((t) => `
-                        <li><a href="/?title=${t.id}" class="release-title" data-title="${t.id}">
+                        <li><a href="${window.Lists ? Lists.link(t) : `/?title=${t.id}`}" class="release-title" data-title="${t.id}">
                             ${t.posterUrl ? `<img src="${esc(t.posterUrl.replace("/w500/", "/w185/"))}" alt="" loading="lazy">` : `<span class="record-noposter">${esc(t.name)}</span>`}
                             <span>${esc(t.name)}${t.releaseYear ? ` <span class="faint">${t.releaseYear}</span>` : ""}</span>
                         </a></li>`)
@@ -165,7 +165,7 @@
             matches = all.filter((t) => !picked.includes(t.id) && t.name.toLowerCase().includes(q)).slice(0, 12);
             if (!matches.length) return hide();
             list.innerHTML = matches
-                .map((t, i) => `<li role="option" id="${listId}-${i}" data-i="${i}" aria-selected="${i === active}">${esc(t.name)}${t.releaseYear ? ` <span class="faint">${t.releaseYear}</span>` : ""}</li>`)
+                .map((t, i) => `<li role="option" id="${listId}-${i}" data-i="${i}" aria-selected="${i === active}">${esc(t.name)}${t.releaseYear ? ` <span class="faint">${t.releaseYear}</span>` : ""}${t.list === "watchlist" ? ` <span class="faint">· on the watchlist</span>` : ""}</li>`)
                 .join("");
             list.classList.remove("hidden");
             input.setAttribute("aria-expanded", "true");

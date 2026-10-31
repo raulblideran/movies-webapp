@@ -21,11 +21,13 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
         {
             e.Property(t => t.Name).HasMaxLength(300);
             e.Property(t => t.Type).HasConversion<string>().HasMaxLength(20);
+            e.Property(t => t.List).HasConversion<string>().HasMaxLength(20);
             e.Property(t => t.Rating).HasPrecision(4, 1);
             e.Property(t => t.Comments).HasMaxLength(4000);
             e.Property(t => t.TmdbMediaType).HasMaxLength(10);
             e.Property(t => t.PosterPath).HasMaxLength(200);
             e.HasIndex(t => t.Name);
+            e.HasIndex(t => t.List);
         });
 
         builder.Entity<CexItem>(e =>

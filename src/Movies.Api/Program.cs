@@ -170,13 +170,10 @@ var buildInfo = typeof(Program).Assembly
     .OfType<System.Reflection.AssemblyMetadataAttribute>()
     .ToDictionary(a => a.Key, a => a.Value);
 // BuildVersion is stamped in UTC; the footer shows it in UK time (BST in summer).
-TimeZoneInfo ukTime;
-try { ukTime = TimeZoneInfo.FindSystemTimeZoneById("Europe/London"); }
-catch (TimeZoneNotFoundException) { ukTime = TimeZoneInfo.Utc; }
 var buildVersion = DateTime.TryParseExact(buildInfo.GetValueOrDefault("BuildVersion"), "yyMMdd.HHmm",
         System.Globalization.CultureInfo.InvariantCulture,
         System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var builtUtc)
-    ? TimeZoneInfo.ConvertTimeFromUtc(builtUtc, ukTime).ToString("yyMMdd.HHmm", System.Globalization.CultureInfo.InvariantCulture)
+    ? TimeZoneInfo.ConvertTimeFromUtc(builtUtc, UkTime.Zone).ToString("yyMMdd.HHmm", System.Globalization.CultureInfo.InvariantCulture)
     : "dev";
 var buildStamp = buildInfo.GetValueOrDefault("BuildStamp") ?? buildVersion;
 app.MapGet("/api/version", () => Results.Ok(new { version = buildVersion }));
@@ -207,6 +204,9 @@ app.MapGet("/stats", (HttpContext ctx) => Page(ctx, "stats.html"));
 app.MapGet("/stats.html", (HttpContext ctx) => Page(ctx, "stats.html"));
 app.MapGet("/titles/new", (HttpContext ctx) => Page(ctx, "edit.html"));
 app.MapGet("/titles/{id:int}/edit", (HttpContext ctx) => Page(ctx, "edit.html"));
+app.MapGet("/watchlist", (HttpContext ctx) => Page(ctx, "watchlist.html"));
+app.MapGet("/watchlist.html", (HttpContext ctx) => Page(ctx, "watchlist.html"));
+app.MapGet("/watchlist/new", (HttpContext ctx) => Page(ctx, "edit.html"));
 
 // The service worker carries the build stamp, so each deploy installs a new worker with a fresh cache.
 // It must never be cached for long, or browsers would keep running an old one.

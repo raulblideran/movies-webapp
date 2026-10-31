@@ -1,39 +1,20 @@
-// Collection editing (add/edit/watched again/delete). Needs auth.js, loaded before this file.
+// Editing on the Watchlog and Watchlist pages: add, edit, watched again, mark as watched, move to the
+// watchlist, delete. Needs auth.js, lists.js and editor.js, loaded before this file.
 
 (function () {
     const { api, dialog, esc } = Auth;
+    const { toRequest } = TitleEditor;
 
-    // ---------- title editing (the form itself is in editor.js) ----------
-
-    function toRequest(row) {
-        return {
-            name: row.name,
-            type: row.type,
-            firstWatch: row.firstWatch,
-            latestWatch: row.latestWatch,
-            watchCount: row.watchCount,
-            rating: row.rating,
-            rewatchPotential: row.rewatchPotential,
-            genres: row.genres,
-            seasons: row.seasons,
-            episodesTotal: row.episodesTotal,
-            withBogdan: row.withBogdan,
-            dateWithBogdan: row.dateWithBogdan,
-            comments: row.comments,
-            releaseYear: row.releaseYear,
-            tmdbId: row.tmdbId,
-            tmdbMediaType: row.tmdbMediaType,
-            posterPath: row.posterPath,
-        };
-    }
-
-    async function afterSave(saved, message) {
+    // saved carries .list: when it's now on the other list it has left this page, so the popup closes
+    async function afterSave(saved, message, action) {
         await App.reload();
-        App.showSuccess(message);
-        const fresh = App.getAll().find((r) => r.id === saved.id);
+        App.showSuccess(message, action);
+        const fresh = saved.list === App.list ? App.getAll().find((r) => r.id === saved.id) : null;
         if (fresh) App.openModal(fresh);
         else App.closeModal();
     }
+
+    const everything = () => [...App.getAll(), ...App.getOther()];
 
     // Ctrl/Cmd/Shift/middle click on an editor link opens the full page; a plain click opens the dialog.
     function editorLink(a, row) {
@@ -44,34 +25,62 @@
         };
     }
 
-    function openEditor(row) {
-        const d = dialog(row ? `Edit ${esc(row.name)}` : "Add a title", "", { wide: true });
+    // the form in a dialog: a title to edit, or null to add one to this page's list
+    function openEditor(row, { markWatched = false } = {}) {
+        const list = row?.list ?? App.list;
+        const heading = markWatched ? `Watched ${esc(row.name)}` : row ? `Edit ${esc(row.name)}` : list === "watchlist" ? "Add to watchlist" : "Add a title";
+        const d = dialog(heading, "", { wide: true });
         TitleEditor.mount(d.body, row, {
-            allRows: App.getAll(),
-            pageLink: row ? `/titles/${row.id}/edit` : "/titles/new",
+            list,
+            markWatched,
+            allRows: everything(),
+            pageLink: markWatched ? null : row ? Lists.editUrl(row.id) : Lists[list].newUrl,
             // its releases, and a new one, open over the form
             openRelease: (id) => App.showRelease(id),
             addRelease: () => App.addRelease(row.id),
             onCancel: () => d.close(),
             async onSaved(saved, isNew) {
                 d.close();
-                await afterSave(saved, isNew ? `Added ${saved.name}` : `Saved ${saved.name}`);
+                const message = markWatched
+                    ? saved.watchCount > 1
+                        ? `Moved ${saved.name} to your Watchlog (watch number ${saved.watchCount})`
+                        : `Moved ${saved.name} to your Watchlog`
+                    : isNew
+                      ? `Added ${saved.name}${list === "watchlist" ? " to your watchlist" : ""}`
+                      : `Saved ${saved.name}`;
+                await afterSave(saved, message);
+            },
+            // adding to the watchlist something already in the Watchlog: that title moved over instead
+            async onMoved(saved) {
+                d.close();
+                await afterSave(saved, `Moved ${saved.name} to your watchlist`);
             },
         });
     }
 
-    async function addWatch(row) {
-        const body = toRequest(row);
-        body.watchCount = (row.watchCount || 0) + 1;
-        body.latestWatch = TitleEditor.todayIso();
-        body.firstWatch = row.firstWatch ?? body.latestWatch;
+    async function save(row, changes, message, action) {
         try {
-            const saved = await api("PUT", `/api/titles/${row.id}`, body);
-            await afterSave(saved, `+1 watch for ${saved.name} (${saved.watchCount} total)`);
+            const saved = Lists.normalise(await api("PUT", `/api/titles/${row.id}`, { ...toRequest(row), ...changes }));
+            await afterSave(saved, message(saved), action?.(saved));
         } catch (e) {
             App.showError(e.message);
         }
     }
+
+    const addWatch = (row) =>
+        save(
+            row,
+            { watchCount: (row.watchCount || 0) + 1, latestWatch: TitleEditor.todayIso(), firstWatch: row.firstWatch ?? TitleEditor.todayIso() },
+            (saved) => `+1 watch for ${saved.name} (${saved.watchCount} total)`,
+        );
+
+    // Onto the watchlist, keeping its watches and rating: it's waiting to be watched again. Undo puts it
+    // back as it was, date and all.
+    const moveToWatchlist = (row) =>
+        save(row, { list: "Watchlist", watchlistAddedOn: TitleEditor.todayIso() }, (saved) => `Moved ${saved.name} to your watchlist`, (saved) => ({
+            label: "Undo",
+            run: () => save(saved, { list: "Watched", watchlistAddedOn: row.watchlistAddedOn ?? null }, (back) => `${back.name} is back in your Watchlog`),
+        }));
 
     async function deleteTitle(row) {
         if (!window.confirm(`Delete "${row.name}"? This can't be undone.`)) return;
@@ -84,17 +93,20 @@
             App.showError(e.message);
         }
     }
-// ---------- page integration ----------
+
+    // ---------- page integration ----------
 
     document.addEventListener("auth-changed", (e) => {
         const me = e.detail;
         const controls = document.getElementById("adminControls");
         controls.innerHTML = "";
         if (me.canEdit) {
+            const url = Lists[App.list].newUrl;
+            const what = App.list === "watchlist" ? "Add to watchlist" : "Add title";
             controls.innerHTML = `
                 <span class="split">
-                    <a href="/titles/new" class="btn btn-primary" data-add>Add title</a>
-                    <a href="/titles/new" class="btn btn-primary split-end" title="Add a title on its own page" aria-label="Add a title on its own page">↗</a>
+                    <a href="${url}" class="btn btn-primary" data-add>${what}</a>
+                    <a href="${url}" class="btn btn-primary split-end" title="${what} on its own page" aria-label="${what} on its own page">↗</a>
                 </span>`;
             editorLink(controls.querySelector("[data-add]"), null);
         } else if (Auth.mustEnrolMfa()) {
@@ -112,15 +124,24 @@
             const bar = document.getElementById("modalAdminBar");
             if (!bar || !Auth.me.canEdit) return;
             bar.className = "modal-actions";
+            const editUrl = Lists.editUrl(row.id);
+            const onWatchlist = row.list === "watchlist";
             bar.innerHTML = `
                 <span class="split">
-                    <a href="/titles/${row.id}/edit" data-edit class="btn">Edit</a>
-                    <a href="/titles/${row.id}/edit" class="btn split-end" title="Edit on its own page" aria-label="Edit on its own page">↗</a>
+                    <a href="${editUrl}" data-edit class="btn">Edit</a>
+                    <a href="${editUrl}" class="btn split-end" title="Edit on its own page" aria-label="Edit on its own page">↗</a>
                 </span>
-                <button type="button" data-watch class="btn" title="Add one to the watch count and set the latest watch to today">Watched again</button>
+                ${onWatchlist
+                    ? `<button type="button" data-mark class="btn btn-primary" title="Rate it and move it to your Watchlog">Mark as watched</button>`
+                    : `<button type="button" data-watch class="btn" title="Add one to the watch count and set the latest watch to today">Watched again</button>
+                       <button type="button" data-move class="btn" title="Put it on your watchlist to watch again. It keeps its watches and rating">Move to watchlist</button>`}
                 <button type="button" data-delete class="btn btn-danger">Delete</button>`;
             editorLink(bar.querySelector("[data-edit]"), row);
-            bar.querySelector("[data-watch]").onclick = () => addWatch(row);
+            if (onWatchlist) bar.querySelector("[data-mark]").onclick = () => openEditor(row, { markWatched: true });
+            else {
+                bar.querySelector("[data-watch]").onclick = () => addWatch(row);
+                bar.querySelector("[data-move]").onclick = () => moveToWatchlist(row);
+            }
             bar.querySelector("[data-delete]").onclick = () => deleteTitle(row);
         },
     };

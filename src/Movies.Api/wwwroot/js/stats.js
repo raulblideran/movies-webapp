@@ -36,7 +36,14 @@
     // every year from the first to the last, so gaps show as gaps instead of being squeezed out
     const yearSpan = (ys) => (ys.length ? Array.from({ length: Math.max(...ys) - Math.min(...ys) + 1 }, (_, i) => Math.min(...ys) + i) : []);
 
+    // every title on both lists (the releases tab and the popups), and the ones you've watched, which the
+    // Watchlog charts count: the Watchlog, plus watchlist titles already seen (waiting for a rewatch)
+    let everything = [];
     let all = [];
+    const setTitles = (rows) => {
+        everything = rows.map((r) => shape({ ...r, list: r.list === "Watchlist" ? "watchlist" : "watched" }));
+        all = everything.filter((r) => r.list === "watched" || r.watchCount > 0);
+    };
     let genreInfo = { name: new Map(), color: new Map(), top: [] };
     const filter = { type: "all", from: null, to: null };
     // Each tab keeps the chart draw calls for its panel; only the visible tab is drawn (hidden panels have no width).
@@ -796,22 +803,22 @@
         return r;
     }
     const releaseCtx = {
-        titles: () => new Map(all.map((t) => [t.id, t])),
+        titles: () => new Map(everything.map((t) => [t.id, t])),
         find: (id) => releaseCache.get(id),
         // after an edit or delete: fresh numbers, and the title popup underneath shown as it is now
         async onChanged(saved) {
             const resp = await fetch("/api/titles", { cache: "no-store" });
             if (resp.ok) {
-                all = (await resp.json()).map(shape);
+                setTitles(await resp.json());
                 if (current === "collection") render();
                 const shown = TitleModal.current();
-                const row = shown && all.find((t) => t.id === shown.id);
+                const row = shown && everything.find((t) => t.id === shown.id);
                 if (row) TitleModal.open(row);
             }
             return saved ? fetchRelease(saved.id) : null;
         },
         openTitle(id) {
-            const row = all.find((t) => t.id === id);
+            const row = everything.find((t) => t.id === id);
             if (row) TitleModal.open(row, { front: true });
         },
     };
@@ -824,7 +831,7 @@
     document.getElementById("statsRoot").addEventListener("click", (e) => {
         const a = e.target.closest("[data-title]");
         if (!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; // new tab: the watchlog
-        const row = all.find((t) => t.id === Number(a.dataset.title));
+        const row = everything.find((t) => t.id === Number(a.dataset.title));
         if (!row) return;
         e.preventDefault();
         TitleModal.open(row);
@@ -835,7 +842,7 @@
         try {
             const resp = await fetch("/api/titles", { cache: "no-store" });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            all = (await resp.json()).map(shape);
+            setTitles(await resp.json());
             buildGenres();
             renderFilters();
             tabs.collection.rendered = true;
@@ -853,7 +860,7 @@
     window.StatsKit = {
         card, section, empty, guard, kpiTiles, setHero, beginTab, slot, OTHER, MAIN, HI, MONTHS,
         gbp, pct, sum, mean, median, plural, countBy, yearSpan,
-        titles: () => all,
+        titles: () => everything,
         addTab: (name, tab) => (tabs[name] = { draws: [], ...tab }),
         redraw: () => drawAll(),
     };

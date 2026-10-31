@@ -12,10 +12,18 @@ public static class TitlesEndpoints
     {
         var titles = app.MapGroup("/api/titles");
 
-        titles.MapGet("/", async (MoviesDbContext db) =>
+        // ?list=watched or ?list=watchlist for one page's titles; without it, both lists
+        titles.MapGet("/", async (string? list, MoviesDbContext db) =>
         {
-            var all = await WithReleases(db.Titles.AsNoTrackingWithIdentityResolution()).OrderBy(t => t.Name).ToListAsync();
-            return all.Select(TitleDto.From);
+            var q = db.Titles.AsNoTrackingWithIdentityResolution();
+            if (list is not null)
+            {
+                if (!Enum.TryParse<TitleList>(list, ignoreCase: true, out var which) || !Enum.IsDefined(which))
+                    return Results.Problem("list must be watched or watchlist.", statusCode: 400);
+                q = q.Where(t => t.List == which);
+            }
+            var all = await WithReleases(q).OrderBy(t => t.Name).ToListAsync();
+            return Results.Ok(all.Select(TitleDto.From));
         });
 
         titles.MapGet("/{id:int}", async (int id, MoviesDbContext db) =>
@@ -55,7 +63,9 @@ public static class TitlesEndpoints
 
         app.MapGet("/api/export.csv", async (MoviesDbContext db) =>
         {
-            var all = await WithReleases(db.Titles.AsNoTrackingWithIdentityResolution()).OrderBy(t => t.Name).ToListAsync();
+            // the old sheet's format, so only the Watchlog
+            var all = await WithReleases(db.Titles.AsNoTrackingWithIdentityResolution().Where(t => t.List == TitleList.Watched))
+                .OrderBy(t => t.Name).ToListAsync();
             var csv = SheetCsv.Write(all);
             return Results.File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv",
                 $"movies-{DateTime.UtcNow:yyyy-MM-dd}.csv");

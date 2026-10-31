@@ -121,10 +121,8 @@
             // only the popup on top: a title popup (js/title-modal.js) can sit over a dialog
             if (e.key === "Escape" && root === [...document.querySelectorAll(".overlay:not(.hidden)")].pop()) d.close();
         };
+        // only × and Esc close a dialog: a click on the backdrop does nothing, so a form isn't lost by accident
         root.querySelector("[data-close]").onclick = () => d.close();
-        root.addEventListener("mousedown", (e) => {
-            if (e.target === root) d.close();
-        });
         document.addEventListener("keydown", onKey);
         document.body.appendChild(root);
         root.querySelector("input:not([type=hidden]), select, textarea")?.focus();
