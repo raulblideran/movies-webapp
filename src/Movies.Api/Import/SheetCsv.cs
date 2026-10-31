@@ -13,7 +13,7 @@ public static partial class SheetCsv
     [
         "Name", "Type", "1st Watch", "Physical Format", "Rating ?/10", "Watch count", "Latest Watch",
         "Seasons", "Episodes Total", "Genre", "Rewatch potential", "Bogdan", "Date W/Bogdi",
-        "Comments", "Price (£)", "Cex Link",
+        "Comments", "Price (£)", "Cex Link", "Cinema",
     ];
 
     /// <summary>Shelves[i] is what the sheet said Titles[i] is owned on (turned into releases by ReleaseConversion).</summary>
@@ -35,6 +35,8 @@ public static partial class SheetCsv
         using var csv = new CsvReader(reader, config);
         csv.Read();
         csv.ReadHeader();
+        // added after the old sheet, so older exports don't have it
+        var hasCinema = csv.HeaderRecord?.Contains("Cinema") == true;
 
         var titles = new List<Title>();
         var shelves = new List<SheetShelf>();
@@ -94,6 +96,7 @@ public static partial class SheetCsv
 
             var bogdan = Get("Bogdan");
             t.WithBogdan = bogdan.Equals("Yes", StringComparison.OrdinalIgnoreCase);
+            t.WatchedInCinema = hasCinema && Get("Cinema").Equals("Yes", StringComparison.OrdinalIgnoreCase);
 
             var comments = Get("Comments");
             t.Comments = comments.Length == 0 ? null : comments;
@@ -142,6 +145,7 @@ public static partial class SheetCsv
             csv.WriteField(t.Comments ?? "");
             csv.WriteField(paid.Count > 0 ? paid.Sum().ToString("0.##", CultureInfo.InvariantCulture) : "");
             csv.WriteField(string.Join(", ", releases.Select(r => r.CexUrl).OfType<string>()));
+            csv.WriteField(t.WatchedInCinema ? "Yes" : "No");
             csv.NextRecord();
         }
         return sw.ToString();

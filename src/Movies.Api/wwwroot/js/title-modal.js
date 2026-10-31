@@ -333,6 +333,7 @@
             row.list === "watchlist" ? `<span class="tag tag-watchlist">Watchlist</span>` : "",
             ...row.genres.map((g) => `<span class="tag">${esc(g)}</span>`),
             row.withBogdan ? `<span class="tag tag-bogdan">With Bogdan</span>` : "",
+            row.watchedInCinema ? `<span class="tag tag-cinema">In cinema</span>` : "",
         ].join("");
 
         scroll.innerHTML = `

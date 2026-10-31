@@ -14,7 +14,21 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
-      - run: dotnet test MoviesWebapp.slnx
+      - run: dotnet test MoviesWebapp.slnx --logger "trx;LogFileName=results.trx"
+      # Failing tests as annotations, so they show on the run's summary page without opening the log.
+      - name: List failed tests
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          ns = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+          for f in glob.glob("**/TestResults/*.trx", recursive=True):
+              for r in ET.parse(f).getroot().iterfind(".//t:UnitTestResult", ns):
+                  if r.get("outcome") == "Failed":
+                      m = r.find(".//t:Message", ns)
+                      text = " ".join(((m.text if m is not None else "") or "").split())[:500]
+                      print(f"::error title={r.get('testName')}::{text}")
+          PY
 
   image:
     # The server's podman auto-update picks up :latest within ~2 minutes.

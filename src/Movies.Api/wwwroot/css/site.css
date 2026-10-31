@@ -1172,6 +1172,9 @@ textarea.code {
 .tag-bogdan {
     --tag: var(--tag-bogdan);
 }
+.tag-cinema {
+    --tag: var(--accent);
+}
 .tag-physical {
     --tag: var(--tag-physical);
 }
@@ -2569,11 +2572,6 @@ textarea.code {
     color: var(--warn);
 }
 
-/* the TMDB search's results, under the search box */
-.tmdb-results {
-    margin-top: 8px;
-}
-
 .tmdb-note .link {
     color: inherit;
     font-weight: 700;
@@ -2716,6 +2714,51 @@ textarea.code {
     padding: 0 5px 5px;
     font-weight: 700;
     color: var(--accent);
+}
+
+.tmdb-results {
+    margin-top: 10px;
+}
+
+/* a TMDB result without a poster: its title on the poster's spot */
+.poster-results .no-poster {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 2 / 3;
+    padding: 6px;
+    background: var(--poster-bg);
+    color: var(--ink-3);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    text-transform: uppercase;
+    overflow: hidden;
+}
+
+/* TMDB's genres, offered under the genre field */
+.genre-suggest {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+.genre-chip {
+    padding: 2px 10px;
+    border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 13px;
+}
+
+.genre-chip:hover,
+.genre-chip:focus-visible {
+    border-style: solid;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .chip-input {

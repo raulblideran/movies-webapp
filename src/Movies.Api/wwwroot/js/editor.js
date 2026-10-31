@@ -130,6 +130,7 @@
         render();
         return {
             get: () => (commit(), values),
+            has: (v) => values.some((x) => x.toLowerCase() === v.toLowerCase()),
             // what it holds, plus anything typed but not yet added (doesn't add it)
             peek: () => [...values, input.value.trim()].filter(Boolean),
             addAll(list) {
@@ -203,6 +204,7 @@
             episodesTotal: row.episodesTotal,
             withBogdan: !!row.withBogdan,
             dateWithBogdan: row.dateWithBogdan,
+            watchedInCinema: !!row.watchedInCinema,
             comments: row.comments,
             releaseYear: row.releaseYear,
             tmdbId: row.tmdbId,
@@ -251,6 +253,7 @@
             genres: [],
             releases: [],
             withBogdan: false,
+            watchedInCinema: false,
         };
         const duplicateOf = (tmdbId, mediaType) => allRows.find((r) => r.id !== row.id && r.tmdbId === tmdbId && r.tmdbMediaType === mediaType);
         const poster = { tmdbId: row.tmdbId ?? null, tmdbMediaType: row.tmdbMediaType ?? null, posterPath: row.posterPath ?? null };
@@ -264,27 +267,32 @@
         const v = (x) => (x == null ? "" : esc(x));
         const date = (name, value) => `<input name="${name}" data-date class="input" value="${v(value)}">`;
         const num = (name, value, attrs = "") => `<input name="${name}" type="number" ${attrs} class="input" value="${v(value)}">`;
+        // the genre chips, with TMDB's genres offered underneath after a pick (nothing is added for you)
+        const genresField = `
+                    <div>
+                        ${f("Genres", `<div data-genres data-label="Add a genre"></div>`)}
+                        <div data-genre-suggest class="genre-suggest hidden"></div>
+                    </div>`;
 
         container.innerHTML = `
             <div data-error class="${CLS.error}" role="alert"></div>
             <form class="editor">
                 <div class="editor-poster">
                     <div data-poster class="poster-slot">No poster</div>
-                    <button type="button" data-find class="btn btn-block">Find poster</button>
+                    <button type="button" data-find class="btn btn-block" title="Search TMDB for the name below">Search TMDB</button>
                     <button type="button" data-clear-poster class="btn btn-small btn-block">Remove poster</button>
                 </div>
                 <div class="stack">
                     <div>
                         ${f("Find on TMDB", `<div class="tmdb-link"><input name="tmdbQuery" type="text" inputmode="search" autocomplete="off" spellcheck="false" class="input" placeholder="Search by name, or paste a themoviedb.org link" aria-describedby="tmdb-hint-${uid}"><button type="button" data-tmdb-go class="btn">Search</button></div>`)}
                         <p class="sr-only" id="tmdb-hint-${uid}">Results appear as you type. Picking one fills in the form.</p>
-                        <div data-tmdb-results class="tmdb-results hidden"></div>
                         <p data-tmdb-note class="tmdb-note hidden" role="status"></p>
+                        <div data-tmdb-results class="tmdb-results hidden"></div>
                     </div>
                     <div class="row row-name">
                         ${f("Name", `<input name="name" required maxlength="300" class="input" value="${v(row.name)}">`)}
                         ${f("Type", `<select name="type" class="input">${["Film", "Series"].map((t) => `<option ${t === row.type ? "selected" : ""}>${t}</option>`).join("")}</select>`)}
                     </div>
-                    <div data-results class="hidden"></div>
                     ${W ? `
                     <div class="row row-4">
                         ${f("Release year", num("releaseYear", row.releaseYear, `min="1870" max="2200"`))}
@@ -292,7 +300,7 @@
                         ${f("Episodes", num("episodesTotal", row.episodesTotal, `min="0"`))}
                         ${f("Added to watchlist", date("watchlistAddedOn", row.watchlistAddedOn))}
                     </div>
-                    ${f("Genres", `<div data-genres data-label="Add a genre"></div>`)}` : `
+                    ${genresField}` : `
                     <div class="row row-4">
                         ${f("Rating out of 10", num("rating", row.rating, `min="0" max="11" step="0.5" placeholder="?"`))}
                         ${f("Rewatch out of 10", num("rewatchPotential", row.rewatchPotential, `min="0" max="10" step="1"`))}
@@ -305,10 +313,11 @@
                         ${f("Seasons", num("seasons", row.seasons, `min="0"`))}
                         ${f("Episodes", num("episodesTotal", row.episodesTotal, `min="0"`))}
                     </div>
-                    ${f("Genres", `<div data-genres data-label="Add a genre"></div>`)}
+                    ${genresField}
                     <div class="row row-3" style="align-items:end">
                         <label class="check" style="padding-bottom:10px"><input type="checkbox" name="withBogdan" ${row.withBogdan ? "checked" : ""}> Watched with Bogdan</label>
                         ${f("Date with Bogdan", date("dateWithBogdan", row.dateWithBogdan))}
+                        <label class="check" style="padding-bottom:10px"><input type="checkbox" name="watchedInCinema" ${row.watchedInCinema ? "checked" : ""}> Watched in cinema</label>
                     </div>`}
                     <div class="editor-releases" data-releases>${releasesInner(row, isNew)}</div>
                     ${f(W ? "Notes" : "Comments", `<textarea name="comments" rows="3" maxlength="4000" class="input"${W ? ` placeholder="Who recommended it, where to watch it…"` : ""}>${v(row.comments)}</textarea>`)}
@@ -377,26 +386,53 @@
             );
         }
 
-        const hideResults = () => {
-            d.$("[data-results]").classList.add("hidden");
-            d.$("[data-tmdb-results]").classList.add("hidden");
-        };
+        const hideResults = () => d.$("[data-tmdb-results]").classList.add("hidden");
 
+        // TMDB's genres, matched to the collection's names, offered as chips to add (nothing is added for you).
+        const suggestBox = d.$("[data-genre-suggest]");
+        let suggested = [];
+        function renderSuggestions() {
+            const left = suggested.filter((g) => !genres.has(g));
+            suggestBox.classList.toggle("hidden", left.length === 0);
+            suggestBox.innerHTML = left.length
+                ? `<span class="faint">From TMDB:</span>
+                   ${left.map((g) => `<button type="button" class="genre-chip" data-genre="${esc(g)}">+ ${esc(g)}</button>`).join("")}
+                   ${left.length > 1 ? `<button type="button" class="btn btn-small" data-genre-all>Add all</button>` : ""}`
+                : "";
+        }
+        suggestBox.addEventListener("click", (e) => {
+            const chip = e.target.closest("[data-genre]");
+            if (chip) genres.addAll([chip.dataset.genre]);
+            else if (e.target.closest("[data-genre-all]")) genres.addAll(suggested);
+            else return;
+            renderSuggestions();
+        });
+
+        // A pick or a pasted link. A new title takes TMDB's name, type, year and episode counts; one you're
+        // editing keeps what's already filled in and only gets the poster and the empty fields.
         function applyDetails(t) {
-            form.name.value = t.title;
-            form.type.value = t.type;
-            form.type.dispatchEvent(new Event("change")); // the themed dropdown (select.js) follows "change"
-            if (t.year) form.releaseYear.value = t.year;
-            if (t.seasons != null) form.seasons.value = t.seasons;
-            if (t.episodes != null) form.episodesTotal.value = t.episodes;
-            genres.addAll(mapGenres(t.genres, t.isAnime, unique(allRows, (r) => r.genres)));
+            const take = (input, value) => {
+                if (value == null || value === "") return;
+                if (isNew || input.value === "") input.value = value;
+            };
+            take(form.name, t.title);
+            if (isNew && form.type.value !== t.type) {
+                form.type.value = t.type;
+                form.type.dispatchEvent(new Event("change")); // the themed dropdown (select.js) follows "change"
+            }
+            take(form.releaseYear, t.year);
+            take(form.seasons, t.seasons);
+            take(form.episodesTotal, t.episodes);
             Object.assign(poster, { tmdbId: t.id, tmdbMediaType: t.mediaType, posterPath: t.posterPath ?? poster.posterPath });
             renderPoster();
+            suggested = mapGenres(t.genres, t.isAnime, unique(allRows, (r) => r.genres));
+            renderSuggestions();
             hideResults();
             const dupe = duplicateOf(t.id, t.mediaType);
             if (dupe) return duplicateNote(dupe);
-            note(`Filled from TMDB: <strong>${esc(t.title)}</strong>${t.year ? ` (${t.year})` : ""}.${W ? "" : " Add your rating and watch dates."}`);
-            (W ? form.comments : form.rating).focus();
+            const pickGenres = suggested.some((g) => !genres.has(g)) ? " Pick genres from the suggestions." : "";
+            note(`From TMDB: <strong>${esc(t.title)}</strong>${t.year ? ` (${t.year})` : ""}.${pickGenres}${W || !isNew ? "" : " Add your rating and watch dates."}`);
+            (W ? form.comments : isNew ? form.rating : form.name).focus();
         }
 
         // a film or series by TMDB link ("movie/603" works too), into the form
@@ -412,9 +448,9 @@
                           const dupe = duplicateOf(r.id, r.mediaType);
                           return `
                     <button type="button" data-pick="${i}" title="${esc(r.title)} (${esc(r.year ?? "?")})">
-                        <img src="${esc(r.posterUrl)}" alt="">
+                        ${r.posterUrl ? `<img src="${esc(r.posterUrl.replace("/w500/", "/w185/"))}" alt="" loading="lazy">` : `<div class="no-poster">${esc(r.title)}</div>`}
                         <span>${esc(r.title)}</span>
-                        <span>${esc(r.year ?? "?")}, ${r.mediaType === "tv" ? "TV" : "film"}</span>
+                        <span>${esc(r.year ?? "?")} · ${r.mediaType === "tv" ? "Series" : "Film"}</span>
                         ${dupe ? `<span class="poster-result-have">${dupe.list === "watchlist" ? "On watchlist" : "In Watchlog"}</span>` : ""}
                     </button>`;
                       })
@@ -432,18 +468,22 @@
         let timer = null;
         async function searchTmdb() {
             clearTimeout(timer);
-            const text = query.value.trim();
-            if (!text) return tmdbBox.classList.add("hidden");
+            const text = query.value.trim() || form.name.value.trim(); // empty: search for the name
+            if (!text) {
+                query.focus();
+                return d.error("Type a title to search for, or paste a TMDB link.");
+            }
             if (looksLikeTmdb(text)) return fillFrom(text, goButton);
             const seq = ++searchSeq;
             const { q, year } = splitYear(text);
             const params = new URLSearchParams({ q });
-            if (year) params.set("year", year);
+            if (year || form.releaseYear.value) params.set("year", year || form.releaseYear.value);
+            if (genres.peek().some((g) => g.toLowerCase().includes("anime"))) params.set("anime", "true");
             try {
                 const results = await api("GET", `/api/tmdb/search?${params}`);
                 if (seq !== searchSeq) return; // a newer search is on its way
                 d.error("");
-                showResults(tmdbBox, results, (r, b) => fillFrom(`${r.mediaType}/${r.id}`, b), "Nothing on TMDB by that name. Try fewer words, or add the year.");
+                showResults(tmdbBox, results, (r, b) => fillFrom(`${r.mediaType}/${r.id}`, b), `Nothing on TMDB for “${esc(q)}”. Try a shorter title, or check the release year.`);
             } catch (e) {
                 if (seq === searchSeq) d.error(e.message);
             }
@@ -474,30 +514,15 @@
                 if (looksLikeTmdb(query.value)) fillFrom(query.value.trim(), goButton);
             }),
         );
-        goButton.onclick = () => (query.value.trim() ? searchTmdb() : (d.error("Type a name to search TMDB, or paste a TMDB link."), query.focus()));
+        goButton.onclick = searchTmdb;
 
-        // ---------- Find poster: by the name and year in the form ----------
-        // On a new title a pick fills the whole form; on one you're editing it only changes the poster.
+        // ---------- the poster column's button: search TMDB for the name ----------
 
-        d.$("[data-find]").onclick = (e) => {
+        d.$("[data-find]").onclick = () => {
             const name = form.name.value.trim();
-            if (!name) return d.error("Enter a name first, or search TMDB above.");
-            const params = new URLSearchParams({ q: name });
-            if (form.releaseYear.value) params.set("year", form.releaseYear.value);
-            if (genres.get().some((g) => g.toLowerCase().includes("anime"))) params.set("anime", "true");
-            busy(d, e.currentTarget, async () => {
-                const results = await api("GET", `/api/tmdb/search?${params}`);
-                showResults(d.$("[data-results]"), results, (r, b) => {
-                    if (isNew) return fillFrom(`${r.mediaType}/${r.id}`, b);
-                    Object.assign(poster, { tmdbId: r.id, tmdbMediaType: r.mediaType, posterPath: r.posterPath });
-                    if (!form.releaseYear.value && r.year) form.releaseYear.value = r.year;
-                    renderPoster();
-                    hideResults();
-                    const dupe = duplicateOf(r.id, r.mediaType);
-                    if (dupe) duplicateNote(dupe);
-                    else note("");
-                }, "No posters found. Check the name or the release year.");
-            });
+            if (name) query.value = name;
+            goButton.textContent = "Search";
+            searchTmdb();
         };
 
         d.$("[data-cancel]").onclick = () => onCancel?.();
@@ -572,6 +597,7 @@
                     rewatchPotential: numOrNull(form.rewatchPotential.value),
                     watchCount: numOrNull(form.watchCount.value) ?? 0,
                     withBogdan: form.withBogdan.checked,
+                    watchedInCinema: form.watchedInCinema.checked,
                 };
             }
             busy(d, form.querySelector("button[type=submit]"), async () => {

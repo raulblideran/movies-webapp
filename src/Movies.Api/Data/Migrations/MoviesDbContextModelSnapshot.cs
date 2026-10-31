@@ -477,6 +477,9 @@ namespace Movies.Api.Data.Migrations
                     b.Property<int>("WatchCount")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("WatchedInCinema")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateOnly?>("WatchlistAddedOn")
                         .HasColumnType("TEXT");
 
