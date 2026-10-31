@@ -101,12 +101,15 @@ src/Movies.Api/
   Services/                     TMDB + CeX clients
   wwwroot/                      index.html (Watchlog) and watchlist.html (Watchlist), both run by js/app.js,
                                 with js/lists.js saying where each list lives; js/auth.js (sign-in, 2FA, users),
-                                js/admin.js (edit controls), js/editor.js (the add/edit form),
+                                js/admin.js (edit controls), js/editor.js (the add/edit form), js/pick.js (Pick for me),
+                                js/title-modal.js (the title popup: trailer, franchise progress),
+                                stats.html + js/stats.js, stats-cex.js, stats-review.js (Watchlog, Releases, Year in review),
                                 js/datepicker.js (themed date picker), edit.html + js/edit-page.js
                                 (/titles/new, /watchlist/new and /titles/{id}/edit: the form on its own page),
                                 manifest.webmanifest + icons/ + sw.js + js/pwa.js + offline.html (installable
                                 app; the Watchlog, Watchlist, releases, stats and CeX pages work offline once visited)
 tests/Movies.Api.Tests/         CSV parsing + API/auth integration tests
+docs/watch-diary.md             design notes for a per-viewing watch diary (not built)
 ```
 
 ## Production (movies.raulblideran.uk)
