@@ -93,8 +93,13 @@
             medium: medium(formats),
             packaging: formats.length ? packaging(formats) : [],
             rewatch: row.rewatchPotential != null && row.rewatchPotential <= 10 ? row.rewatchPotential : null,
+            // screen time: a film's length per watch, a series' episode length × episodes per watch
+            minutes: !row.runtime || !row.watchCount ? null : row.type === "Series" ? (row.episodesTotal ? row.runtime * row.episodesTotal * row.watchCount : null) : row.runtime * row.watchCount,
         };
     }
+
+    // "1,234 h" or "51 days" for the tile; "6 days of screen time" for the hero
+    const hoursText = (min) => (min == null ? "–" : min >= 60 * 24 * 3 ? `${fmt(min / 1440, 0)} days` : `${fmt(min / 60, 0)} h`);
 
     // Genre names and colours come from the whole collection, so a filter never repaints a genre.
     function buildGenres() {
@@ -185,6 +190,7 @@
             ["Genres", fmt(genres), `${fmt(mean(F.map((r) => r.gkeys.length)), 1)} per title`],
             ["Rewatch potential", fmt(mean(rewatchOf), 1), "average, out of 10"],
             ["Episodes", fmt(sum(F.map((r) => r.episodesTotal ?? 0))), plural(sum(F.map((r) => r.seasons ?? 0)), "season")],
+            ["Time watched", hoursText(sum(F.map((r) => r.minutes ?? 0)) || null), `${fmt(sum(F.map((r) => r.minutes ?? 0)) / 60, 0)} hours · ${plural(F.filter((r) => r.minutes == null).length, "title")} without a runtime`],
             ["Busiest month", busiest ? `${MONTHS[busiest[0] % 12]} ${Math.floor(busiest[0] / 12)}` : "–", busiest ? `${plural(busiest[1], "title")} first watched` : ""],
             ["Years of watching", years.length ? fmt(Math.max(...years) - Math.min(...years) + 1) : "–", years.length ? `${Math.min(...years)}–${Math.max(...years)}` : ""],
             ["Titles a month", fmt(months.size ? sum([...months.values()]) / ((Math.max(...months.keys()) - Math.min(...months.keys())) + 1) : null, 1), "average since the first"],
@@ -613,6 +619,8 @@
             ["Best value", pick(priced.filter((r) => r.r10 != null), (a, b) => b.r10 / b.pricePaid - a.r10 / a.pricePaid), (r) => `${fmt(r.rating, 1)}/10 for ${gbp(r.pricePaid)}`],
             ["Priciest", pick(priced, (a, b) => b.pricePaid - a.pricePaid), (r) => gbp(r.pricePaid)],
             ["Oldest release", pick(F.filter((r) => r.releaseYear), (a, b) => a.releaseYear - b.releaseYear), (r) => String(r.releaseYear)],
+            ["Longest film", pick(F.filter((r) => r.type === "Film" && r.runtime), (a, b) => b.runtime - a.runtime), (r) => TitleModal.runtimeText(r)],
+            ["Shortest film", pick(F.filter((r) => r.type === "Film" && r.runtime), (a, b) => a.runtime - b.runtime), (r) => TitleModal.runtimeText(r)],
             ["First ever logged", pick(dated, (a, b) => a.firstWatch.localeCompare(b.firstWatch)), (r) => `${MONTHS[r.fm]} ${r.fy}`],
             ["Latest addition", pick(dated, (a, b) => b.firstWatch.localeCompare(a.firstWatch)), (r) => `${MONTHS[r.fm]} ${r.fy}`],
         ].filter(([, r]) => r);
@@ -635,6 +643,129 @@
                     .join("")}</div>
             </section>`;
     }
+
+    // ---------- length ----------
+
+    function lengthSection(F) {
+        const films = F.filter((r) => r.type === "Film" && r.runtime);
+        if (films.length < 3) return "";
+        const bands = [["Under 1h30", 0, 89], ["1h30–1h45", 90, 105], ["1h45–2h", 106, 120], ["2h–2h15", 121, 135], ["2h15–2h30", 136, 150], ["2h30–3h", 151, 180], ["Over 3h", 181, 9999]];
+        const items = bands.map(([label, lo, hi]) => ({ label, value: films.filter((r) => r.runtime >= lo && r.runtime <= hi).length }));
+        const avg = mean(films.map((r) => r.runtime));
+        const R = films.filter((r) => r.r10 != null);
+        const byBand = bands.map(([label, lo, hi]) => {
+            const xs = R.filter((r) => r.runtime >= lo && r.runtime <= hi).map((r) => r.r10);
+            return [label, xs.length ? fmt(mean(xs), 2) : "–", xs.length];
+        });
+        return section("s-length", "Length", `Films average ${TitleModal.runtimeText({ runtime: Math.round(avg) })}. Runtimes come from TMDB.`, [
+            card("Film length", plural(films.length, "film"), (el) => columns(el, { items, label: "Films by length" }), {
+                head: ["Length", "Films", "Average rating"],
+                rows: byBand.map(([l, a], i) => [l, items[i].value, a]),
+            }),
+        ]);
+    }
+
+    // ---------- people (from TMDB credits: /api/titles/people) ----------
+
+    let credits = null; // { people: { id: { name, photoUrl } }, titles: { titleId: { directors: [ids], cast: [ids] } } }
+    let peopleSort = "titles";
+    let peopleOpen = null; // "directors:123": the person whose titles are showing
+    let peopleF = [];
+
+    function tally(F, role) {
+        const map = new Map();
+        for (const r of F) {
+            const ids = credits.titles[r.id]?.[role] ?? [];
+            for (const id of new Set(ids)) {
+                const p = map.get(id) ?? { id, titles: [], watches: 0, ratings: [] };
+                p.titles.push(r);
+                p.watches += r.watchCount || 0;
+                if (r.r10 != null) p.ratings.push(r.r10);
+                map.set(id, p);
+            }
+        }
+        const key = peopleSort === "watches" ? (p) => [p.watches, p.titles.length] : (p) => [p.titles.length, p.watches];
+        return [...map.values()]
+            .map((p) => ({ ...p, ...(credits.people[p.id] ?? { name: "?" }) }))
+            .sort((a, b) => {
+                const [a1, a2] = key(a), [b1, b2] = key(b);
+                return b1 - a1 || b2 - a2 || (mean(b.ratings) ?? 0) - (mean(a.ratings) ?? 0) || a.name.localeCompare(b.name);
+            });
+    }
+
+    function peopleList(F, role, heading, emptyText) {
+        const ranked = tally(F, role).slice(0, 12);
+        if (!ranked.length) return `<div class="people-col"><h3>${heading}</h3><p class="viz-empty">${emptyText}</p></div>`;
+        const open = peopleOpen?.startsWith(`${role}:`) ? Number(peopleOpen.split(":")[1]) : null;
+        const shown = ranked.find((p) => p.id === open);
+        return `
+            <div class="people-col">
+                <h3>${heading}</h3>
+                <ol class="people-list">${ranked
+                    .map((p, i) => `
+                    <li>
+                        <button type="button" class="person${p.id === open ? " is-open" : ""}" data-person="${role}:${p.id}" aria-expanded="${p.id === open}">
+                            <span class="person-rank">${i + 1}</span>
+                            ${p.photoUrl ? `<img src="${esc(p.photoUrl)}" alt="" loading="lazy">` : `<span class="person-nophoto" aria-hidden="true">${esc(p.name.split(" ").map((w) => w[0]).slice(0, 2).join(""))}</span>`}
+                            <span class="person-text">
+                                <span class="person-name">${esc(p.name)}</span>
+                                <span class="person-figures">${plural(p.titles.length, "title")} · ${plural(p.watches, "watch", "watches")}${p.ratings.length ? ` · avg ${fmt(mean(p.ratings), 1)}` : ""}</span>
+                            </span>
+                        </button>
+                    </li>`)
+                    .join("")}</ol>
+                ${shown ? `
+                <div class="person-titles" aria-label="${esc(shown.name)}'s titles">
+                    ${shown.titles
+                        .sort((a, b) => (b.r10 ?? -1) - (a.r10 ?? -1))
+                        .map((r) => `
+                        <a class="record" href="${Lists.link(r)}" data-title="${r.id}">
+                            ${r.posterUrl ? `<img src="${esc(r.posterUrl.replace("/w500/", "/w185/"))}" alt="" loading="lazy">` : `<span class="record-noposter">${esc(r.name)}</span>`}
+                            <span class="record-text">
+                                <span class="record-name">${esc(r.name)}</span>
+                                <span class="record-value">${r.rating != null ? `${fmt(r.rating, 1)}/10 · ` : ""}${r.watchCount}×</span>
+                            </span>
+                        </a>`)
+                        .join("")}
+                </div>` : ""}
+            </div>`;
+    }
+
+    const peopleInner = (F) => `
+        <div class="viz-section-head">
+            <h2 id="s-people">People</h2>
+            <p>Who you watch most: a film's directors (a series' creators) and its ten top-billed actors, from TMDB. Pick someone to see their titles.</p>
+        </div>
+        <div class="chips people-sort" role="group" aria-label="Rank people by">
+            ${[["titles", "By titles"], ["watches", "By watches"]].map(([v, l]) => `<button type="button" class="chip" data-people-sort="${v}" aria-pressed="${peopleSort === v}">${l}</button>`).join("")}
+        </div>
+        <div class="people">
+            ${peopleList(F, "directors", "Directors &amp; creators", "No directors yet: TMDB details are still being fetched.")}
+            ${peopleList(F, "cast", "Actors", "No cast yet: TMDB details are still being fetched.")}
+        </div>`;
+
+    function peopleSection(F) {
+        if (!credits) return "";
+        peopleF = F;
+        return `<section class="viz-section" aria-labelledby="s-people" id="peopleSection">${peopleInner(F)}</section>`;
+    }
+
+    function redrawPeople() {
+        const el = document.getElementById("peopleSection");
+        if (el) el.innerHTML = peopleInner(peopleF);
+    }
+
+    document.getElementById("statsRoot").addEventListener("click", (e) => {
+        const sort = e.target.closest("[data-people-sort]");
+        const person = e.target.closest("[data-person]");
+        if (sort) {
+            peopleSort = sort.dataset.peopleSort;
+            redrawPeople();
+        } else if (person) {
+            peopleOpen = peopleOpen === person.dataset.person ? null : person.dataset.person;
+            redrawPeople();
+        }
+    });
 
     function qualitySection(F) {
         const n = F.length || 1;
@@ -731,7 +862,7 @@
         const count = document.getElementById("statsCount");
         if (count) count.textContent = F.length === all.length ? `All ${plural(all.length, "title")}` : `${fmt(F.length)} of ${plural(all.length, "title")}`;
         document.getElementById("statsRoot").innerHTML = F.length
-            ? [kpis(F), timeSection(F), ratingSection(F), genreSection(F), collectionSection(F), rewatchSection(F), bogdanSection(F), eraSection(F), seriesSection(F), recordsSection(F), qualitySection(F)].join("")
+            ? [kpis(F), timeSection(F), ratingSection(F), genreSection(F), peopleSection(F), collectionSection(F), rewatchSection(F), bogdanSection(F), eraSection(F), lengthSection(F), seriesSection(F), recordsSection(F), qualitySection(F)].join("")
             : `<div class="empty"><h2>Nothing matches</h2><p class="muted">Try a wider year range or a different type.</p></div>`;
         drawAll();
     }
@@ -840,9 +971,12 @@
     async function load() {
         const overlay = document.getElementById("loadingOverlay");
         try {
+            // people are a nice-to-have: the page draws without them
+            const people = fetch("/api/titles/people", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
             const resp = await fetch("/api/titles", { cache: "no-store" });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             setTitles(await resp.json());
+            credits = await people;
             buildGenres();
             renderFilters();
             tabs.collection.rendered = true;
@@ -861,6 +995,9 @@
         card, section, empty, guard, kpiTiles, setHero, beginTab, slot, OTHER, MAIN, HI, MONTHS,
         gbp, pct, sum, mean, median, plural, countBy, yearSpan,
         titles: () => everything,
+        watched: () => all,
+        credits: () => credits,
+        hoursText,
         addTab: (name, tab) => (tabs[name] = { draws: [], ...tab }),
         redraw: () => drawAll(),
     };

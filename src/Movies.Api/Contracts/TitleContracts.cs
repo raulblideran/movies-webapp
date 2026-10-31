@@ -25,9 +25,18 @@ public record TitleDto(
     List<ReleaseSummaryDto> Releases,
     TitleList List,
     DateOnly? WatchlistAddedOn,
+    int? Runtime,
+    string? Overview,
+    string? TrailerKey,
+    int? CollectionId,
+    string? CollectionName,
+    List<string> Directors,
+    List<string> Cast,
     DateTime UpdatedAt)
 {
     public const string PosterBaseUrl = "https://image.tmdb.org/t/p/w500";
+    /// <summary>How many of the cast the title list carries (the Stats page gets them all from /api/titles/people).</summary>
+    public const int CastShown = 5;
 
     /// <summary>Expects ReleaseLinks → Release → TitleLinks loaded (see TitlesEndpoints.WithReleases).</summary>
     public static TitleDto From(Title t) => new(
@@ -38,7 +47,24 @@ public record TitleDto(
         t.ReleaseLinks.Select(l => ReleaseSummaryDto.From(l.Release)).OrderBy(r => r.Name).ToList(),
         t.List,
         t.WatchlistAddedOn,
+        t.Runtime,
+        t.Overview,
+        t.TrailerKey,
+        t.CollectionId,
+        t.CollectionName,
+        t.Credits.Where(c => c.Job != Credit.Cast).Select(c => c.Name).ToList(),
+        t.Credits.Where(c => c.Job == Credit.Cast).OrderBy(c => c.Order).Take(CastShown).Select(c => c.Name).ToList(),
         t.UpdatedAt);
+}
+
+public record PersonDto(string Name, string? PhotoUrl)
+{
+    public const string ProfileBaseUrl = "https://image.tmdb.org/t/p/w185";
+}
+
+/// <summary>A title's directors (or creators) and top-billed cast, as person ids.</summary>
+public record TitlePeopleDto(List<int> Directors, List<int> Cast)
+{
 }
 
 public record TitleUpsertRequest(

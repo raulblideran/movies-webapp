@@ -3,6 +3,7 @@ using Movies.Api.Auth;
 using Movies.Api.Contracts;
 using Movies.Api.Data;
 using Movies.Api.Import;
+using Movies.Api.Services;
 
 namespace Movies.Api.Endpoints;
 
@@ -33,26 +34,48 @@ public static class TitlesEndpoints
 
         var write = titles.MapGroup("").RequireAuthorization(Policies.Editor);
 
-        write.MapPost("/", async (TitleUpsertRequest req, MoviesDbContext db) =>
+        write.MapPost("/", async (TitleUpsertRequest req, MoviesDbContext db, TmdbMetadataService meta, CancellationToken ct) =>
         {
             var errors = req.Validate();
             if (errors.Count > 0) return Results.ValidationProblem(errors);
             var t = new Title { Name = "" };
             req.ApplyTo(t);
+            await meta.RefreshAfterSaveAsync(t, tmdbChanged: true, ct);
             db.Titles.Add(t);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(ct);
             return Results.Created($"/api/titles/{t.Id}", TitleDto.From(t));
         });
 
-        write.MapPut("/{id:int}", async (int id, TitleUpsertRequest req, MoviesDbContext db) =>
+        write.MapPut("/{id:int}", async (int id, TitleUpsertRequest req, MoviesDbContext db, TmdbMetadataService meta, CancellationToken ct) =>
         {
             var errors = req.Validate();
             if (errors.Count > 0) return Results.ValidationProblem(errors);
-            var t = await WithReleases(db.Titles).FirstOrDefaultAsync(x => x.Id == id);
+            var t = await WithReleases(db.Titles).FirstOrDefaultAsync(x => x.Id == id, ct);
             if (t is null) return Results.NotFound();
+            var (oldId, oldType) = (t.TmdbId, t.TmdbMediaType);
             req.ApplyTo(t);
-            await db.SaveChangesAsync();
+            await meta.RefreshAfterSaveAsync(t, tmdbChanged: t.TmdbId != oldId || t.TmdbMediaType != oldType, ct);
+            await db.SaveChangesAsync(ct);
             return Results.Ok(TitleDto.From(t));
+        });
+
+        // Who made and starred in what, for the Stats page's people: everyone once, and each title's ids.
+        titles.MapGet("/people", async (MoviesDbContext db) =>
+        {
+            // credits only ever come from a TMDB sync (they're JSON, so the count can't be asked of the DB)
+            var rows = await db.Titles.AsNoTracking().Where(t => t.TmdbSyncedAt != null)
+                .Select(t => new { t.Id, t.Credits }).ToListAsync();
+            rows = rows.Where(r => r.Credits.Count > 0).ToList();
+            var people = new Dictionary<int, PersonDto>();
+            foreach (var c in rows.SelectMany(r => r.Credits))
+                people.TryAdd(c.Id, new PersonDto(c.Name, c.ProfilePath is null ? null : PersonDto.ProfileBaseUrl + c.ProfilePath));
+            return Results.Ok(new
+            {
+                people,
+                titles = rows.ToDictionary(r => r.Id, r => new TitlePeopleDto(
+                    r.Credits.Where(c => c.Job != Credit.Cast).Select(c => c.Id).ToList(),
+                    r.Credits.Where(c => c.Job == Credit.Cast).OrderBy(c => c.Order).Select(c => c.Id).ToList())),
+            });
         });
 
         write.MapDelete("/{id:int}", async (int id, MoviesDbContext db) =>

@@ -1552,6 +1552,51 @@ textarea.code {
     color: var(--ink-3);
 }
 
+/* from TMDB: who made it and who's in it, the synopsis, and the trailer */
+.modal-credits {
+    margin: 8px 0 0;
+    font-size: 15px;
+    color: var(--ink-2);
+}
+
+.modal-trailer {
+    margin-top: 14px;
+}
+
+.modal-overview {
+    margin: 0;
+    max-width: 68ch;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ink);
+}
+
+.trailer-dialog .panel {
+    width: min(1100px, calc(100vw - 32px));
+}
+
+.trailer-frame {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: #000;
+}
+
+.trailer-frame iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.trailer-link {
+    margin: 12px 0 0;
+    text-align: right;
+    font-size: 14px;
+}
+
 .modal-note {
     margin: 0;
     padding: 14px 18px;
@@ -3664,6 +3709,106 @@ textarea.code {
 }
 
 /* records */
+/* ---------- stats: people ---------- */
+
+.people-sort {
+    margin-bottom: 14px;
+}
+
+.people {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+    gap: 24px;
+}
+
+.people-col h3 {
+    margin-bottom: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink-2);
+}
+
+.people-list {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.person {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    padding: 8px 12px 8px 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.person:hover,
+.person.is-open {
+    border-color: var(--accent);
+}
+
+.person-rank {
+    flex: 0 0 22px;
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    font-size: 18px;
+    text-align: center;
+    color: var(--ink-3);
+}
+
+.person img,
+.person-nophoto {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--poster-bg);
+}
+
+.person-nophoto {
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-3);
+}
+
+.person-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.person-name {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.person-figures {
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.person-titles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+
 .records {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));

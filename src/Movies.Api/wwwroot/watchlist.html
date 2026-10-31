@@ -75,7 +75,7 @@
                             type="search"
                             class="input"
                             id="searchBox"
-                            placeholder="Search titles, genres, notes…"
+                            placeholder="Search titles, people, genres, notes…"
                             oninput="filterCards()"
                         />
                     </label>
@@ -98,6 +98,8 @@
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="name">Name (A–Z)</button>
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="year-desc">Release year, newest first</button>
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="year-asc">Release year, oldest first</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="runtime-asc">Shortest first</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="runtime-desc">Longest first</button>
                         </div>
                     </div>
                     <button
@@ -123,6 +125,10 @@
                     <div class="filter-group">
                         <h3>Genre</h3>
                         <div class="chips chips-scroll" id="genreFilters"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Length</h3>
+                        <div class="chips" id="runtimeFilters"></div>
                     </div>
                     <div class="filter-group">
                         <h3>Special</h3>

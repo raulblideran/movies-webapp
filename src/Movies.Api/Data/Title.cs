@@ -16,6 +16,14 @@ public enum TitleList
     Watchlist,
 }
 
+/// <summary>Someone who made or is in a title, from TMDB: its directors (a series' creators) and top-billed cast.</summary>
+public record Credit(int Id, string Name, string? ProfilePath, string Job, int Order)
+{
+    public const string Director = "Director";
+    public const string Creator = "Creator";
+    public const string Cast = "Cast";
+}
+
 public interface ITimestamped
 {
     DateTime CreatedAt { get; set; }
@@ -56,6 +64,19 @@ public class Title : ITimestamped
     public int? TmdbId { get; set; }
     public string? TmdbMediaType { get; set; }
     public string? PosterPath { get; set; }
+
+    // From TMDB, refreshed by TmdbMetadataService (never typed in): see TmdbSyncedAt.
+    /// <summary>Minutes: a film's length, or a series' episode length.</summary>
+    public int? Runtime { get; set; }
+    public string? Overview { get; set; }
+    /// <summary>The YouTube id of its trailer.</summary>
+    public string? TrailerKey { get; set; }
+    /// <summary>The TMDB collection (franchise) a film belongs to, e.g. "Alien Collection".</summary>
+    public int? CollectionId { get; set; }
+    public string? CollectionName { get; set; }
+    public List<Credit> Credits { get; set; } = [];
+    /// <summary>When the fields above were last fetched from TMDB; null means never.</summary>
+    public DateTime? TmdbSyncedAt { get; set; }
 
     public List<TitleRelease> ReleaseLinks { get; set; } = [];
 

@@ -384,11 +384,22 @@ namespace Movies.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("CollectionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CollectionName")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Comments")
                         .HasMaxLength(4000)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Credits")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<DateOnly?>("DateWithBogdan")
@@ -417,6 +428,10 @@ namespace Movies.Api.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Overview")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PosterPath")
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
@@ -431,6 +446,9 @@ namespace Movies.Api.Data.Migrations
                     b.Property<int?>("RewatchPotential")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("Runtime")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("Seasons")
                         .HasColumnType("INTEGER");
 
@@ -439,6 +457,13 @@ namespace Movies.Api.Data.Migrations
 
                     b.Property<string>("TmdbMediaType")
                         .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("TmdbSyncedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TrailerKey")
+                        .HasMaxLength(40)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Type")

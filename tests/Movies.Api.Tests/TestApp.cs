@@ -29,6 +29,7 @@ public class TestApp : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:Movies", ConnectionString);
         builder.UseSetting("DataProtection:KeysPath", _keysDir);
         builder.UseSetting("Tmdb:ApiKey", "");
+        builder.UseSetting("Tmdb:BackgroundSync", "false");
         builder.UseSetting("Auth:RequireMfa", "true");
         builder.UseSetting("Cex:BackgroundRefresh", "false");
         builder.UseSetting("Cex:ProxyUrl", "");

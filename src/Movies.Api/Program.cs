@@ -99,6 +99,8 @@ builder.Services.AddRateLimiter(o =>
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
     o.AddPolicy("cex", ctx => RateLimitPartition.GetFixedWindowLimiter(Ip(ctx),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 300, Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("tmdb", ctx => RateLimitPartition.GetFixedWindowLimiter(Ip(ctx),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
 });
 
 // ---- external services ----
@@ -109,6 +111,8 @@ builder.Services.AddHttpClient<TmdbClient>(c =>
     c.BaseAddress = new Uri("https://api.themoviedb.org/");
     c.Timeout = TimeSpan.FromSeconds(10);
 });
+builder.Services.AddScoped<TmdbMetadataService>();
+builder.Services.AddHostedService<TmdbMetadataRefreshService>();
 builder.Services.Configure<CexOptions>(config.GetSection("Cex"));
 builder.Services.AddScoped<CexItemsService>();
 builder.Services.AddHostedService<CexRefreshService>();

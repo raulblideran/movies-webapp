@@ -24,6 +24,7 @@ Settings live in `.env.dev`, which is git-ignored and created from `.env.dev.exa
 |---|---|
 | `Tmdb__ApiKey` | TMDB key, used for the poster search and poster lookup on import |
 | `Auth__RequireMfa` | `true` (default): users must enrol 2FA before they can edit anything |
+| `Tmdb__BackgroundSync` | `true` (default): fetch each title's runtime, synopsis, trailer, collection and credits from TMDB shortly after startup and daily (refreshed after 30 days) |
 
 Locally, CeX calls go through the `cex-proxy-movies-dev` proxy on Deno Deploy and the background CeX price jobs are off
 (`appsettings.Development.json`), so your home connection never calls CeX's API directly. CeX blocks
@@ -77,6 +78,8 @@ If the app is running, these commands `exec` into it; otherwise they run in a th
 |---|---|
 | `GET /api/titles[?list=watched\|watchlist]`, `GET /api/titles/{id}` | public; each title has a `list` (Watched = the Watchlog, Watchlist = to watch) |
 | `POST /api/titles`, `PUT /api/titles/{id}`, `DELETE /api/titles/{id}` | Editor + 2FA |
+| `GET /api/titles/people` | public; directors/creators and top-billed cast of every title (TMDB credits), for the Stats page's People |
+| `GET /api/tmdb/collection/{id}` | public, rate-limited, cached 24h; a TMDB collection's films, for franchise progress in the title popup |
 | `GET /api/export.csv` | Editor + 2FA; same columns as the old sheet (the Watchlog only) |
 | `GET /api/cex/{sku}` | public; server-side CeX lookup, cached 6h (replaces the CORS proxies and Cloudflare worker) |
 | `GET /api/tmdb/search?q=&year=&anime=` | Editor + 2FA |

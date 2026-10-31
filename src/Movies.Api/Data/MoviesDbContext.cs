@@ -26,6 +26,18 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
             e.Property(t => t.Comments).HasMaxLength(4000);
             e.Property(t => t.TmdbMediaType).HasMaxLength(10);
             e.Property(t => t.PosterPath).HasMaxLength(200);
+            e.Property(t => t.Overview).HasMaxLength(4000);
+            e.Property(t => t.TrailerKey).HasMaxLength(40);
+            e.Property(t => t.CollectionName).HasMaxLength(300);
+            // credits are only ever read with their title, so they live in it as JSON
+            e.Property(t => t.Credits)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    s => System.Text.Json.JsonSerializer.Deserialize<List<Credit>>(s, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<Credit>(),
+                    new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<Credit>>(
+                        (a, b) => a!.SequenceEqual(b!),
+                        v => v.Aggregate(0, (h, c) => HashCode.Combine(h, c.GetHashCode())),
+                        v => v.ToList()));
             e.HasIndex(t => t.Name);
             e.HasIndex(t => t.List);
         });

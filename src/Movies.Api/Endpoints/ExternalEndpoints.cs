@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Caching.Memory;
 using Movies.Api.Auth;
 using Movies.Api.Services;
 
@@ -50,7 +51,29 @@ public static partial class ExternalEndpoints
                 return Results.Problem("TMDB couldn't be reached. Try again in a moment.", statusCode: 502);
             }
         }).RequireAuthorization(Policies.Editor);
+
+        MapCollection(app);
     }
+
+    private static void MapCollection(IEndpointRouteBuilder app) =>
+        // A franchise's films, for the title popup's progress. Public (anyone can see the popup), so it's
+        // cached and rate-limited: TMDB's collections change rarely.
+        app.MapGet("/api/tmdb/collection/{id:int}", async (int id, TmdbClient tmdb, IMemoryCache cache, CancellationToken ct) =>
+        {
+            if (!tmdb.Enabled) return Results.Problem("TMDB API key is not configured.", statusCode: 503);
+            if (cache.TryGetValue($"tmdb-collection:{id}", out TmdbCollection? hit)) return Results.Ok(hit);
+            try
+            {
+                var c = await tmdb.GetCollectionAsync(id, ct);
+                if (c is null) return Results.NotFound();
+                cache.Set($"tmdb-collection:{id}", c, TimeSpan.FromHours(24));
+                return Results.Ok(c);
+            }
+            catch (TmdbUnavailableException)
+            {
+                return Results.Problem("TMDB couldn't be reached. Try again in a moment.", statusCode: 502);
+            }
+        }).RequireRateLimiting("tmdb");
 
     [GeneratedRegex(@"^[A-Za-z0-9\-]{1,40}$")]
     private static partial Regex SkuRegex();

@@ -87,6 +87,14 @@
         return longDateFormat.format(new Date(y, m - 1, d));
     }
 
+    // 135 → "2h 15m"; a series' runtime is its episode length
+    function runtimeText(row) {
+        if (!row.runtime) return "";
+        const h = Math.floor(row.runtime / 60), m = row.runtime % 60;
+        const t = h ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`;
+        return row.type === "Series" ? `${t} episodes` : t;
+    }
+
     const pad = (n) => String(n).padStart(2, "0");
     function todayIso() {
         const d = new Date();
@@ -150,6 +158,7 @@
         const W = row.list === "watchlist";
         const facts = [];
         if (W && row.rating != null) facts.push(["Rated", `${row.rating}/10`]);
+        if (row.runtime) facts.push(["Runtime", runtimeText(row)]);
         if (row.watchCount) facts.push(["Seen", row.watchCount === 1 ? "once" : `${row.watchCount} times`]);
         if (!W && row.rewatchPotential != null) facts.push(["Rewatch", `${row.rewatchPotential}/10`]);
         if (row.type === "Series") {
@@ -177,6 +186,26 @@
                 ${cex ? `<h3>At CeX today</h3><div id="cexPricing" class="stub-cex"><p class="muted pulse">Checking prices…</p></div>` : ""}
             </section>` : ""}
         </aside>`;
+    }
+
+    // "Directed by Ridley Scott · Starring Sigourney Weaver, Tom Skerritt" (a series: "Created by")
+    function creditsHtml(row) {
+        const parts = [];
+        if (row.directors?.length) parts.push(`${row.type === "Series" ? "Created" : "Directed"} by ${row.directors.map(esc).join(", ")}`);
+        if (row.cast?.length) parts.push(`Starring ${row.cast.slice(0, 4).map(esc).join(", ")}`);
+        return parts.length ? `<p class="modal-credits">${parts.join(" · ")}</p>` : "";
+    }
+
+    // The trailer plays in a dialog over the popup (closing it stops the video).
+    function openTrailer(row) {
+        const key = encodeURIComponent(row.trailerKey);
+        const d = Auth.dialog(
+            `${esc(row.name)}: trailer`,
+            `<div class="trailer-frame"><iframe src="https://www.youtube-nocookie.com/embed/${key}?autoplay=1&rel=0" title="Trailer for ${esc(row.name)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
+             <p class="trailer-link"><a href="https://www.youtube.com/watch?v=${key}" target="_blank" rel="noopener" class="link">Open on YouTube ↗</a></p>`,
+            { wide: true },
+        );
+        d.root.classList.add("trailer-dialog");
     }
 
     // The poster is never cropped, so when the ticket is taller than the poster, the poster column
@@ -243,12 +272,15 @@
                 <div class="ticket-head-text">
                     <div class="tags">${tags}</div>
                     <h2 class="modal-title" id="modalTitle">${esc(row.name)}${row.releaseYear ? ` <span class="modal-year">${row.releaseYear}</span>` : ""}</h2>
+                    ${creditsHtml(row)}
+                    ${row.trailerKey ? `<button type="button" class="btn btn-small modal-trailer" data-trailer><span aria-hidden="true">▶</span> Watch the trailer</button>` : ""}
                 </div>
             </header>
             <div class="ticket-actions"><div id="modalAdminBar"></div></div>
             ${stubHtml(row)}
-            ${watchLogHtml(row) || row.comments ? `
+            ${watchLogHtml(row) || row.comments || row.overview ? `
             <div class="ticket-body">
+                ${row.overview ? `<p class="modal-overview">${esc(row.overview)}</p>` : ""}
                 ${watchLogHtml(row)}
                 ${row.comments ? `<blockquote class="modal-note">${esc(row.comments)}</blockquote>` : ""}
             </div>` : ""}
@@ -258,6 +290,7 @@
         fitPoster();
 
         updateNav();
+        scroll.querySelector("[data-trailer]")?.addEventListener("click", () => openTrailer(row));
         config.onOpened?.(row);
         if (config.showRelease)
             scroll.querySelectorAll("[data-release-link]").forEach((a) => {
@@ -385,5 +418,6 @@
         todayIso,
         waitText,
         formatLongDate,
+        runtimeText,
     };
 })();

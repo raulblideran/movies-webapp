@@ -15,6 +15,7 @@ let activeFilters = {
     rating: "all",
     physicalFormat: "all",
     special: "all",
+    runtime: "all",
 };
 // the page's sort menu marks its default
 let currentSort = document.querySelector('#sortDropdown [aria-checked="true"]')?.dataset.sort ?? "name";
@@ -78,6 +79,8 @@ function searchTextFor(row) {
         formatDate(row.latestWatch),
         formatDate(row.watchlistAddedOn),
         row.releaseYear,
+        ...(row.directors ?? []),
+        ...(row.cast ?? []),
     ]
         .filter(Boolean)
         .join(" ")
@@ -239,6 +242,7 @@ function createFilters() {
     fill("typeFilters", "type", [["all", "All"], ["film", "Film"], ["series", "Series"]]);
     fill("genreFilters", "genre", [["all", "All"], ...uniqueValues((r) => r.genres)]);
     fill("ratingFilters", "rating", ["All", "10", "9-10", "8-9", "7-8", "<7"].map((r) => [r.toLowerCase(), r]));
+    fill("runtimeFilters", "runtime", RUNTIMES.map(([value, label]) => [value, label]));
     fill("physicalFormatFilters", "physicalFormat", [["all", "All"], ...uniqueValues((r) => r.releases.map(Shelf.label))]);
     fill(
         "specialFilters",
@@ -249,6 +253,15 @@ function createFilters() {
         ).map((s) => [s.toLowerCase(), s]),
     );
 }
+
+// Length bands (a series by its episode length). Titles without a runtime only show under "All".
+const RUNTIMES = [
+    ["all", "All", () => true],
+    ["under-90", "Under 1h30", (m) => m < 90],
+    ["90-120", "1h30–2h", (m) => m >= 90 && m <= 120],
+    ["120-150", "2h–2h30", (m) => m > 120 && m <= 150],
+    ["over-150", "Over 2h30", (m) => m > 150],
+];
 
 function setFilter(category, value, button) {
     activeFilters[category] = value;
@@ -277,6 +290,11 @@ function applyFilters() {
             if (activeFilters.rating === "8-9" && (rating < 8 || rating >= 9)) return false;
             if (activeFilters.rating === "7-8" && (rating < 7 || rating >= 8)) return false;
             if (activeFilters.rating === "<7" && rating >= 7) return false;
+        }
+
+        if (activeFilters.runtime !== "all") {
+            const band = RUNTIMES.find(([v]) => v === activeFilters.runtime);
+            if (!row.runtime || (band && !band[2](row.runtime))) return false;
         }
 
         if (
@@ -369,6 +387,10 @@ function sortCards() {
                 return (b.releaseYear ?? 0) - (a.releaseYear ?? 0) || a.name.localeCompare(b.name);
             case "year-asc":
                 return (a.releaseYear ?? 9999) - (b.releaseYear ?? 9999) || a.name.localeCompare(b.name);
+            case "runtime-asc":
+                return (a.runtime ?? 99999) - (b.runtime ?? 99999) || a.name.localeCompare(b.name);
+            case "runtime-desc":
+                return (b.runtime ?? -1) - (a.runtime ?? -1) || a.name.localeCompare(b.name);
             default:
                 return 0;
         }
@@ -423,6 +445,7 @@ const watchlistColumns = [
     { key: "name", label: "Name", value: (r) => r.name },
     { key: "type", label: "Type", value: (r) => r.type },
     { key: "year", label: "Year", value: (r) => r.releaseYear, num: true },
+    { key: "runtime", label: "Runtime", value: (r) => r.runtime, html: (r) => escapeHtml(TitleModal.runtimeText(r).replace(" episodes", "/ep")), num: true },
     { key: "added", label: "Added", value: (r) => r.watchlistAddedOn, html: (r) => escapeHtml(formatDate(r.watchlistAddedOn)) },
     { key: "genres", label: "Genres", value: (r) => r.genres.join(", "), wrap: true },
     { key: "seen", label: "Seen", value: (r) => r.watchCount || null, num: true },
@@ -432,6 +455,7 @@ const titleColumns = [
     { key: "name", label: "Name", value: (r) => r.name },
     { key: "type", label: "Type", value: (r) => r.type },
     { key: "year", label: "Year", value: (r) => r.releaseYear, num: true },
+    { key: "runtime", label: "Runtime", value: (r) => r.runtime, html: (r) => escapeHtml(TitleModal.runtimeText(r).replace(" episodes", "/ep")), num: true },
     { key: "rating", label: "Rating", value: (r) => r.rating, num: true },
     { key: "watches", label: "Watches", value: (r) => r.watchCount, num: true },
     { key: "first", label: "First watch", value: (r) => r.firstWatch, html: (r) => escapeHtml(formatDate(r.firstWatch)) },

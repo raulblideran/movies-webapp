@@ -75,7 +75,7 @@
                             type="search"
                             class="input"
                             id="searchBox"
-                            placeholder="Search titles, genres, comments…"
+                            placeholder="Search titles, people, genres, comments…"
                             oninput="filterCards()"
                         />
                     </label>
@@ -99,6 +99,8 @@
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="date-latest">Latest watch</button>
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="date-first">First watch</button>
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="watch-count">Watch count</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="runtime-asc">Shortest first</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="runtime-desc">Longest first</button>
                         </div>
                     </div>
                     <button
@@ -124,6 +126,10 @@
                     <div class="filter-group">
                         <h3>Genre</h3>
                         <div class="chips chips-scroll" id="genreFilters"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Length</h3>
+                        <div class="chips" id="runtimeFilters"></div>
                     </div>
                     <div class="filter-group">
                         <h3>Rating</h3>

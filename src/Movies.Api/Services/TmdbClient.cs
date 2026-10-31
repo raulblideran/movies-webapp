@@ -27,7 +27,36 @@ file record TmdbSearchResponse([property: JsonPropertyName("results")] List<Tmdb
 
 public record TmdbGenre([property: JsonPropertyName("name")] string Name);
 
-/// <summary>The fields we use from TMDB's /movie/{id} and /tv/{id} responses.</summary>
+public record TmdbCollectionRef(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("name")] string? Name);
+
+public record TmdbVideo(
+    [property: JsonPropertyName("key")] string? Key,
+    [property: JsonPropertyName("site")] string? Site,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("official")] bool Official,
+    [property: JsonPropertyName("iso_639_1")] string? Language,
+    [property: JsonPropertyName("published_at")] string? PublishedAt);
+
+public record TmdbVideos([property: JsonPropertyName("results")] List<TmdbVideo>? Results);
+
+public record TmdbPerson(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("profile_path")] string? ProfilePath,
+    [property: JsonPropertyName("order")] int? Order,
+    [property: JsonPropertyName("job")] string? Job,
+    [property: JsonPropertyName("total_episode_count")] int? TotalEpisodeCount);
+
+/// <summary>/movie credits, and a series' aggregate_credits (cast across every season).</summary>
+public record TmdbCredits(
+    [property: JsonPropertyName("cast")] List<TmdbPerson>? Cast,
+    [property: JsonPropertyName("crew")] List<TmdbPerson>? Crew);
+
+public record TmdbEpisode([property: JsonPropertyName("runtime")] int? Runtime);
+
+/// <summary>The fields we use from TMDB's /movie/{id} and /tv/{id} responses (with videos and credits appended).</summary>
 public record TmdbDetailsResponse(
     [property: JsonPropertyName("id")] int Id,
     [property: JsonPropertyName("title")] string? Title,
@@ -39,9 +68,45 @@ public record TmdbDetailsResponse(
     [property: JsonPropertyName("origin_country")] List<string>? OriginCountry,
     [property: JsonPropertyName("genres")] List<TmdbGenre>? Genres,
     [property: JsonPropertyName("number_of_seasons")] int? NumberOfSeasons,
-    [property: JsonPropertyName("number_of_episodes")] int? NumberOfEpisodes);
+    [property: JsonPropertyName("number_of_episodes")] int? NumberOfEpisodes,
+    [property: JsonPropertyName("overview")] string? Overview = null,
+    [property: JsonPropertyName("runtime")] int? Runtime = null,
+    [property: JsonPropertyName("episode_run_time")] List<int>? EpisodeRunTime = null,
+    [property: JsonPropertyName("last_episode_to_air")] TmdbEpisode? LastEpisode = null,
+    [property: JsonPropertyName("belongs_to_collection")] TmdbCollectionRef? Collection = null,
+    [property: JsonPropertyName("videos")] TmdbVideos? Videos = null,
+    [property: JsonPropertyName("credits")] TmdbCredits? Credits = null,
+    [property: JsonPropertyName("aggregate_credits")] TmdbCredits? AggregateCredits = null,
+    [property: JsonPropertyName("created_by")] List<TmdbPerson>? CreatedBy = null);
 
-/// <summary>A film or series as the add/edit form wants it.</summary>
+public record TmdbCollectionPart(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("title")] string? Title,
+    [property: JsonPropertyName("release_date")] string? ReleaseDate,
+    [property: JsonPropertyName("poster_path")] string? PosterPath);
+
+public record TmdbCollectionResponse(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("parts")] List<TmdbCollectionPart>? Parts);
+
+/// <summary>A franchise and its films in release order (unreleased ones have no date, or one in the future).</summary>
+public record TmdbCollection(int Id, string Name, List<TmdbCollection.Part> Parts)
+{
+    public record Part(int Id, string Title, string? ReleaseDate, int? Year, string? PosterPath, string? PosterUrl);
+
+    public static TmdbCollection From(TmdbCollectionResponse c) => new(
+        c.Id,
+        c.Name ?? "",
+        (c.Parts ?? [])
+            .OrderBy(p => string.IsNullOrEmpty(p.ReleaseDate) ? "9999" : p.ReleaseDate)
+            .Select(p => new Part(p.Id, p.Title ?? "", string.IsNullOrEmpty(p.ReleaseDate) ? null : p.ReleaseDate,
+                p.ReleaseDate is { Length: >= 4 } d && int.TryParse(d[..4], out var y) ? y : null,
+                p.PosterPath, p.PosterPath is null ? null : Contracts.TitleDto.PosterBaseUrl + p.PosterPath))
+            .ToList());
+}
+
+/// <summary>A film or series as the add/edit form wants it, plus what TmdbMetadataService stores.</summary>
 public record TmdbDetails(
     int Id,
     string MediaType,
@@ -51,8 +116,17 @@ public record TmdbDetails(
     string? PosterPath,
     int? Seasons,
     int? Episodes,
-    bool IsAnime)
+    bool IsAnime,
+    int? Runtime = null,
+    string? Overview = null,
+    string? TrailerKey = null,
+    int? CollectionId = null,
+    string? CollectionName = null,
+    List<Data.Credit>? Credits = null)
 {
+    /// <summary>How many of the cast are kept: the top-billed (a series: the most episodes).</summary>
+    public const int CastKept = 10;
+
     public string Type => MediaType == "tv" ? "Series" : "Film";
     public string? PosterUrl => PosterPath is null ? null : Contracts.TitleDto.PosterBaseUrl + PosterPath;
 
@@ -66,6 +140,7 @@ public record TmdbDetails(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         var japanese = d.OriginalLanguage == "ja" || d.OriginCountry?.Contains("JP") == true;
+        var tv = mediaType == "tv";
         return new(
             d.Id,
             mediaType,
@@ -73,9 +148,50 @@ public record TmdbDetails(
             date is { Length: >= 4 } && int.TryParse(date[..4], out var y) ? y : null,
             genres,
             d.PosterPath,
-            mediaType == "tv" ? d.NumberOfSeasons : null,
-            mediaType == "tv" ? d.NumberOfEpisodes : null,
-            japanese && genres.Contains("Animation", StringComparer.OrdinalIgnoreCase));
+            tv ? d.NumberOfSeasons : null,
+            tv ? d.NumberOfEpisodes : null,
+            japanese && genres.Contains("Animation", StringComparer.OrdinalIgnoreCase),
+            Runtime: tv
+                ? d.EpisodeRunTime?.FirstOrDefault(m => m > 0) is > 0 and var ep ? ep : d.LastEpisode?.Runtime is > 0 and var last ? last : null
+                : d.Runtime is > 0 ? d.Runtime : null,
+            Overview: string.IsNullOrWhiteSpace(d.Overview) ? null : d.Overview.Trim(),
+            TrailerKey: PickTrailer(d.Videos?.Results),
+            CollectionId: tv ? null : d.Collection?.Id,
+            CollectionName: tv ? null : d.Collection?.Name,
+            Credits: CreditsOf(d, tv));
+    }
+
+    /// <summary>A YouTube trailer: official first, then English, then the newest. A teaser if there's no trailer.</summary>
+    public static string? PickTrailer(List<TmdbVideo>? videos) =>
+        (videos ?? [])
+            .Where(v => v.Site == "YouTube" && !string.IsNullOrEmpty(v.Key) && v.Type is "Trailer" or "Teaser")
+            .OrderBy(v => v.Type == "Trailer" ? 0 : 1)
+            .ThenByDescending(v => v.Official)
+            .ThenBy(v => v.Language == "en" ? 0 : 1)
+            .ThenByDescending(v => v.PublishedAt)
+            .Select(v => v.Key)
+            .FirstOrDefault();
+
+    /// <summary>A film's directors or a series' creators, then the top-billed cast (a series: by episodes).</summary>
+    private static List<Data.Credit> CreditsOf(TmdbDetailsResponse d, bool tv)
+    {
+        var makers = tv
+            ? (d.CreatedBy ?? []).Select(p => (p, Data.Credit.Creator))
+            : (d.Credits?.Crew ?? []).Where(p => p.Job == "Director").Select(p => (p, Data.Credit.Director));
+        var castFrom = tv ? d.AggregateCredits?.Cast ?? d.Credits?.Cast : d.Credits?.Cast;
+        var cast = (castFrom ?? [])
+            .OrderBy(p => tv ? -(p.TotalEpisodeCount ?? 0) : 0)
+            .ThenBy(p => p.Order ?? int.MaxValue)
+            .Take(CastKept);
+        var list = new List<Data.Credit>();
+        foreach (var (p, job) in makers)
+            if (!string.IsNullOrWhiteSpace(p.Name) && list.All(c => c.Id != p.Id || c.Job != job))
+                list.Add(new(p.Id, p.Name.Trim(), p.ProfilePath, job, list.Count));
+        var i = 0;
+        foreach (var p in cast)
+            if (!string.IsNullOrWhiteSpace(p.Name) && list.All(c => c.Id != p.Id || c.Job != Data.Credit.Cast))
+                list.Add(new(p.Id, p.Name.Trim(), p.ProfilePath, Data.Credit.Cast, i++));
+        return list;
     }
 }
 
@@ -155,7 +271,8 @@ public class TmdbClient(HttpClient http, Microsoft.Extensions.Options.IOptions<T
         if (!Enabled || mediaType is not ("movie" or "tv")) return null;
         try
         {
-            var url = $"3/{mediaType}/{id}?api_key={Uri.EscapeDataString(options.Value.ApiKey!)}";
+            var extra = mediaType == "tv" ? "videos,aggregate_credits" : "videos,credits";
+            var url = $"3/{mediaType}/{id}?api_key={Uri.EscapeDataString(options.Value.ApiKey!)}&append_to_response={extra}";
             using var resp = await http.GetAsync(url, ct);
             if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
             resp.EnsureSuccessStatusCode();
@@ -165,6 +282,25 @@ public class TmdbClient(HttpClient http, Microsoft.Extensions.Options.IOptions<T
         catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
         {
             logger.LogWarning(ex, "TMDB details failed for {MediaType}/{Id}", mediaType, id);
+            throw new TmdbUnavailableException(ex);
+        }
+    }
+
+    /// <summary>A franchise and its films, or null if TMDB has no such collection.</summary>
+    public async Task<TmdbCollection?> GetCollectionAsync(int id, CancellationToken ct = default)
+    {
+        if (!Enabled) return null;
+        try
+        {
+            using var resp = await http.GetAsync($"3/collection/{id}?api_key={Uri.EscapeDataString(options.Value.ApiKey!)}", ct);
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+            resp.EnsureSuccessStatusCode();
+            var c = await resp.Content.ReadFromJsonAsync<TmdbCollectionResponse>(ct);
+            return c is null ? null : TmdbCollection.From(c);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            logger.LogWarning(ex, "TMDB collection {Id} failed", id);
             throw new TmdbUnavailableException(ex);
         }
     }
