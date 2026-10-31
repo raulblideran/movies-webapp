@@ -66,6 +66,7 @@
             <div class="stats-tabs" role="tablist" aria-label="Stats">
                 <button type="button" role="tab" id="tab-collection" data-tab="collection" aria-controls="panel-collection" aria-selected="true">Watchlog</button>
                 <button type="button" role="tab" id="tab-releases" data-tab="releases" aria-controls="panel-releases" aria-selected="false" tabindex="-1">Releases</button>
+                <button type="button" role="tab" id="tab-review" data-tab="review" aria-controls="panel-review" aria-selected="false" tabindex="-1">Year in review</button>
             </div>
             <div role="tabpanel" id="panel-collection" aria-labelledby="tab-collection">
                 <div class="stats-filters" id="statsFilters" aria-label="Filter the stats"></div>
@@ -73,6 +74,9 @@
             </div>
             <div role="tabpanel" id="panel-releases" aria-labelledby="tab-releases" hidden>
                 <div id="releasesRoot" class="stats-root"></div>
+            </div>
+            <div role="tabpanel" id="panel-review" aria-labelledby="tab-review" hidden>
+                <div id="reviewRoot" class="stats-root"></div>
             </div>
         </main>
 
@@ -101,5 +105,6 @@
         <script src="js/charts.js"></script>
         <script src="js/stats.js"></script>
         <script src="js/stats-cex.js"></script>
+        <script src="js/stats-review.js"></script>
     </body>
 </html>

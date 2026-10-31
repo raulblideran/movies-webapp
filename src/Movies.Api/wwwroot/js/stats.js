@@ -983,7 +983,8 @@
             tabs.collection.rendered = true;
             render();
             initTabs();
-            const wanted = location.hash.slice(1) === "cex" ? "releases" : location.hash.slice(1); // #cex: the tab's old name
+            // #cex: the Releases tab's old name; #review-2025: Year in review on that year
+            const wanted = location.hash.slice(1) === "cex" ? "releases" : location.hash.slice(1).replace(/-\d{4}$/, "");
             if (tabs[wanted] && wanted !== "collection") showTab(wanted, { push: location.hash === "#cex" });
         } catch (e) {
             document.getElementById("statsRoot").innerHTML = `<div class="empty"><h2>Couldn't load the watchlog</h2><p class="muted">${esc(e.message)}</p></div>`;

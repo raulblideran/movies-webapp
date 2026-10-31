@@ -3924,6 +3924,26 @@ textarea.code {
 }
 
 /* records */
+/* ---------- stats: year in review ---------- */
+
+.review-years {
+    margin-bottom: 12px;
+}
+
+.review-note {
+    max-width: 80ch;
+    margin: 0 0 18px;
+    font-size: 14px;
+}
+
+.person.is-static {
+    cursor: default;
+}
+
+.person.is-static:hover {
+    border-color: var(--line);
+}
+
 /* ---------- stats: people ---------- */
 
 .people-sort {
