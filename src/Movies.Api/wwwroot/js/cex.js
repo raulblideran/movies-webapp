@@ -400,7 +400,8 @@
     }
 
     async function deleteItem(item) {
-        if (!window.confirm(`Stop tracking "${item.title ?? item.sku}"?`)) return;
+        const sure = await Auth.confirm({ title: `Stop tracking ${item.title ?? item.sku}?`, message: "It comes off the tracker, with its stock checks.", confirmLabel: "Stop tracking", danger: true });
+        if (!sure) return;
         try {
             await Auth.api("DELETE", `/api/cex-items/${item.id}`);
             items = items.filter((i) => i.id !== item.id);

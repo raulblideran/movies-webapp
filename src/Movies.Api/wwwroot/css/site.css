@@ -623,6 +623,17 @@ code,
     background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
+/* the yes button of a destructive confirmation */
+.btn-danger-solid {
+    border-color: color-mix(in srgb, var(--danger) 72%, #000);
+    background: color-mix(in srgb, var(--danger) 72%, #000);
+    color: #fff;
+}
+
+.btn-danger-solid:hover {
+    background: color-mix(in srgb, var(--danger) 60%, #000);
+}
+
 .btn-warn {
     border-color: color-mix(in srgb, var(--warn) 55%, transparent);
     color: var(--warn);
@@ -1574,16 +1585,33 @@ textarea.code {
     color: var(--ink);
 }
 
-/* franchise progress: the film's TMDB collection */
-.franchise-count {
-    margin: -6px 0 8px;
+/* franchise progress: the film's TMDB collection, as a compact list at the foot of the stub */
+.stub-franchise {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    text-align: left;
+}
+
+.stub-franchise h3 {
     font-size: 14px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--ink-2);
+}
+
+.franchise-count {
+    margin: 0;
+    font-size: 13px;
     color: var(--ink-3);
 }
 
 .franchise-bar {
-    height: 6px;
-    margin-bottom: 14px;
+    height: 4px;
+    margin: 2px 0 6px;
     border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--ink) 12%, transparent);
     overflow: hidden;
@@ -1596,75 +1624,86 @@ textarea.code {
     background: var(--accent);
 }
 
-.franchise-parts {
-    display: flex;
-    gap: 12px;
-    margin: 0 0 12px;
-    padding: 0 0 6px;
-    list-style: none;
-    overflow-x: auto;
-}
-
-.franchise-part {
-    display: flex;
-    flex: none;
-    flex-direction: column;
-    gap: 6px;
-    width: 104px;
-}
-
-.franchise-part a {
+.franchise-list {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.franchise-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.franchise-row.is-extra {
+    display: none;
+}
+
+.franchise-list.is-expanded .franchise-row.is-extra {
+    display: flex;
+}
+
+.franchise-row a {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 4px;
+    border-radius: var(--radius-sm);
     color: inherit;
     text-decoration: none;
 }
 
-.franchise-part img,
+.franchise-row a:hover {
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.franchise-row img,
 .franchise-noposter {
-    width: 100%;
+    flex: none;
+    width: 28px;
     aspect-ratio: 2 / 3;
     object-fit: cover;
-    border: 2px solid transparent;
-    border-radius: var(--radius-sm);
+    border-radius: 3px;
     background: var(--poster-bg);
 }
 
-.franchise-noposter {
-    display: grid;
-    place-items: center;
-    padding: 6px;
-    font-size: 11px;
-    text-align: center;
-    color: var(--ink-3);
-}
-
-/* not yours yet: faded until hovered; the one you're looking at is outlined */
-.franchise-part.is-missing img,
-.franchise-part.is-coming img {
+/* not yours yet: faded; the one you're looking at is outlined */
+.franchise-row.is-missing img,
+.franchise-row.is-coming img {
     opacity: 0.45;
-    filter: grayscale(0.6);
-    transition: opacity 0.15s, filter 0.15s;
+    filter: grayscale(0.7);
 }
 
-.franchise-part a:hover img {
-    opacity: 1;
-    filter: none;
+.franchise-row.is-current img {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
-.franchise-part.is-current img {
-    border-color: var(--accent);
+.franchise-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .franchise-name {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 1.25;
     overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.franchise-row.is-missing .franchise-name,
+.franchise-row.is-coming .franchise-name {
+    color: var(--ink-2);
+    font-weight: 400;
 }
 
 .franchise-meta {
@@ -1672,17 +1711,63 @@ textarea.code {
     color: var(--ink-3);
 }
 
-.franchise-part.is-watched .franchise-meta strong,
-.franchise-part.is-current .franchise-meta strong {
+.franchise-row.is-watched .franchise-meta strong,
+.franchise-row.is-current .franchise-meta strong {
     color: var(--ok);
 }
 
-.franchise-part.is-watchlist .franchise-meta strong {
+.franchise-row.is-watchlist .franchise-meta strong {
     color: var(--accent);
 }
 
-.franchise-part .btn-small {
-    padding-inline: 6px;
+.franchise-add {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.franchise-add:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.franchise-more {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.franchise-more:empty {
+    display: none;
+}
+
+/* ---------- confirmations (Auth.confirm): a small dialog over whatever is open ---------- */
+
+.confirm-dialog .panel {
+    max-width: 440px;
+}
+
+.confirm-dialog .panel-heading {
+    padding-right: 36px;
+}
+
+.confirm-message {
+    margin: -4px 0 18px;
+    color: var(--ink-2);
+    line-height: 1.5;
+}
+
+.confirm-form .actions {
+    justify-content: flex-end;
 }
 
 /* ---------- Pick for me: a reel of posters that lands on the pick ---------- */
@@ -2021,6 +2106,13 @@ textarea.code {
     .stub-copy {
         padding: 16px;
         text-align: center;
+    }
+    .stub-franchise {
+        grid-column: 1 / -1;
+        order: 1;
+        min-width: 0; /* long titles truncate instead of widening the ticket */
+        width: auto;
+        margin: 0 16px 24px;
     }
     .ticket-body {
         gap: 24px;

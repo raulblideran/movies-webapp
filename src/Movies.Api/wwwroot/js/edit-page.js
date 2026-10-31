@@ -11,11 +11,21 @@
     let mounted = false;
     let editor = null;
 
-    // leaving with unsaved changes (closing the tab, Back, a link) asks first
+    // Leaving with unsaved changes asks first. Links on the page (the nav, "Back to…") ask with the site's
+    // own dialog; closing the tab, reloading or the browser's Back can only use the browser's.
     window.addEventListener("beforeunload", (e) => {
         if (!editor?.isDirty()) return;
         e.preventDefault();
         e.returnValue = "";
+    });
+    document.addEventListener("click", async (e) => {
+        const a = e.target.closest("a[href]");
+        if (!a || !editor?.isDirty() || a.target === "_blank" || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        if (new URL(a.href, location.href).origin !== location.origin) return;
+        e.preventDefault();
+        if (!(await Auth.confirmDiscard())) return;
+        editor.markClean();
+        location.href = a.href;
     });
 
     const titles = Lists.loadAll();
@@ -68,8 +78,8 @@
         editor = TitleEditor.mount(root, row, {
             list: newList,
             allRows: rows,
-            onCancel() {
-                if (editor.isDirty() && !window.confirm("Discard your changes?")) return;
+            async onCancel() {
+                if (editor.isDirty() && !(await Auth.confirmDiscard())) return;
                 editor.markClean(); // asked already: don't ask again on the way out
                 history.length > 1 && document.referrer.startsWith(location.origin) ? history.back() : (location.href = Lists[row?.list ?? newList].page);
             },

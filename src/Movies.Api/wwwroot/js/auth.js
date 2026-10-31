@@ -108,8 +108,8 @@
             guard(fn) {
                 isDirty = fn;
             },
-            requestClose() {
-                if (isDirty?.() && !window.confirm("Discard your changes?")) return false;
+            async requestClose() {
+                if (isDirty?.() && !(await confirmDialog(DISCARD))) return false;
                 d.close();
                 return true;
             },
@@ -137,6 +137,47 @@
         document.body.appendChild(root);
         root.querySelector("input:not([type=hidden]), select, textarea")?.focus();
         return d;
+    }
+
+    // ---------- confirmations (in place of the browser's confirm() and prompt()) ----------
+
+    const DISCARD = { title: "Discard your changes?", message: "What you've typed here hasn't been saved.", confirmLabel: "Discard", cancelLabel: "Keep editing", danger: true };
+
+    /**
+     * A themed yes/no question over whatever is open. Resolves true for yes, false for no, Esc or ×.
+     *   title, message      the question, and a line of detail (text, not HTML)
+     *   confirmLabel        the yes button ("OK" by default); cancelLabel the no button ("Cancel")
+     *   danger              the yes button is red, and Cancel has the focus (Enter won't destroy anything)
+     *   input               { label, type, autocomplete }: ask for a value too; resolves it, or null for no
+     */
+    function confirmDialog({ title, message = "", confirmLabel = "OK", cancelLabel = "Cancel", danger = false, input = null }) {
+        return new Promise((resolve) => {
+            let answer = input ? null : false;
+            const inputId = `confirm-${Math.random().toString(36).slice(2)}`;
+            const d = dialog(
+                esc(title),
+                `
+                ${message ? `<p class="confirm-message">${esc(message)}</p>` : ""}
+                <form class="stack confirm-form">
+                    ${input ? `<div><label class="label" for="${inputId}">${esc(input.label)}</label><input id="${inputId}" name="value" type="${esc(input.type ?? "text")}" autocomplete="${esc(input.autocomplete ?? "off")}" class="input" required></div>` : ""}
+                    <div class="actions">
+                        <button type="button" class="btn" data-no>${esc(cancelLabel)}</button>
+                        <button type="submit" class="btn ${danger ? "btn-danger-solid" : "btn-primary"}" data-yes>${esc(confirmLabel)}</button>
+                    </div>
+                </form>`,
+                { onClose: () => resolve(answer) },
+            );
+            d.root.classList.add("confirm-dialog");
+            d.root.querySelector("[role=dialog]").setAttribute("role", "alertdialog");
+            const form = d.$("form");
+            d.$("[data-no]").onclick = () => d.close();
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                answer = input ? form.value.value : true;
+                d.close();
+            };
+            (input ? form.value : danger ? d.$("[data-no]") : d.$("[data-yes]")).focus();
+        });
     }
 
     // Disable the submit button while a request runs, and surface errors in the dialog.
@@ -368,10 +409,17 @@
                 });
             };
 
-        d.$("[data-disable]")?.addEventListener("click", (e) => {
-            const password = window.prompt("Enter your password to turn off two-factor authentication");
+        d.$("[data-disable]")?.addEventListener("click", async (e) => {
+            const button = e.currentTarget;
+            const password = await confirmDialog({
+                title: "Turn off two-factor?",
+                message: "You'll only need your password to sign in. Enter it to confirm.",
+                input: { label: "Password", type: "password", autocomplete: "current-password" },
+                confirmLabel: "Turn off",
+                danger: true,
+            });
             if (!password) return;
-            busy(d, e.currentTarget, async () => {
+            busy(d, button, async () => {
                 await api("POST", "/api/account/mfa/disable", { password });
                 d.close();
                 await refreshMe();
@@ -469,19 +517,19 @@
             });
         });
 
-        d.$("[data-rows]").addEventListener("click", (e) => {
+        d.$("[data-rows]").addEventListener("click", async (e) => {
             const btn = e.target.closest("[data-act]");
             if (!btn) return;
             const tr = btn.closest("tr");
             const { id, name } = tr.dataset;
             const act = btn.dataset.act;
-            const confirmText = {
-                lock: `Lock ${name}? They'll be signed out and can't sign in until unlocked.`,
-                "reset-mfa": `Reset two-factor for ${name}? They'll have to enrol again on next sign-in.`,
-                delete: `Delete ${name}? This can't be undone.`,
-                "reset-password": `Reset ${name}'s password? A new random password will be shown once.`,
+            const question = {
+                lock: { title: `Lock ${name}?`, message: "They'll be signed out and can't sign in until unlocked.", confirmLabel: "Lock", danger: true },
+                "reset-mfa": { title: `Reset two-factor for ${name}?`, message: "They'll have to set it up again the next time they sign in.", confirmLabel: "Reset two-factor", danger: true },
+                delete: { title: `Delete ${name}?`, message: "This can't be undone.", confirmLabel: "Delete", danger: true },
+                "reset-password": { title: `Reset ${name}'s password?`, message: "A new random password will be shown once.", confirmLabel: "Reset password", danger: true },
             }[act];
-            if (confirmText && !window.confirm(confirmText)) return;
+            if (question && !(await confirmDialog(question))) return;
             notice("");
             busy(d, btn, async () => {
                 if (act === "delete") await api("DELETE", `/api/users/${id}`);
@@ -551,6 +599,8 @@
         api,
         dialog,
         busy,
+        confirm: confirmDialog,
+        confirmDiscard: () => confirmDialog(DISCARD),
         esc,
         CLS,
         showError,

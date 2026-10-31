@@ -187,6 +187,7 @@
                     .join("")}</ul>` : ""}
                 ${cex ? `<h3>At CeX today</h3><div id="cexPricing" class="stub-cex"><p class="muted pulse">Checking prices…</p></div>` : ""}
             </section>` : ""}
+            ${row.collectionId ? `<section class="stub-franchise" id="franchise" aria-live="polite"><h3>${esc(row.collectionName ?? "Collection")}</h3><p class="muted pulse">Looking it up…</p></section>` : ""}
         </aside>`;
     }
 
@@ -233,6 +234,7 @@
         const box = document.getElementById("franchise");
         if (current !== row || !box) return; // switched or closed meanwhile
         if (!c || c.parts.length < 2) return box.remove();
+        box.classList.add("is-loaded");
         const parts = c.parts.map((p) => ({ ...p, ...partStatus(p) }));
         const released = parts.filter((p) => p.kind !== "coming");
         const watched = released.filter((p) => p.kind === "watched").length;
@@ -244,22 +246,37 @@
             : p.kind === "watchlist" ? "On your watchlist"
             : p.kind === "coming" ? (p.year ? `Coming ${p.year}` : "Coming soon")
             : "";
+        // a long franchise shows the five films around this one; the rest are a click away
+        const SHOWN = 5;
+        const currentIndex = Math.max(0, parts.findIndex((p) => p.mine?.id === row.id));
+        const from = Math.min(Math.max(0, currentIndex - 2), Math.max(0, parts.length - SHOWN));
+        const extra = (i) => parts.length > SHOWN + 1 && (i < from || i >= from + SHOWN);
         box.innerHTML = `
             <h3>${esc(c.name)}</h3>
             <p class="franchise-count">${watched} of ${released.length} watched</p>
             <div class="franchise-bar" role="progressbar" aria-label="Films watched" aria-valuemin="0" aria-valuemax="${released.length}" aria-valuenow="${watched}"><span style="width:${released.length ? (watched / released.length) * 100 : 0}%"></span></div>
-            <ol class="franchise-parts">${parts
+            <ol class="franchise-list">${parts
                 .map((p, i) => `
-                <li class="franchise-part is-${p.kind}${p.mine?.id === row.id ? " is-current" : ""}">
-                    <a ${p.mine ? `href="${window.Lists ? Lists.link(p.mine) : "#"}" data-part-title="${i}"` : `href="https://www.themoviedb.org/movie/${p.id}" target="_blank" rel="noopener"`} title="${esc(p.title)}${p.year ? ` (${p.year})` : ""}">
-                        ${p.posterUrl ? `<img src="${esc(p.posterUrl.replace("/w500/", "/w185/"))}" alt="" loading="lazy">` : `<span class="franchise-noposter">${esc(p.title)}</span>`}
-                        <span class="franchise-name">${esc(p.title)}</span>
-                        <span class="franchise-meta">${p.year ?? ""}${badge(p) ? `${p.year ? " · " : ""}<strong>${badge(p)}</strong>` : ""}</span>
+                <li class="franchise-row is-${p.kind}${p.mine?.id === row.id ? " is-current" : ""}${extra(i) ? " is-extra" : ""}">
+                    <a ${p.mine ? `href="${window.Lists ? Lists.link(p.mine) : "#"}" data-part-title="${i}"` : `href="https://www.themoviedb.org/movie/${p.id}" target="_blank" rel="noopener"`} title="${esc(p.title)}${p.year ? ` (${p.year})` : ""}${p.mine ? "" : " on TMDB"}">
+                        ${p.posterUrl ? `<img src="${esc(p.posterUrl.replace("/w500/", "/w92/"))}" alt="" loading="lazy">` : `<span class="franchise-noposter" aria-hidden="true"></span>`}
+                        <span class="franchise-text">
+                            <span class="franchise-name">${esc(p.title)}</span>
+                            <span class="franchise-meta">${p.year ?? ""}${badge(p) ? `${p.year ? " · " : ""}<strong>${badge(p)}</strong>` : ""}</span>
+                        </span>
                     </a>
-                    ${canAdd && !p.mine ? `<button type="button" class="btn btn-small" data-part-add="${i}">+ Watchlist</button>` : ""}
+                    ${canAdd && !p.mine ? `<button type="button" class="franchise-add" data-part-add="${i}" title="Add ${esc(p.title)} to the watchlist" aria-label="Add ${esc(p.title)} to the watchlist">+</button>` : ""}
                 </li>`)
                 .join("")}</ol>
-            ${canAdd && missing.length > 1 ? `<button type="button" class="btn btn-small" data-parts-add>Add all ${missing.length} to the watchlist</button>` : ""}`;
+            <div class="franchise-more">
+                ${parts.some((p, i) => extra(i)) ? `<button type="button" class="link" data-parts-all>Show all ${parts.length}</button>` : ""}
+                ${canAdd && missing.length > 1 ? `<button type="button" class="link" data-parts-add>Add the ${missing.length} missing to the watchlist</button>` : ""}
+            </div>`;
+        box.querySelector("[data-parts-all]")?.addEventListener("click", (e) => {
+            box.querySelector(".franchise-list").classList.add("is-expanded");
+            e.currentTarget.remove();
+            fitPoster();
+        });
         // yours open here; a click on one you don't have goes to TMDB
         box.querySelectorAll("[data-part-title]").forEach((a) => {
             a.onclick = (e) => {
@@ -271,11 +288,12 @@
         });
         const add = async (list, button) => {
             button.disabled = true;
-            button.textContent = "Adding…";
+            button.textContent = button.classList.contains("franchise-add") ? "…" : "Adding…";
             await config.addToWatchlist(list.map((p) => ({ id: p.id, title: p.title })));
         };
         box.querySelectorAll("[data-part-add]").forEach((b) => (b.onclick = () => add([parts[Number(b.dataset.partAdd)]], b)));
         box.querySelector("[data-parts-add]")?.addEventListener("click", (e) => add(missing, e.currentTarget));
+        fitPoster(); // the stub grew
     }
 
     // The poster is never cropped, so when the ticket is taller than the poster, the poster column
@@ -349,12 +367,11 @@
             </header>
             <div class="ticket-actions"><div id="modalAdminBar"></div></div>
             ${stubHtml(row)}
-            ${watchLogHtml(row) || row.comments || row.overview || row.collectionId ? `
+            ${watchLogHtml(row) || row.comments || row.overview ? `
             <div class="ticket-body">
                 ${row.overview ? `<p class="modal-overview">${esc(row.overview)}</p>` : ""}
                 ${watchLogHtml(row)}
                 ${row.comments ? `<blockquote class="modal-note">${esc(row.comments)}</blockquote>` : ""}
-                ${row.collectionId ? `<section class="modal-section franchise" id="franchise" aria-live="polite"><h3>${esc(row.collectionName ?? "Collection")}</h3><p class="muted pulse">Looking up the collection…</p></section>` : ""}
             </div>` : ""}
         </div>`;
 

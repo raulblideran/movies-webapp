@@ -84,7 +84,13 @@
         }));
 
     async function deleteTitle(row) {
-        if (!window.confirm(`Delete "${row.name}"? This can't be undone.`)) return;
+        const sure = await Auth.confirm({
+            title: `Delete ${row.name}?`,
+            message: `It comes off your ${row.list === "watchlist" ? "watchlist" : "Watchlog"} for good${row.releases.length ? ", and off the discs it's on (the discs stay)" : ""}. This can't be undone.`,
+            confirmLabel: "Delete",
+            danger: true,
+        });
+        if (!sure) return;
         try {
             await api("DELETE", `/api/titles/${row.id}`);
             App.closeModal();

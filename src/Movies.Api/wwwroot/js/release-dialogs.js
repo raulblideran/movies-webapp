@@ -116,7 +116,8 @@
     }
 
     async function remove(r, d, ctx) {
-        if (!window.confirm(`Delete "${r.name}"? Its titles stay in the watchlog.`)) return;
+        const sure = await Auth.confirm({ title: `Delete ${r.name}?`, message: "The disc goes; its titles stay where they are. This can't be undone.", confirmLabel: "Delete", danger: true });
+        if (!sure) return;
         try {
             await api("DELETE", `/api/releases/${r.id}`);
             d.close();
