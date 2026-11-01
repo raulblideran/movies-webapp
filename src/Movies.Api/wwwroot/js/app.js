@@ -48,7 +48,7 @@ const VIEW_KEY = `view:${LIST === "watchlist" ? "watchlist" : "titles"}`;
         } catch {
             // storage unavailable: the grid it is
         }
-    if (!/^(all|\d+)$/.test(activeFilters.watchCount)) activeFilters.watchCount = "all"; // a count, or nothing
+    if (!/^(all|\d+|over[12])$/.test(activeFilters.watchCount)) activeFilters.watchCount = "all"; // a count, "over1"/"over2" (more than once/twice), or nothing
     updateFilterCount();
 })();
 
@@ -305,10 +305,17 @@ function createFilters() {
     // how many times you've watched them: a chip for each count your titles have (and the chosen one, from a link)
     const times = new Map();
     for (const r of allData) times.set(r.watchCount || 0, (times.get(r.watchCount || 0) ?? 0) + 1);
-    if (activeFilters.watchCount !== "all" && !times.has(Number(activeFilters.watchCount))) times.set(Number(activeFilters.watchCount), 0);
+    if (/^\d+$/.test(activeFilters.watchCount) && !times.has(Number(activeFilters.watchCount))) times.set(Number(activeFilters.watchCount), 0);
     const timesLabel = (n) => (n === 0 ? "Not seen" : n === 1 ? "Once" : n === 2 ? "Twice" : `${n}×`);
     const byTimes = [...times].sort((a, b) => a[0] - b[0]);
-    fill("watchCountFilters", "watchCount", [["all", "All"], ...byTimes.map(([n, c]) => [String(n), `${timesLabel(n)} (${c})`])]);
+    // "More than once/twice": those counts together, when that's more than a single chip already shows
+    const moreThan = [
+        [1, "More than once"],
+        [2, "More than twice"],
+    ]
+        .filter(([n]) => byTimes.filter(([t]) => t > n).length > 1 || activeFilters.watchCount === `over${n}`)
+        .map(([n, label]) => [`over${n}`, `${label} (${allData.filter((r) => r.watchCount > n).length})`]);
+    fill("watchCountFilters", "watchCount", [["all", "All"], ...moreThan, ...byTimes.map(([n, c]) => [String(n), `${timesLabel(n)} (${c})`])]);
     document.getElementById("watchCountFilters")?.closest(".filter-group").classList.toggle("hidden", byTimes.length < 2);
     fill("physicalFormatFilters", "physicalFormat", [["all", "All"], ...uniqueValues((r) => r.releases.map(Shelf.label))]);
     fill(
@@ -390,7 +397,10 @@ function applyFilters() {
 
         if (activeFilters.language !== "all" && row.originalLanguage !== activeFilters.language) return false;
 
-        if (activeFilters.watchCount !== "all" && (row.watchCount || 0) !== Number(activeFilters.watchCount)) return false;
+        if (activeFilters.watchCount !== "all") {
+            const over = /^over(\d)$/.exec(activeFilters.watchCount);
+            if (over ? !(row.watchCount > Number(over[1])) : (row.watchCount || 0) !== Number(activeFilters.watchCount)) return false;
+        }
 
         if (activeFilters.decade !== "all") {
             const band = DECADES.find(([v]) => v === activeFilters.decade);
