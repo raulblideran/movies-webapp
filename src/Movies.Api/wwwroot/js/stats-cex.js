@@ -5,7 +5,7 @@
 
 (function () {
     const K = window.StatsKit;
-    const { columns, hbars, lines, divbars, donut, scatter, heatmap, legend, fmt, esc } = window.Charts;
+    const { columns, hbars, lines, divbars, dumbbell, donut, scatter, heatmap, legend, fmt, esc } = window.Charts;
     const { card, section, empty, guard, gbp, pct, sum, mean, median, plural, slot, OTHER, MONTHS } = K;
 
     // one colour per measure, used the same way on every chart in this tab
@@ -27,6 +27,8 @@
     };
 
     let history = null; // [{ sku, boxName, category, points: [{ date, sell, cash, exchange }] }]
+    let priceSort = "gain"; // the "Paid vs CeX's price" chart's order
+    let priceDraw = null; // and how to draw it again in a new order
     let releases = null; // /api/releases
     let hero = [];
     const PLACES = Shelf.PLACES;
@@ -137,6 +139,7 @@
             valueSection(A),
             concentrationSection(A, I),
             valued ? timeSection(I, totalsByDay(I), paidValued) : "",
+            valued ? priceSection(priced) : "",
             valued ? sellSection(I, priced, { cash, voucher, sell, paidCex: paidValued }) : section("c-sell", "CeX trade values", linked.length
                 ? `The server checks CeX for the ${plural(linked.length, "release")} with a CeX link a couple of minutes after it starts, then every day. Come back shortly.`
                 : "Add CeX links to releases (wherever you bought them) to see what CeX would pay for them.", []),
@@ -390,6 +393,57 @@
             }),
         ]);
     }
+
+    // Every priced release on one big chart: what you paid against what CeX sells it for now (their shop price).
+    const PRICE_SORTS = [
+        ["gain", "Biggest gain", (a, b) => b.diff - a.diff],
+        ["loss", "Biggest loss", (a, b) => a.diff - b.diff],
+        ["sell", "CeX price", (a, b) => b.sell - a.sell],
+        ["paid", "Paid", (a, b) => b.paid - a.paid],
+        ["name", "A–Z", (a, b) => a.name.localeCompare(b.name)],
+    ];
+
+    function priceSection(priced) {
+        const rows = priced.map((i) => ({ name: i.name, paid: i.paid, sell: i.latest.sell, diff: i.latest.sell - i.paid }));
+        const up = rows.filter((r) => r.diff > 0).length, down = rows.filter((r) => r.diff < 0).length;
+        const top = Math.max(5, Math.ceil(Math.max(...rows.flatMap((r) => [r.paid, r.sell])) / 10) * 10);
+        const diffLabel = (d) => (Math.abs(d) < 0.005 ? "same" : signed(d));
+        const draw = (el) => {
+            const by = (PRICE_SORTS.find(([k]) => k === priceSort) ?? PRICE_SORTS[0])[2];
+            dumbbell(el, {
+                items: [...rows].sort((a, b) => by(a, b) || a.name.localeCompare(b.name)).map((r) => ({
+                    label: r.name, a: r.paid, b: r.sell, valueLabel: diffLabel(r.diff), full: r.name,
+                    tip: `paid ${gbp(r.paid)} · CeX sells for ${gbp(r.sell)} · ${diffLabel(r.diff)}`,
+                })),
+                series: [M.paid, M.sell],
+                xTicks: [0, 1, 2, 5, 10, 20, 50, 100, 200].filter((v) => v <= top),
+                xFmt: (v) => `£${v}`,
+                sqrt: true,
+                label: "What you paid for each release against what CeX sells it for now",
+            });
+        };
+        priceDraw = draw;
+        const chips = `<div class="chips price-sort" role="group" aria-label="Order by">${PRICE_SORTS.map(([k, l]) => `<button type="button" class="chip" data-price-sort="${k}" aria-pressed="${priceSort === k}">${l}</button>`).join("")}</div>`;
+        return section("c-price", "Paid vs CeX's price", "What each release cost you, against what CeX sells it for today: their shop price, so what buying it again would cost.", [
+            card("Release by release", `${plural(up, "release")} would cost more at CeX now than you paid, ${fmt(down)} less · square-root scale, so the cheap ones don't bunch up`, draw, {
+                size: "is-wide",
+                extra: `<div class="price-controls">${legend([M.paid, M.sell])}${chips}</div>`,
+                head: ["Release", "Paid", "CeX sells for", "Difference"],
+                rows: [...rows].sort((a, b) => b.diff - a.diff).map((r) => [r.name, gbp(r.paid), gbp(r.sell), diffLabel(r.diff)]),
+            }),
+        ]);
+    }
+
+    // the chart's order: only that chart is drawn again
+    document.getElementById("releasesRoot")?.addEventListener("click", (e) => {
+        const chip = e.target.closest("[data-price-sort]");
+        if (!chip) return;
+        priceSort = chip.dataset.priceSort;
+        const cardEl = chip.closest(".viz-card");
+        cardEl.querySelectorAll("[data-price-sort]").forEach((b) => b.setAttribute("aria-pressed", String(b === chip)));
+        const body = cardEl.querySelector(".viz-body");
+        if (body) priceDraw?.(body);
+    });
 
     function sellSection(I, priced, t) {
         const compare = [

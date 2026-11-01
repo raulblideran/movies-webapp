@@ -363,6 +363,44 @@
         el.innerHTML = svg(W, H, body, label);
     }
 
+    // ---------- dumbbell: two values per row, joined ----------
+    // items: [{ label, a, b, valueLabel, tip, full }]; series: [{ name, color }, { name, color }] for a and b.
+    // One row per item, a dot for each value on a shared axis (ticks top and bottom, since it can be tall).
+    function dumbbell(el, { items, series, xTicks, xFmt = fmt, sqrt = false, label = "" }) {
+        const W = widthOf(el);
+        const row = 26, axisH = 22;
+        const labelW = Math.min(280, Math.round(W * 0.34));
+        const valueW = Math.max(48, ...items.map((it) => String(it.valueLabel ?? "").length * 7 + 12));
+        const x0 = labelW, x1 = W - valueW - 10;
+        const top = Math.max(...xTicks, ...items.flatMap((i) => [i.a, i.b]));
+        const s = sqrt ? (v) => Math.sqrt(Math.max(0, v)) : (v) => v;
+        const x = (v) => x0 + (s(v) / s(top)) * (x1 - x0);
+        const H = axisH * 2 + items.length * row;
+        const bottom = axisH + items.length * row;
+        let body = "";
+        items.forEach((_, i) => {
+            if (i % 2 === 0) body += `<rect class="viz-band" x="0" y="${axisH + i * row}" width="${W}" height="${row}"/>`;
+        });
+        for (const v of xTicks) {
+            const xx = x(v);
+            body += `<line class="viz-gridline" x1="${xx}" x2="${xx}" y1="${axisH - 4}" y2="${bottom + 4}"/>`;
+            body += `<text class="viz-tick" x="${xx}" y="${axisH - 9}" text-anchor="middle">${esc(xFmt(v))}</text>`;
+            body += `<text class="viz-tick" x="${xx}" y="${bottom + 16}" text-anchor="middle">${esc(xFmt(v))}</text>`;
+        }
+        const [A, B] = series;
+        items.forEach((it, i) => {
+            const y = axisH + i * row, cy = y + row / 2;
+            const xa = x(it.a), xb = x(it.b);
+            body += `<g class="viz-item"><text class="viz-label" x="${labelW - 10}" y="${cy}" dy="0.32em" text-anchor="end">${esc(fit(it.label, labelW - 14))}</text>`;
+            if (Math.abs(xb - xa) > 1) body += `<line class="viz-mark viz-link" x1="${xa.toFixed(1)}" x2="${xb.toFixed(1)}" y1="${cy}" y2="${cy}"/>`;
+            body += `<circle class="viz-mark viz-dot" cx="${xa.toFixed(1)}" cy="${cy}" r="5.5" style="fill:${A.color}"/>`;
+            body += `<circle class="viz-mark viz-dot" cx="${xb.toFixed(1)}" cy="${cy}" r="5.5" style="fill:${B.color}"/>`;
+            if (it.valueLabel) body += `<text class="viz-value" x="${W - 4}" y="${cy}" dy="0.32em" text-anchor="end">${esc(it.valueLabel)}</text>`;
+            body += `<rect class="viz-hit" x="0" y="${y}" width="${W}" height="${row}" ${tip(it.tip ?? `${A.name} ${xFmt(it.a)} · ${B.name} ${xFmt(it.b)}`, it.full ?? it.label)}/></g>`;
+        });
+        el.innerHTML = svg(W, H, body, label);
+    }
+
     // ---------- legend for multi-series charts ----------
     const legend = (series) =>
         `<ul class="viz-legend viz-legend-row">${series.map((s) => `<li><span class="viz-key" style="background:${s.color}"></span><span class="viz-legend-name">${esc(s.name)}</span></li>`).join("")}</ul>`;
@@ -407,5 +445,5 @@
         return { show, hide };
     })();
 
-    window.Charts = { columns, hbars, line, lines, divbars, donut, heatmap, scatter, legend, table, fmt, esc };
+    window.Charts = { columns, hbars, line, lines, divbars, dumbbell, donut, heatmap, scatter, legend, table, fmt, esc };
 })();

@@ -4003,6 +4003,18 @@ a.tag-own:focus-visible {
     stroke-width: 1;
 }
 
+/* the dumbbell's joining line, and the faint stripe on every other row so a long list reads across */
+.viz-link {
+    stroke: var(--line-strong);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.viz-band {
+    fill: var(--ink);
+    opacity: 0.035;
+}
+
 .viz-crossline {
     stroke: var(--ink-3);
     stroke-width: 1;
@@ -4303,6 +4315,20 @@ a.tag-own:focus-visible {
 
 .people-sort {
     margin-bottom: 14px;
+}
+
+/* the paid vs CeX price chart: its legend, and the order chips beside it */
+.price-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    margin-top: 10px;
+}
+
+.price-controls .viz-legend-row {
+    margin-top: 0;
 }
 
 .people {
