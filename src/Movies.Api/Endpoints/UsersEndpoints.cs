@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Movies.Api.Auth;
+using Movies.Api.Data;
 using static Movies.Api.Endpoints.AuthEndpoints;
 
 namespace Movies.Api.Endpoints;
@@ -16,7 +17,7 @@ public static class UsersEndpoints
     {
         var g = app.MapGroup("/api/users").RequireAuthorization(Policies.Admin);
 
-        g.MapGet("/", async (UserManager<IdentityUser> users) =>
+        g.MapGet("/", async (UserManager<AppUser> users) =>
         {
             var list = await users.Users.OrderBy(u => u.UserName).ToListAsync();
             var result = new List<object>();
@@ -24,18 +25,18 @@ public static class UsersEndpoints
             return result;
         });
 
-        g.MapPost("/", async (CreateUserRequest req, UserManager<IdentityUser> users) =>
+        g.MapPost("/", async (CreateUserRequest req, UserManager<AppUser> users) =>
         {
             if (string.IsNullOrWhiteSpace(req.UserName)) return Problem("Username is required.", 400);
             if (!Roles.All.Contains(req.Role)) return Problem("Role must be Admin or Editor.", 400);
-            var user = new IdentityUser { UserName = req.UserName.Trim(), LockoutEnabled = true };
+            var user = new AppUser { UserName = req.UserName.Trim(), LockoutEnabled = true };
             var created = await users.CreateAsync(user, req.Password ?? "");
             if (!created.Succeeded) return IdentityErrors(created);
             await users.AddToRoleAsync(user, req.Role!);
             return Results.Ok(await ToDto(user, users));
         });
 
-        g.MapPut("/{id}/role", async (string id, SetRoleRequest req, ClaimsPrincipal me, UserManager<IdentityUser> users) =>
+        g.MapPut("/{id}/role", async (string id, SetRoleRequest req, ClaimsPrincipal me, UserManager<AppUser> users) =>
         {
             if (!Roles.All.Contains(req.Role)) return Problem("Role must be Admin or Editor.", 400);
             if (await users.FindByIdAsync(id) is not { } user) return Results.NotFound();
@@ -47,7 +48,7 @@ public static class UsersEndpoints
             return Results.Ok(await ToDto(user, users));
         });
 
-        g.MapPost("/{id}/lock", async (string id, ClaimsPrincipal me, UserManager<IdentityUser> users) =>
+        g.MapPost("/{id}/lock", async (string id, ClaimsPrincipal me, UserManager<AppUser> users) =>
         {
             if (await users.FindByIdAsync(id) is not { } user) return Results.NotFound();
             if (IsSelf(me, user, users)) return Problem("You can't lock yourself out.", 409);
@@ -57,7 +58,7 @@ public static class UsersEndpoints
             return Results.Ok(await ToDto(user, users));
         });
 
-        g.MapPost("/{id}/unlock", async (string id, UserManager<IdentityUser> users) =>
+        g.MapPost("/{id}/unlock", async (string id, UserManager<AppUser> users) =>
         {
             if (await users.FindByIdAsync(id) is not { } user) return Results.NotFound();
             await users.SetLockoutEndDateAsync(user, null);
@@ -65,7 +66,7 @@ public static class UsersEndpoints
             return Results.Ok(await ToDto(user, users));
         });
 
-        g.MapPost("/{id}/reset-password", async (string id, PasswordRequest req, UserManager<IdentityUser> users) =>
+        g.MapPost("/{id}/reset-password", async (string id, PasswordRequest req, UserManager<AppUser> users) =>
         {
             if (await users.FindByIdAsync(id) is not { } user) return Results.NotFound();
             var token = await users.GeneratePasswordResetTokenAsync(user);
@@ -73,7 +74,7 @@ public static class UsersEndpoints
             return result.Succeeded ? Results.Ok(await ToDto(user, users)) : IdentityErrors(result);
         });
 
-        g.MapPost("/{id}/reset-mfa", async (string id, ClaimsPrincipal me, UserManager<IdentityUser> users) =>
+        g.MapPost("/{id}/reset-mfa", async (string id, ClaimsPrincipal me, UserManager<AppUser> users) =>
         {
             if (await users.FindByIdAsync(id) is not { } user) return Results.NotFound();
             if (IsSelf(me, user, users)) return Problem("Reset your own MFA from your account instead.", 409);
@@ -82,7 +83,7 @@ public static class UsersEndpoints
             return Results.Ok(await ToDto(user, users));
         });
 
-        g.MapDelete("/{id}", async (string id, ClaimsPrincipal me, UserManager<IdentityUser> users) =>
+        g.MapDelete("/{id}", async (string id, ClaimsPrincipal me, UserManager<AppUser> users) =>
         {
             if (await users.FindByIdAsync(id) is not { } user) return Results.NotFound();
             if (IsSelf(me, user, users)) return Problem("You can't delete yourself.", 409);
@@ -91,10 +92,10 @@ public static class UsersEndpoints
         });
     }
 
-    private static bool IsSelf(ClaimsPrincipal me, IdentityUser user, UserManager<IdentityUser> users) =>
+    private static bool IsSelf(ClaimsPrincipal me, AppUser user, UserManager<AppUser> users) =>
         users.GetUserId(me) == user.Id;
 
-    private static async Task<object> ToDto(IdentityUser u, UserManager<IdentityUser> users) => new
+    private static async Task<object> ToDto(AppUser u, UserManager<AppUser> users) => new
     {
         id = u.Id,
         userName = u.UserName,

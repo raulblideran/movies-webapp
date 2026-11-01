@@ -357,9 +357,9 @@
     // ---------- account ----------
 
     async function openAccount() {
-        let mfa;
+        let mfa, home;
         try {
-            mfa = await api("GET", "/api/account/mfa");
+            [mfa, home] = await Promise.all([api("GET", "/api/account/mfa"), api("GET", "/api/account/address")]);
         } catch (e) {
             return showError(e.message);
         }
@@ -368,6 +368,18 @@
             `
             <div data-error class="${CLS.error}" role="alert"></div>
             <p class="muted">Signed in as <b style="color:var(--ink)">${esc(me.userName)}</b>, ${esc(me.roles.join(", ") || "no role")}</p>
+
+            <h3 class="subhead">Home address</h3>
+            <form data-address class="boxed stack">
+                <p class="muted address-note">The CeX tracker shows how far stores are from here. Only you can see it, and only the postcode is used to find it on the map.</p>
+                <textarea name="address" rows="3" maxlength="500" autocomplete="street-address" aria-label="Home address" class="input"
+                    placeholder="12 High Street&#10;Doncaster&#10;DN1 1AA" required>${esc(home.address ?? "")}</textarea>
+                <p data-located class="status-on${home.postcode ? "" : " hidden"}">Located by postcode <b>${esc(home.postcode ?? "")}</b></p>
+                <div class="actions">
+                    <button type="button" data-remove-address class="btn btn-danger push${home.address ? "" : " hidden"}">Remove</button>
+                    <button class="btn">Save address</button>
+                </div>
+            </form>
 
             <h3 class="subhead">Two-factor authentication</h3>
             <div class="boxed stack">
@@ -426,6 +438,43 @@
                 showSuccess("Two-factor authentication turned off");
             });
         });
+
+        // Pages that use the address (the CeX tracker) listen for "home-changed" (detail = { postcode } or null).
+        const addrForm = d.$("[data-address]");
+        let savedAddress = home.address ?? "";
+        d.guard(() => addrForm.address.value.trim() !== savedAddress.trim());
+        const showAddress = (address, postcode) => {
+            savedAddress = address ?? "";
+            addrForm.address.value = savedAddress;
+            const located = addrForm.querySelector("[data-located]");
+            located.classList.toggle("hidden", !postcode);
+            located.innerHTML = `Located by postcode <b>${esc(postcode ?? "")}</b>`;
+            addrForm.querySelector("[data-remove-address]").classList.toggle("hidden", !address);
+            document.dispatchEvent(new CustomEvent("home-changed", { detail: postcode ? { postcode } : null }));
+        };
+        addrForm.onsubmit = (e) => {
+            e.preventDefault();
+            busy(d, addrForm.querySelector("button:not([type=button])"), async () => {
+                const res = await api("PUT", "/api/account/address", { address: addrForm.address.value });
+                showAddress(res.address, res.postcode);
+                showSuccess(`Address saved: ${res.postcode}${res.place ? `, ${res.place}` : ""}`);
+            });
+        };
+        addrForm.querySelector("[data-remove-address]").onclick = async (e) => {
+            const button = e.currentTarget;
+            const sure = await confirmDialog({
+                title: "Remove your address?",
+                message: "The CeX tracker goes back to measuring from a store.",
+                confirmLabel: "Remove",
+                danger: true,
+            });
+            if (!sure) return;
+            busy(d, button, async () => {
+                await api("DELETE", "/api/account/address");
+                showAddress(null, null);
+                showSuccess("Address removed");
+            });
+        };
 
         const pwForm = d.$("[data-password]");
         pwForm.onsubmit = (e) => {

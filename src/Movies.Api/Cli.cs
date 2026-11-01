@@ -140,13 +140,13 @@ public static class Cli
         var role = Option(args, "--role") ?? Roles.Admin;
         if (!Roles.All.Contains(role)) throw new CliException("Role must be Admin or Editor.");
 
-        var users = sp.GetRequiredService<UserManager<IdentityUser>>();
+        var users = sp.GetRequiredService<UserManager<AppUser>>();
         if (await users.FindByNameAsync(userName) is not null) throw new CliException($"User '{userName}' already exists.");
 
         var password = ReadPassword("Password: ");
         if (!Console.IsInputRedirected && ReadPassword("Confirm:  ") != password) throw new CliException("Passwords don't match.");
 
-        var user = new IdentityUser { UserName = userName, LockoutEnabled = true };
+        var user = new AppUser { UserName = userName, LockoutEnabled = true };
         var result = await users.CreateAsync(user, password);
         if (!result.Succeeded) throw new CliException(string.Join(Environment.NewLine, result.Errors.Select(e => e.Description)));
         await users.AddToRoleAsync(user, role);

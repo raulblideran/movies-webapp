@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Movies.Api.Data;
 
 namespace Movies.Api.Tests;
 
@@ -38,8 +39,8 @@ public class TestApp : WebApplicationFactory<Program>
     public async Task CreateUserAsync(string userName, string password, string role)
     {
         using var scope = Services.CreateScope();
-        var users = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
-        var user = new IdentityUser { UserName = userName, LockoutEnabled = true };
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var user = new AppUser { UserName = userName, LockoutEnabled = true };
         var result = await users.CreateAsync(user, password);
         Assert.True(result.Succeeded, string.Join(", ", result.Errors.Select(e => e.Description)));
         await users.AddToRoleAsync(user, role);

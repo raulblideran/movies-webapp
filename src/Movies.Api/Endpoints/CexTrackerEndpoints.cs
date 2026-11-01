@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Movies.Api.Auth;
 using Movies.Api.Data;
@@ -32,6 +34,18 @@ public static class CexTrackerEndpoints
                 ? Results.Ok(stock)
                 : Results.Problem("CeX is not responding.", statusCode: 502);
         }).RequireRateLimiting("cex");
+
+        // The same, measured from the signed-in user's home address. The coordinates stay on the server.
+        app.MapGet("/api/cex/{sku}/stores/home", async (string sku, ClaimsPrincipal principal, UserManager<AppUser> users,
+            CexClient cex, CancellationToken ct) =>
+        {
+            if (CexItemsService.ExtractSku(sku) != sku) return Results.BadRequest();
+            if (await users.GetUserAsync(principal) is not { Latitude: { } lat, Longitude: { } lon })
+                return Results.Problem("Add your address on your account first.", statusCode: 404);
+            return await cex.GetNearestStockAsync(sku, lat, lon, ct) is { } stock
+                ? Results.Ok(stock)
+                : Results.Problem("CeX is not responding.", statusCode: 502);
+        }).RequireAuthorization(Policies.SignedIn).RequireRateLimiting("cex");
 
         // Daily price history of the collection's own CeX products (see CexHistoryService), oldest first.
         app.MapGet("/api/cex/history", async (MoviesDbContext db) =>

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Movies.Api.Data;
 
 public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
-    : IdentityDbContext<IdentityUser>(options)
+    : IdentityDbContext<AppUser>(options)
 {
     public DbSet<Title> Titles => Set<Title>();
     public DbSet<CexItem> CexItems => Set<CexItem>();
@@ -18,6 +18,12 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        builder.Entity<AppUser>(e =>
+        {
+            e.Property(u => u.Address).HasMaxLength(500);
+            e.Property(u => u.Postcode).HasMaxLength(10);
+        });
 
         builder.Entity<Title>(e =>
         {

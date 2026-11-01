@@ -2914,6 +2914,10 @@ a.tag-own:focus-visible {
     background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 
+.address-note {
+    font-size: 14px;
+}
+
 .subhead {
     margin: 22px 0 8px;
     font-size: 15px;
@@ -3264,7 +3268,7 @@ a.tag-own:focus-visible {
 }
 
 .store-picker .input {
-    padding-left: 92px;
+    padding-left: 56px;
 }
 
 .dropdown {
@@ -3297,6 +3301,12 @@ a.tag-own:focus-visible {
 .dropdown .is-selected {
     color: var(--accent);
     font-weight: 700;
+}
+
+/* The signed-in user's address, above the stores */
+.dropdown .home-option {
+    margin-bottom: 6px;
+    box-shadow: 0 7px 0 -6px var(--line);
 }
 
 /* Sits in the same row as the store picker; the status line hangs below without moving the row */

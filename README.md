@@ -91,6 +91,8 @@ If the app is running, these commands `exec` into it; otherwise they run in a th
 | `GET /api/tmdb/details?link=` | Editor + 2FA; film/series details from a pasted themoviedb.org link (fills the add/edit form) |
 | `POST /api/auth/login`, `/login/mfa`, `/logout`, `GET /api/auth/me` | |
 | `/api/account/password`, `/api/account/mfa/*` | signed in |
+| `GET/PUT/DELETE /api/account/address` | signed in; your home address. Its postcode is located with postcodes.io (only the postcode is sent) |
+| `GET /api/cex/{sku}/stores/home` | signed in; stores with the item in stock, nearest your address first (the coordinates stay on the server) |
 | `/api/users/*` | Admin + 2FA |
 
 ## Layout
@@ -100,12 +102,13 @@ Containerfile, dev.sh           dev environment
 src/Movies.Api/
   Program.cs                    DI, Identity, policies, rate limits
   Cli.cs                        import / create-user commands
-  Data/                         Title (on the Watchlog or the Watchlist) and its watches (WatchSummary works out
+  Data/                         AppUser (an Identity user with a home address for the CeX tracker),
+                                Title (on the Watchlog or the Watchlist) and its watches (WatchSummary works out
                                 the title's first/latest watch, count, Bogdan and cinema from them), releases,
                                 yearly goals, DbContext, migrations
   Endpoints/                    titles, releases, auth/account, users, CeX/TMDB
   Import/SheetCsv.cs            sheet CSV ⇄ Title
-  Services/                     TMDB + CeX clients
+  Services/                     TMDB, CeX and postcodes.io clients
   wwwroot/                      index.html (Watchlog) and watchlist.html (Watchlist), both run by js/app.js,
                                 with js/lists.js saying where each list lives; js/auth.js (sign-in, 2FA, users),
                                 js/admin.js (edit controls), js/editor.js (the add/edit form), js/pick.js (Pick for me),

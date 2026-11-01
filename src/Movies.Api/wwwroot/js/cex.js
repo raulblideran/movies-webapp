@@ -1,4 +1,6 @@
 // CeX stock tracker: tracked items come from /api/cex-items, stock per store from /api/cex/{sku}/stores.
+// Distances are from a chosen store, or from home: the signed-in user's address (set under Account),
+// whose coordinates never reach the browser (/api/cex/{sku}/stores/home).
 // Signed-in editors can paste a link to track it, and edit/refresh/delete cards. Needs auth.js.
 
 (function () {
@@ -8,6 +10,10 @@
 
     let allStores = [];
     let selectedStore = null;
+    let home = null; // { postcode } when the signed-in user has an address
+    let useHome = false;
+    let started = false;
+    let generation = 0; // bumped when the location changes, so lookups for the old one are dropped
     let sortByDistance = false;
     let items = [];
     const stock = new Map(); // item id -> array of stores (empty = none in stock), null = lookup failed
@@ -23,9 +29,10 @@
         return resp.json();
     }
 
-    const kmToMiles = (km) => km * 0.621371;
     const location_ = () => selectedStore ?? DEFAULT_LOCATION;
-    const nearestDistance = (item) => stock.get(item.id)?.[0]?.distanceKm ?? Infinity;
+    const homeLabel = () => `Home, ${home.postcode}`;
+    const locationLabel = () => (useHome ? homeLabel() : location_().storeName);
+    const nearestDistance = (item) => stock.get(item.id)?.[0]?.distanceMiles ?? Infinity;
 
     function hideLoading() {
         const overlay = document.getElementById("loadingOverlay");
@@ -33,51 +40,72 @@
         setTimeout(() => overlay.classList.add("hidden"), 300);
     }
 
+    // { type: "home" } or { type: "store", storeId, overHome }. overHome: the store was picked while home was on offer,
+    // so it wins over home next time too. A store picked before there was an address doesn't.
     function loadPreference() {
         try {
-            const prefs = JSON.parse(localStorage.getItem(PREF_KEY) ?? "null");
-            return prefs?.type === "store" ? prefs.storeId : null;
+            return JSON.parse(localStorage.getItem(PREF_KEY) ?? "null");
         } catch {
             return null;
         }
     }
 
-    function savePreference(storeId) {
+    function savePreference(pref) {
         try {
-            localStorage.setItem(PREF_KEY, JSON.stringify({ type: "store", storeId }));
+            localStorage.setItem(PREF_KEY, JSON.stringify(pref));
         } catch {
             // storage unavailable: the choice just won't be remembered
         }
+    }
+
+    // Where distances are measured from, by preference: home when there's an address, unless a store was picked over it.
+    function preferredChoice() {
+        const pref = loadPreference();
+        if (home && !(pref?.type === "store" && pref.overHome)) return "home";
+        return (
+            allStores.find((s) => pref?.type === "store" && s.storeId === pref.storeId) ??
+            allStores.find((s) => s.storeName === DEFAULT_LOCATION.storeName) ??
+            null
+        );
+    }
+
+    // choice: "home", or a store (null = the default location)
+    function applyChoice(choice) {
+        useHome = choice === "home";
+        if (!useHome) selectedStore = choice;
+        document.getElementById("storeSearch").value = locationLabel();
+        generation++;
+        stock.clear();
+        render();
+        loadStock(items);
     }
 
     // ---------- store picker ----------
 
     function renderStoreDropdown(filterText = "") {
         const dropdown = document.getElementById("storeDropdown");
-        const filtered = allStores.filter((s) => s.storeName.toLowerCase().includes(filterText.toLowerCase()));
-        dropdown.innerHTML = filtered.length
-            ? filtered
-                  .map(
-                      (s) =>
-                          `<div data-store-id="${s.storeId}" role="option" aria-selected="${selectedStore?.storeId === s.storeId}" class="${
-                              selectedStore?.storeId === s.storeId ? "is-selected" : ""
-                          }">${esc(s.storeName)}</div>`,
-                  )
-                  .join("")
-            : `<div class="faint" style="padding:10px;text-align:center">No stores match</div>`;
+        const q = filterText.toLowerCase();
+        const showHome = home && homeLabel().toLowerCase().includes(q);
+        const filtered = allStores.filter((s) => s.storeName.toLowerCase().includes(q));
+        const option = (id, label, selected, extra = "") =>
+            `<div data-store-id="${id}" role="option" aria-selected="${selected}" class="${selected ? "is-selected" : ""}${extra}">${label}</div>`;
+        dropdown.innerHTML =
+            showHome || filtered.length
+                ? (showHome ? option("home", esc(homeLabel()), useHome, " home-option") : "") +
+                  filtered.map((s) => option(s.storeId, esc(s.storeName), !useHome && selectedStore?.storeId === s.storeId)).join("")
+                : `<div class="faint" style="padding:10px;text-align:center">No stores match</div>`;
         dropdown.querySelectorAll("[data-store-id]").forEach((opt) => {
-            opt.onclick = () => selectStore(allStores.find((s) => s.storeId === Number(opt.dataset.storeId)));
+            opt.onclick = () =>
+                opt.dataset.storeId === "home"
+                    ? select("home")
+                    : select(allStores.find((s) => s.storeId === Number(opt.dataset.storeId)));
         });
     }
 
-    function selectStore(store) {
-        selectedStore = store;
-        document.getElementById("storeSearch").value = store.storeName;
+    function select(choice) {
         setDropdown(false);
-        savePreference(store.storeId);
-        stock.clear();
-        render();
-        loadStock(items);
+        savePreference(choice === "home" ? { type: "home" } : { type: "store", storeId: choice.storeId, overHome: !!home });
+        applyChoice(choice);
     }
 
     function setDropdown(open) {
@@ -88,12 +116,10 @@
     function initStoreSelector() {
         const input = document.getElementById("storeSearch");
         const dropdown = document.getElementById("storeDropdown");
-        const savedId = loadPreference();
-        selectedStore =
-            allStores.find((s) => s.storeId === savedId) ??
-            allStores.find((s) => s.storeName === DEFAULT_LOCATION.storeName) ??
-            null;
-        input.value = location_().storeName;
+        const choice = preferredChoice();
+        useHome = choice === "home";
+        if (!useHome) selectedStore = choice;
+        input.value = locationLabel();
 
         let selectedIndex = -1;
         const options = () => dropdown.querySelectorAll("[data-store-id]");
@@ -127,14 +153,14 @@
                 options()[selectedIndex].click();
             } else if (e.key === "Escape") {
                 setDropdown(false);
-                input.value = location_().storeName;
+                input.value = locationLabel();
                 input.blur();
             }
         });
         document.addEventListener("click", (e) => {
             if (!input.contains(e.target) && !dropdown.contains(e.target)) {
                 setDropdown(false);
-                if (!input.value.trim()) input.value = location_().storeName;
+                if (!input.value.trim()) input.value = locationLabel();
             }
         });
     }
@@ -143,21 +169,26 @@
 
     async function loadStock(list) {
         const { latitude, longitude } = location_();
+        const from = useHome ? "/home" : `?lat=${latitude}&lon=${longitude}`;
+        const run = generation;
         const queue = [...list];
         async function worker() {
-            while (queue.length) {
+            while (queue.length && run === generation) {
                 const item = queue.shift();
+                let stores;
                 try {
-                    stock.set(item.id, await getJson(`/api/cex/${encodeURIComponent(item.sku)}/stores?lat=${latitude}&lon=${longitude}`));
+                    stores = await getJson(`/api/cex/${encodeURIComponent(item.sku)}/stores${from}`);
                 } catch {
-                    stock.set(item.id, null);
+                    stores = null;
                 }
+                if (run !== generation) return;
+                stock.set(item.id, stores);
                 updateStock(item);
                 renderStats();
             }
         }
         await Promise.all([worker(), worker(), worker(), worker()]);
-        if (sortByDistance) render();
+        if (sortByDistance && run === generation) render();
     }
 
     function stockHtml(item) {
@@ -167,12 +198,12 @@
         if (stores.length === 0) return `<div class="stock stock-none">Not in stock anywhere</div>`;
 
         const nearest = stores[0];
-        const isSelected = selectedStore && nearest.storeName === selectedStore.storeName;
+        const isSelected = !useHome && selectedStore && nearest.storeName === selectedStore.storeName;
         return `
             <div class="stock">
                 <div style="min-width:0">
                     <div class="stock-store${isSelected ? " is-home" : ""}">${esc(nearest.storeName)}</div>
-                    <div class="stock-meta">${kmToMiles(nearest.distanceKm).toFixed(1)} mi, ${nearest.quantity} in stock</div>
+                    <div class="stock-meta">${nearest.distanceMiles.toFixed(1)} mi, ${nearest.quantity} in stock</div>
                 </div>
                 ${
                     stores.length > 1
@@ -187,7 +218,7 @@
         if (!el) return;
         const checked = items.filter((i) => stock.has(i.id));
         const inStock = checked.filter((i) => stock.get(i.id)?.length > 0).length;
-        const near = checked.filter((i) => (stock.get(i.id)?.[0]?.distanceKm ?? Infinity) <= 16.1).length;
+        const near = checked.filter((i) => (stock.get(i.id)?.[0]?.distanceMiles ?? Infinity) <= 10).length;
         const stats = [[items.length, "tracked"]];
         if (checked.length === items.length && items.length) stats.push([inStock, "in stock"], [near, "within 10 mi"]);
         el.innerHTML = stats.map(([v, l]) => `<div class="stat"><dt>${l}</dt><dd>${v}</dd></div>`).join("");
@@ -208,14 +239,14 @@
     function showStoresModal(title, stores) {
         const overlay = document.getElementById("modalOverlay");
         document.getElementById("modalTitle").textContent = title;
-        const locationName = location_().storeName;
+        const locationName = useHome ? "home" : location_().storeName;
         document.getElementById("modalBody").innerHTML = stores
             .map((s) => {
-                const isSelected = selectedStore && s.storeName === selectedStore.storeName;
+                const isSelected = !useHome && selectedStore && s.storeName === selectedStore.storeName;
                 return `
                 <div class="store-row">
                     <strong class="${isSelected ? "is-home" : ""}">${esc(s.storeName)}</strong>
-                    <span><span class="status-on">${s.quantity} in stock</span>, ${kmToMiles(s.distanceKm).toFixed(1)} mi from ${esc(locationName)}</span>
+                    <span><span class="status-on">${s.quantity} in stock</span>, ${s.distanceMiles.toFixed(1)} mi from ${esc(locationName)}</span>
                 </div>`;
             })
             .join("");
@@ -413,12 +444,41 @@
         }
     }
 
-    document.addEventListener("auth-changed", (e) => {
+    // ---------- home (the signed-in user's address) ----------
+
+    let homeKnown;
+    const firstHome = new Promise((resolve) => (homeKnown = resolve));
+
+    async function fetchHome(me) {
+        if (!me.authenticated) return null;
+        try {
+            const res = await Auth.api("GET", "/api/account/address");
+            return res.postcode ? { postcode: res.postcode } : null;
+        } catch {
+            return null;
+        }
+    }
+
+    // prefer: switch to home now (the address was just saved), whatever was picked before
+    function setHome(next, { prefer = false } = {}) {
+        const changed = home?.postcode !== next?.postcode;
+        home = next;
+        if (!started || (!changed && !prefer)) return;
+        if (prefer && home) savePreference({ type: "home" });
+        const choice = preferredChoice();
+        if (choice === "home" ? !useHome || changed : useHome || choice !== selectedStore) applyChoice(choice);
+    }
+
+    document.addEventListener("auth-changed", async (e) => {
         const wasEditing = canEdit;
         canEdit = e.detail.canEdit === true;
         renderAdminBar(e.detail);
         if (canEdit !== wasEditing) render();
+        setHome(await fetchHome(e.detail));
+        homeKnown();
     });
+
+    document.addEventListener("home-changed", (e) => setHome(e.detail, { prefer: true }));
 
     // ---------- start ----------
 
@@ -434,10 +494,13 @@
             [allStores, items] = await Promise.all([
                 getJson("/api/cex/stores").catch(() => []),
                 getJson("/api/cex-items"),
+                // whether there's a home to measure from (don't wait long: a store works meanwhile)
+                Promise.race([firstHome, new Promise((r) => setTimeout(r, 3000))]),
             ]);
         } catch (e) {
             Auth.showError("Couldn't load the tracked items: " + e.message);
         }
+        started = true;
         initStoreSelector();
         render();
         hideLoading();

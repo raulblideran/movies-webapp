@@ -24,7 +24,8 @@ public class CexOptions
 
 public record CexStore(int StoreId, string StoreName, double Latitude, double Longitude);
 
-public record CexStoreStock(string StoreName, int Quantity, double DistanceKm);
+/// <param name="DistanceMiles">In a straight line. CeX's "distance" is in miles (checked against the stores' coordinates).</param>
+public record CexStoreStock(string StoreName, int Quantity, double DistanceMiles);
 
 /// <summary>Server-side CeX lookups (replaces the browser CORS-proxy chain).</summary>
 public class CexClient(HttpClient http, IMemoryCache cache, Microsoft.Extensions.Options.IOptions<CexOptions> options, ILogger<CexClient> logger)
@@ -105,7 +106,7 @@ public class CexClient(HttpClient http, IMemoryCache cache, Microsoft.Extensions
             stock = arr.EnumerateArray()
                 .Select(s => new CexStoreStock(Str(s, "storeName") ?? "", (int)Dec(s, "quantityOnHand"), Dbl(s, "distance")))
                 .Where(s => s.StoreName.Length > 0)
-                .OrderBy(s => s.DistanceKm)
+                .OrderBy(s => s.DistanceMiles)
                 .ToList();
         }
         cache.Set(key, stock, StockCacheFor);

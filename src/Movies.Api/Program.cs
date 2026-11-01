@@ -26,7 +26,7 @@ builder.Services.Configure<AuthOptions>(config.GetSection("Auth"));
 var requireMfa = config.GetValue("Auth:RequireMfa", true);
 
 builder.Services
-    .AddIdentity<IdentityUser, IdentityRole>(o =>
+    .AddIdentity<AppUser, IdentityRole>(o =>
     {
         o.Password.RequiredLength = 12;
         o.Password.RequireNonAlphanumeric = false;
@@ -124,6 +124,12 @@ builder.Services.AddHttpClient<CexClient>(c =>
     c.BaseAddress = new Uri("https://wss2.cex.uk.webuy.io/");
     c.Timeout = TimeSpan.FromSeconds(10);
     c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; movies-webapp)");
+});
+
+builder.Services.AddHttpClient<PostcodeClient>(c =>
+{
+    c.BaseAddress = new Uri("https://api.postcodes.io/");
+    c.Timeout = TimeSpan.FromSeconds(10);
 });
 
 builder.Services.ConfigureHttpJsonOptions(o =>
