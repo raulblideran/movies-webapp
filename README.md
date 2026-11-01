@@ -39,6 +39,7 @@ addresses that call it a lot, and it blocks a whole home IPv6 range at once.
 | `./dev.sh ef migrations add <Name>` | EF Core migrations (applied automatically on startup) |
 | `./dev.sh import <file.csv or url> [--replace] [--no-posters]` | import a sheet-format CSV. Dates can be `dd/MM/yyyy` or `MM/yyyy`; month-only dates get a random day in that month |
 | `./dev.sh create-user <name> [--role Admin\|Editor]` | create a user from the CLI |
+| `./dev.sh fill-years [--dry-run]` | a release year for every title without one, from TMDB: a linked title takes its film's year (and that film's poster if its cover isn't one of them); an unlinked one is matched by name (the most popular film or series, or the one with the cover it already has). Lists links that look wrong without changing them |
 | `./dev.sh shell` / `./dev.sh dotnet …` | shell or any dotnet command inside the container |
 | `./dev.sh rebuild` / `down` / `nuke` | rebuild the image; remove the pod; remove the pod **and** data volumes |
 
@@ -76,10 +77,14 @@ If the app is running, these commands `exec` into it; otherwise they run in a th
 
 | | Auth |
 |---|---|
-| `GET /api/titles[?list=watched\|watchlist]`, `GET /api/titles/{id}` | public; each title has a `list` (Watched = the Watchlog, Watchlist = to watch) |
-| `POST /api/titles`, `PUT /api/titles/{id}`, `DELETE /api/titles/{id}` | Editor + 2FA |
+| `GET /api/titles[?list=watched\|watchlist]`, `GET /api/titles/{id}` | public; each title has a `list` (Watched = the Watchlog, Watchlist = to watch) and its `watches` |
+| `POST /api/titles`, `PUT /api/titles/{id}`, `DELETE /api/titles/{id}` | Editor + 2FA; `watches` sent with a title is its whole list (by id: changed, kept or removed; without an id: added); left out, they stay as they are |
+| `POST /api/titles/{id}/watches`, `PUT /api/watches/{id}`, `DELETE /api/watches/{id}` | Editor + 2FA; one watch (date or none, with Bogdan, in the cinema, notes). Each answers with the title as it is now |
+| `GET /api/goals`, `PUT /api/goals/{year}`, `DELETE /api/goals/{year}` | read public, write Editor + 2FA; the Stats page's yearly goal (watches) |
 | `GET /api/titles/people` | public; directors/creators and top-billed cast of every title (TMDB credits), for the Stats page's People |
 | `GET /api/tmdb/collection/{id}` | public, rate-limited, cached 24h; a TMDB collection's films, for franchise progress in the title popup |
+| `GET /api/tmdb/person/{id}` | public, rate-limited, cached 24h; a person and their work, for `/people/{id}` |
+| `GET /api/coming-soon` | public, cached 12h; films not out yet from franchises you've started and your most-watched directors (the Watchlist page) |
 | `GET /api/export.csv` | Editor + 2FA; same columns as the old sheet (the Watchlog only) |
 | `GET /api/cex/{sku}` | public; server-side CeX lookup, cached 6h (replaces the CORS proxies and Cloudflare worker) |
 | `GET /api/tmdb/search?q=&year=&anime=` | Editor + 2FA |
@@ -95,21 +100,26 @@ Containerfile, dev.sh           dev environment
 src/Movies.Api/
   Program.cs                    DI, Identity, policies, rate limits
   Cli.cs                        import / create-user commands
-  Data/                         Title (on the Watchlog or the Watchlist), releases, DbContext, migrations
+  Data/                         Title (on the Watchlog or the Watchlist) and its watches (WatchSummary works out
+                                the title's first/latest watch, count, Bogdan and cinema from them), releases,
+                                yearly goals, DbContext, migrations
   Endpoints/                    titles, releases, auth/account, users, CeX/TMDB
   Import/SheetCsv.cs            sheet CSV ⇄ Title
   Services/                     TMDB + CeX clients
   wwwroot/                      index.html (Watchlog) and watchlist.html (Watchlist), both run by js/app.js,
                                 with js/lists.js saying where each list lives; js/auth.js (sign-in, 2FA, users),
                                 js/admin.js (edit controls), js/editor.js (the add/edit form), js/pick.js (Pick for me),
-                                js/title-modal.js (the title popup: trailer, franchise progress),
+                                js/title-modal.js (the title popup: trailer, franchise progress, watch history),
+                                js/watch-dialog.js (add/edit/delete one watch), watches.html + js/watches-page.js
+                                (/watches, every watch, for editors), person.html + js/person.js (/people/{id}),
+                                js/coming-soon.js (the Watchlist's Coming soon),
                                 stats.html + js/stats.js, stats-cex.js, stats-review.js (Watchlog, Releases, Year in review),
                                 js/datepicker.js (themed date picker), edit.html + js/edit-page.js
                                 (/titles/new, /watchlist/new and /titles/{id}/edit: the form on its own page),
                                 manifest.webmanifest + icons/ + sw.js + js/pwa.js + offline.html (installable
                                 app; the Watchlog, Watchlist, releases, stats and CeX pages work offline once visited)
 tests/Movies.Api.Tests/         CSV parsing + API/auth integration tests
-docs/watch-diary.md             design notes for a per-viewing watch diary (not built)
+docs/watch-diary.md             how titles' old watch summaries became one record per watch
 ```
 
 ## Production (movies.raulblideran.uk)
@@ -136,6 +146,7 @@ Day to day, from this repo (the server address is in `deploy/secrets/host`):
 ./deploy/vps.sh update                         # pull the latest GHCR image right now
 ./deploy/vps.sh backup                         # back up and download to ./backups/
 ./deploy/vps.sh cex-add <link> [<link> …]      # track CeX products (or paste links on /cex when signed in)
+./deploy/vps.sh fill-years [--dry-run]         # release years (and matching covers) for titles without one
 ./deploy/vps.sh install                        # re-apply config after editing deploy/ or deploy/secrets/
 ./deploy/vps.sh restore <backup.db>            # roll the live DB back to a backup
 ./deploy/vps.sh reset-db                       # back up, then wipe the live DB (titles, users, CeX items)

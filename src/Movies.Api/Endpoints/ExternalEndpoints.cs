@@ -54,6 +54,7 @@ public static partial class ExternalEndpoints
         }).RequireAuthorization(Policies.Editor);
 
         MapCollection(app);
+        MapPeople(app);
     }
 
     private static void MapCollection(IEndpointRouteBuilder app) =>
@@ -62,19 +63,37 @@ public static partial class ExternalEndpoints
         app.MapGet("/api/tmdb/collection/{id:int}", async (int id, TmdbClient tmdb, IMemoryCache cache, CancellationToken ct) =>
         {
             if (!tmdb.Enabled) return Results.Problem("TMDB API key is not configured.", statusCode: 503);
-            if (cache.TryGetValue($"tmdb-collection:{id}", out TmdbCollection? hit)) return Results.Ok(hit);
             try
             {
-                var c = await tmdb.GetCollectionAsync(id, ct);
-                if (c is null) return Results.NotFound();
-                cache.Set($"tmdb-collection:{id}", c, TimeSpan.FromHours(24));
-                return Results.Ok(c);
+                return await TmdbCached.CollectionAsync(tmdb, cache, id, ct) is { } c ? Results.Ok(c) : Results.NotFound();
             }
             catch (TmdbUnavailableException)
             {
                 return Results.Problem("TMDB couldn't be reached. Try again in a moment.", statusCode: 502);
             }
         }).RequireRateLimiting("tmdb");
+
+    private static void MapPeople(IEndpointRouteBuilder app)
+    {
+        // A person's page: who they are and everything they've made or been in (the page marks what you've seen).
+        app.MapGet("/api/tmdb/person/{id:int}", async (int id, TmdbClient tmdb, IMemoryCache cache, CancellationToken ct) =>
+        {
+            if (!tmdb.Enabled) return Results.Problem("TMDB API key is not configured.", statusCode: 503);
+            try
+            {
+                return await TmdbCached.PersonAsync(tmdb, cache, id, ct) is { } p ? Results.Ok(p) : Results.NotFound();
+            }
+            catch (TmdbUnavailableException)
+            {
+                return Results.Problem("TMDB couldn't be reached. Try again in a moment.", statusCode: 502);
+            }
+        }).RequireRateLimiting("tmdb");
+
+        // Films on their way from franchises you've started and directors you watch (the Watchlist page).
+        app.MapGet("/api/coming-soon", async (TmdbClient tmdb, ComingSoonService soon, CancellationToken ct) =>
+            tmdb.Enabled ? Results.Ok(await soon.GetAsync(ct)) : Results.Ok(Array.Empty<object>()))
+            .RequireRateLimiting("tmdb");
+    }
 
     [GeneratedRegex(@"^[A-Za-z0-9\-]{1,40}$")]
     private static partial Regex SkuRegex();

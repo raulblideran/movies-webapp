@@ -17,7 +17,9 @@ public record TmdbResult(
     [property: JsonPropertyName("poster_path")] string? PosterPath,
     [property: JsonPropertyName("original_language")] string? OriginalLanguage,
     [property: JsonPropertyName("origin_country")] List<string>? OriginCountry,
-    [property: JsonPropertyName("overview")] string? Overview)
+    [property: JsonPropertyName("overview")] string? Overview,
+    [property: JsonPropertyName("popularity")] double? Popularity = null,
+    [property: JsonPropertyName("vote_count")] int? VoteCount = null)
 {
     public string DisplayTitle => Title ?? Name ?? "";
     public string? Date => string.IsNullOrEmpty(ReleaseDate) ? FirstAirDate : ReleaseDate;
@@ -77,7 +79,12 @@ public record TmdbDetailsResponse(
     [property: JsonPropertyName("videos")] TmdbVideos? Videos = null,
     [property: JsonPropertyName("credits")] TmdbCredits? Credits = null,
     [property: JsonPropertyName("aggregate_credits")] TmdbCredits? AggregateCredits = null,
-    [property: JsonPropertyName("created_by")] List<TmdbPerson>? CreatedBy = null);
+    [property: JsonPropertyName("created_by")] List<TmdbPerson>? CreatedBy = null,
+    [property: JsonPropertyName("vote_average")] double? VoteAverage = null,
+    [property: JsonPropertyName("vote_count")] int? VoteCount = null,
+    [property: JsonPropertyName("production_countries")] List<TmdbCountry>? ProductionCountries = null);
+
+public record TmdbCountry([property: JsonPropertyName("iso_3166_1")] string? Code);
 
 public record TmdbCollectionPart(
     [property: JsonPropertyName("id")] int Id,
@@ -122,7 +129,11 @@ public record TmdbDetails(
     string? TrailerKey = null,
     int? CollectionId = null,
     string? CollectionName = null,
-    List<Data.Credit>? Credits = null)
+    List<Data.Credit>? Credits = null,
+    decimal? VoteAverage = null,
+    int? VoteCount = null,
+    string? OriginalLanguage = null,
+    List<string>? Countries = null)
 {
     /// <summary>How many of the cast are kept: the top-billed (a series: the most episodes).</summary>
     public const int CastKept = 10;
@@ -158,7 +169,14 @@ public record TmdbDetails(
             TrailerKey: PickTrailer(d.Videos?.Results),
             CollectionId: tv ? null : d.Collection?.Id,
             CollectionName: tv ? null : d.Collection?.Name,
-            Credits: CreditsOf(d, tv));
+            Credits: CreditsOf(d, tv),
+            // a score from a handful of votes says little; none at all isn't a 0
+            VoteAverage: d.VoteCount > 0 && d.VoteAverage is { } avg ? Math.Round((decimal)avg, 1) : null,
+            VoteCount: d.VoteCount,
+            OriginalLanguage: string.IsNullOrWhiteSpace(d.OriginalLanguage) ? null : d.OriginalLanguage,
+            // where it's from: TMDB's origin country, else where it was made
+            Countries: (d.OriginCountry is { Count: > 0 } origin ? origin : (d.ProductionCountries ?? []).Select(c => c.Code ?? ""))
+                .Where(c => c.Length == 2).Distinct().ToList());
     }
 
     /// <summary>A YouTube trailer: official first, then English, then the newest. A teaser if there's no trailer.</summary>
@@ -305,8 +323,130 @@ public class TmdbClient(HttpClient http, Microsoft.Extensions.Options.IOptions<T
         }
     }
 
+    /// <summary>Every poster TMDB has for a film or series (their image paths), any language.</summary>
+    public async Task<HashSet<string>> GetPosterPathsAsync(string mediaType, int id, CancellationToken ct = default)
+    {
+        if (!Enabled || mediaType is not ("movie" or "tv")) return [];
+        try
+        {
+            var url = $"3/{mediaType}/{id}/images?api_key={Uri.EscapeDataString(options.Value.ApiKey!)}";
+            var images = await http.GetFromJsonAsync<TmdbImages>(url, ct);
+            return (images?.Posters ?? []).Select(p => p.FilePath).OfType<string>().ToHashSet();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            logger.LogWarning(ex, "TMDB images failed for {MediaType}/{Id}", mediaType, id);
+            throw new TmdbUnavailableException(ex);
+        }
+    }
+
+    /// <summary>A person and everything they've made or been in, or null if TMDB has no such person.</summary>
+    public async Task<TmdbPersonDetails?> GetPersonAsync(int id, CancellationToken ct = default)
+    {
+        if (!Enabled) return null;
+        try
+        {
+            var url = $"3/person/{id}?api_key={Uri.EscapeDataString(options.Value.ApiKey!)}&append_to_response=combined_credits";
+            using var resp = await http.GetAsync(url, ct);
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+            resp.EnsureSuccessStatusCode();
+            var p = await resp.Content.ReadFromJsonAsync<TmdbPersonResponse>(ct);
+            return p is null ? null : TmdbPersonDetails.From(p);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            logger.LogWarning(ex, "TMDB person {Id} failed", id);
+            throw new TmdbUnavailableException(ex);
+        }
+    }
+
     public async Task<TmdbResult?> FindBestAsync(string name, int? year, bool isAnime, CancellationToken ct = default) =>
         PickBest(await SearchAsync(name, ct), year, isAnime);
+}
+
+file record TmdbImages([property: JsonPropertyName("posters")] List<TmdbImage>? Posters);
+file record TmdbImage([property: JsonPropertyName("file_path")] string? FilePath);
+
+public record TmdbPersonCredit(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("media_type")] string? MediaType,
+    [property: JsonPropertyName("title")] string? Title,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("release_date")] string? ReleaseDate,
+    [property: JsonPropertyName("first_air_date")] string? FirstAirDate,
+    [property: JsonPropertyName("poster_path")] string? PosterPath,
+    [property: JsonPropertyName("popularity")] double? Popularity,
+    [property: JsonPropertyName("vote_count")] int? VoteCount,
+    [property: JsonPropertyName("vote_average")] double? VoteAverage,
+    [property: JsonPropertyName("character")] string? Character,
+    [property: JsonPropertyName("job")] string? Job,
+    [property: JsonPropertyName("episode_count")] int? EpisodeCount,
+    [property: JsonPropertyName("genre_ids")] List<int>? GenreIds);
+
+public record TmdbPersonResponse(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("profile_path")] string? ProfilePath,
+    [property: JsonPropertyName("biography")] string? Biography,
+    [property: JsonPropertyName("birthday")] string? Birthday,
+    [property: JsonPropertyName("deathday")] string? Deathday,
+    [property: JsonPropertyName("place_of_birth")] string? PlaceOfBirth,
+    [property: JsonPropertyName("known_for_department")] string? KnownFor,
+    [property: JsonPropertyName("combined_credits")] TmdbCombinedCredits? Credits);
+
+public record TmdbCombinedCredits(
+    [property: JsonPropertyName("cast")] List<TmdbPersonCredit>? Cast,
+    [property: JsonPropertyName("crew")] List<TmdbPersonCredit>? Crew);
+
+/// <summary>
+/// A person, and each film or series they made or were in, once, with what they did on it. Talk shows,
+/// news, awards ceremonies and self appearances are left out, and so are series they were in for an
+/// episode or two.
+/// </summary>
+public record TmdbPersonDetails(int Id, string Name, string? ProfileUrl, string? Biography, string? Birthday, string? Deathday,
+    string? PlaceOfBirth, string? KnownFor, List<TmdbPersonDetails.Work> Works)
+{
+    public record Work(int Id, string MediaType, string Title, string? ReleaseDate, int? Year, string? PosterUrl,
+        double Popularity, int VoteCount, decimal? VoteAverage, List<string> Roles);
+
+    // TMDB's genre ids for talk, news, reality and documentary-ish TV that isn't really someone's work
+    private static readonly HashSet<int> SkipGenres = [10763, 10764, 10767];
+
+    public static TmdbPersonDetails From(TmdbPersonResponse p)
+    {
+        var works = new Dictionary<(string, int), Work>();
+        void Add(TmdbPersonCredit c, string role)
+        {
+            if (c.MediaType is not ("movie" or "tv") || c.GenreIds?.Any(SkipGenres.Contains) == true) return;
+            if (c.MediaType == "tv" && c.Job is null && c.EpisodeCount is < 3) return; // a guest spot
+            var key = (c.MediaType, c.Id);
+            if (works.TryGetValue(key, out var have))
+            {
+                if (!have.Roles.Contains(role)) have.Roles.Add(role);
+                return;
+            }
+            var date = string.IsNullOrEmpty(c.ReleaseDate) ? (string.IsNullOrEmpty(c.FirstAirDate) ? null : c.FirstAirDate) : c.ReleaseDate;
+            works[key] = new Work(c.Id, c.MediaType, c.Title ?? c.Name ?? "", date,
+                date is { Length: >= 4 } && int.TryParse(date[..4], out var y) ? y : null,
+                c.PosterPath is null ? null : Contracts.TitleDto.PosterBaseUrl.Replace("/w500", "/w342") + c.PosterPath,
+                c.Popularity ?? 0, c.VoteCount ?? 0,
+                c.VoteCount > 0 && c.VoteAverage is { } avg ? Math.Round((decimal)avg, 1) : null,
+                [role]);
+        }
+        foreach (var c in p.Credits?.Crew ?? [])
+            if (c.Job is "Director" or "Creator" or "Screenplay" or "Writer" or "Original Music Composer")
+                Add(c, c.Job == "Original Music Composer" ? "Music" : c.Job == "Screenplay" ? "Writer" : c.Job);
+        foreach (var c in p.Credits?.Cast ?? [])
+            if (!string.Equals(c.Character?.Trim(), "Himself", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(c.Character?.Trim(), "Herself", StringComparison.OrdinalIgnoreCase)
+                && !(c.Character ?? "").Contains("(uncredited)", StringComparison.OrdinalIgnoreCase))
+                Add(c, string.IsNullOrWhiteSpace(c.Character) ? "Cast" : "as " + c.Character.Trim());
+        return new(p.Id, p.Name ?? "", p.ProfilePath is null ? null : Contracts.PersonDto.ProfileBaseUrl.Replace("/w185", "/h632") + p.ProfilePath,
+            string.IsNullOrWhiteSpace(p.Biography) ? null : p.Biography.Trim(),
+            string.IsNullOrEmpty(p.Birthday) ? null : p.Birthday, string.IsNullOrEmpty(p.Deathday) ? null : p.Deathday,
+            string.IsNullOrWhiteSpace(p.PlaceOfBirth) ? null : p.PlaceOfBirth, p.KnownFor,
+            works.Values.OrderByDescending(w => w.Popularity).ToList());
+    }
 }
 
 public class TmdbUnavailableException(Exception inner) : Exception("TMDB could not be reached.", inner);

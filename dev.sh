@@ -7,6 +7,7 @@
 #   ./dev.sh ef <args>            dotnet ef <args> against src/Movies.Api   (e.g. ./dev.sh ef migrations add Foo)
 #   ./dev.sh import <csv|url>     import titles from a CSV file (repo-relative) or published Google Sheet URL
 #   ./dev.sh create-user <name> [--role Admin|Editor]
+#   ./dev.sh fill-years [--dry-run]   release years (and matching covers) for titles without one, from TMDB
 #   ./dev.sh dotnet <args>        any dotnet command
 #   ./dev.sh rebuild              rebuild the dev image
 #   ./dev.sh down                 remove pod + containers (keeps volumes: DB and NuGet cache)
@@ -98,6 +99,7 @@ case "$cmd" in
         done
         in_dev dotnet run --project src/Movies.Api -- import "${args[@]}" ;;
     create-user)  in_dev dotnet run --project src/Movies.Api -- create-user "$@" ;;
+    fill-years)   in_dev dotnet run --project src/Movies.Api -- fill-years "$@" ;;
     dotnet)       in_dev dotnet "$@" ;;
     rebuild)      ensure_image --force ;;
     down)

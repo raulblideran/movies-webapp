@@ -4,7 +4,7 @@
 // blocks as window.StatsKit with the other tabs (js/stats-cex.js).
 
 (function () {
-    const { columns, hbars, line, donut, heatmap, scatter, legend, table, fmt, esc } = window.Charts;
+    const { columns, hbars, line, divbars, donut, heatmap, scatter, legend, table, fmt, esc } = window.Charts;
 
     const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const SLOTS = 7; // categorical colours per theme (--chart-1 … --chart-7)
@@ -204,6 +204,141 @@
             .map(([label, value, sub]) => `<div class="kpi"><dt>${esc(label)}</dt><dd>${esc(value)}</dd><p>${esc(sub)}</p></div>`)
             .join("")}</dl>`;
 
+    // ---------- this year's goal (all titles, whatever the filters): watches dated this year ----------
+
+    let goals = []; // [{ year, target }]
+    const watchesIn = (year) => everything.flatMap((r) => r.watches ?? []).filter((w) => w.date?.startsWith(String(year))).length;
+
+    function goalSection() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const goal = goals.find((g) => g.year === year);
+        const canEdit = !!window.Auth?.me?.canEdit;
+        if (!goal && !canEdit) return "";
+        if (!goal)
+            return `
+            <section class="goal-card is-empty" aria-label="${year} goal">
+                <p>No goal for ${year} yet. How many watches are you aiming for?</p>
+                <button type="button" class="btn" data-goal-edit>Set a goal for ${year}</button>
+            </section>`;
+        const done = watchesIn(year);
+        const start = new Date(year, 0, 1), end = new Date(year + 1, 0, 1);
+        const through = (now - start) / (end - start);
+        const due = goal.target * through;
+        const ahead = Math.round(done - due);
+        const weeksLeft = (end - now) / (7 * 864e5);
+        const left = goal.target - done;
+        const share = Math.min(100, (done / goal.target) * 100);
+        const pace = left <= 0
+            ? `Done: ${fmt(done - goal.target)} past it`
+            : `${ahead === 0 ? "Right on pace" : ahead > 0 ? `${plural(ahead, "watch", "watches")} ahead of pace` : `${plural(-ahead, "watch", "watches")} behind pace`} · ${weeksLeft >= 1 ? `about ${fmt(left / weeksLeft, 1)} a week to make it` : `${plural(left, "watch", "watches")} to go`}`;
+        return `
+            <section class="goal-card${left <= 0 ? " is-done" : ""}" aria-label="${year} goal">
+                <div class="goal-head">
+                    <h2>${year} goal</h2>
+                    ${canEdit ? `<button type="button" class="link" data-goal-edit>Change</button>` : ""}
+                </div>
+                <p class="goal-figure"><strong>${fmt(done)}</strong> of ${fmt(goal.target)} watches</p>
+                <div class="goal-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${goal.target}" aria-valuenow="${Math.min(done, goal.target)}" aria-label="${fmt(done)} of ${fmt(goal.target)} watches">
+                    <span style="width:${share.toFixed(1)}%"></span>
+                    <i style="left:${(through * 100).toFixed(1)}%" title="Where you'd be on pace today"></i>
+                </div>
+                <p class="goal-note">${pace}</p>
+            </section>`;
+    }
+
+    // whether you can set the goal is only known once sign-in has loaded
+    document.addEventListener("auth-changed", () => {
+        if (!tabs.collection.rendered) return;
+        const html = goalSection();
+        const el = document.querySelector(".goal-card");
+        if (el) el.outerHTML = html || "";
+        else if (html) document.getElementById("statsRoot").insertAdjacentHTML("afterbegin", html);
+    });
+
+    async function editGoal() {
+        const year = new Date().getFullYear();
+        const goal = goals.find((g) => g.year === year);
+        const value = await Auth.confirm({
+            title: `Your ${year} goal`,
+            message: `How many watches in ${year}? Every watch dated this year counts, rewatches too.${goal ? " Enter 0 to remove the goal." : ""}`,
+            confirmLabel: "Save",
+            input: { label: "Watches", type: "number" },
+        });
+        if (value == null) return;
+        const target = Math.round(Number(value));
+        try {
+            if (!target && goal) await Auth.api("DELETE", `/api/goals/${year}`);
+            else if (target > 0) await Auth.api("PUT", `/api/goals/${year}`, { target });
+            else return;
+            goals = await Auth.api("GET", "/api/goals");
+            const el = document.querySelector(".goal-card");
+            if (el) el.outerHTML = goalSection() || "";
+            else render();
+        } catch (e) {
+            Auth.showError(e.message);
+        }
+    }
+
+    // ---------- you vs the crowd: your rating against TMDB users' ----------
+
+    // titles TMDB has a meaningful score for (enough votes), and your rating, as a 10 at most
+    const CROWD_VOTES = 50;
+    function crowdSection(F) {
+        const R = F.filter((r) => r.r10 != null && r.voteAverage != null && (r.voteCount ?? 0) >= CROWD_VOTES)
+            .map((r) => ({ r, diff: Math.round((r.r10 - r.voteAverage) * 10) / 10 }));
+        if (R.length < 5) return "";
+        const avgDiff = mean(R.map((x) => x.diff));
+        const same = R.filter((x) => Math.abs(x.diff) < 0.5).length;
+        const item = (x) => ({ label: x.r.name, value: x.diff, valueLabel: `${x.diff > 0 ? "+" : ""}${fmt(x.diff, 1)}`, full: `${x.r.name}: you ${fmt(x.r.rating, 1)}, TMDB ${fmt(x.r.voteAverage, 1)}` });
+        const higher = R.filter((x) => x.diff > 0).sort((a, b) => b.diff - a.diff).slice(0, 10);
+        const lower = R.filter((x) => x.diff < 0).sort((a, b) => a.diff - b.diff).slice(0, 10);
+        const rows = (xs) => xs.map((x) => [x.r.name, fmt(x.r.rating, 1), fmt(x.r.voteAverage, 1), `${x.diff > 0 ? "+" : ""}${fmt(x.diff, 1)}`]);
+        return section("s-crowd", "You vs the crowd", `Your rating against TMDB users' average, for ${plural(R.length, "rated title")} with at least ${CROWD_VOTES} votes there (an 11 counts as a 10). On average you rate ${fmt(Math.abs(avgDiff), 1)} ${avgDiff >= 0 ? "higher" : "lower"}, and ${plural(same, "title")} land within half a point.`, [
+            card("You liked more", "Your rating minus TMDB's", guard(higher.length, (el) => divbars(el, { items: higher.map(item), label: "Titles you rated above TMDB users" }), "Nothing you rated above TMDB."), {
+                head: ["Title", "You", "TMDB", "Difference"],
+                rows: rows(higher),
+            }),
+            card("You liked less", "Your rating minus TMDB's", guard(lower.length, (el) => divbars(el, { items: lower.map(item), label: "Titles you rated below TMDB users" }), "Nothing you rated below TMDB."), {
+                head: ["Title", "You", "TMDB", "Difference"],
+                rows: rows(lower),
+            }),
+        ]);
+    }
+
+    // ---------- where it's from: original language and country (TMDB) ----------
+
+    function originSection(F) {
+        const L = F.filter((r) => r.originalLanguage);
+        if (L.length < 5) return "";
+        const top = (counts, name, n) => {
+            const sorted = [...counts].sort((a, b) => b[1] - a[1]);
+            const items = sorted.slice(0, n).map(([k, v]) => ({ label: name(k), value: v, full: name(k) }));
+            const rest = sum(sorted.slice(n).map(([, v]) => v));
+            if (rest) items.push({ label: "Others", value: rest, full: `${plural(sorted.length - n, "other")}`, color: OTHER });
+            return items;
+        };
+        const langs = countBy(L, (r) => r.originalLanguage);
+        const countries = new Map();
+        for (const r of L) for (const c of r.countries ?? []) countries.set(c, (countries.get(c) ?? 0) + 1);
+        const langItems = top(langs, TitleModal.languageName, 9);
+        const countryItems = top(countries, TitleModal.countryName, 11);
+        const avgBy = (code) => {
+            const xs = L.filter((r) => r.originalLanguage === code && r.r10 != null).map((r) => r.r10);
+            return xs.length ? fmt(mean(xs), 2) : "–";
+        };
+        return section("s-origin", "Where it's from", `The original language and the countries of ${plural(L.length, "title")}, from TMDB. ${fmt(langs.size)} languages, ${fmt(countries.size)} countries.`, [
+            card("Languages", "Titles by original language", (el) => hbars(el, { items: langItems, label: "Titles by original language" }), {
+                head: ["Language", "Titles", "Average rating"],
+                rows: [...langs].sort((a, b) => b[1] - a[1]).map(([k, v]) => [TitleModal.languageName(k), v, avgBy(k)]),
+            }),
+            card("Countries", "A title can be from more than one", (el) => hbars(el, { items: countryItems, label: "Titles by country" }), {
+                head: ["Country", "Titles"],
+                rows: [...countries].sort((a, b) => b[1] - a[1]).map(([k, v]) => [TitleModal.countryName(k), v]),
+            }),
+        ]);
+    }
+
     function timeSection(F) {
         const W = F.filter((r) => r.fy != null);
         if (!W.length) return section("s-time", "Watching over time", "", [card("No dates", "", (el) => empty(el))]);
@@ -213,6 +348,17 @@
             return { label: String(y), values: [ys.filter((r) => r.type === "Film").length, ys.filter((r) => r.type === "Series").length] };
         });
         const typeSeries = [{ name: "Films", color: TYPE_COLOR.Film }, { name: "Series", color: TYPE_COLOR.Series }];
+
+        // every dated watch in its year: a title's first, or a rewatch (the watches with no date can't be placed)
+        const watches = F.flatMap((r) => (r.watches ?? []).map((w) => ({ w, first: w.date && w.date === r.firstWatch })));
+        const dated = watches.filter((x) => x.w.date);
+        const undated = watches.length - dated.length;
+        const watchYears = yearSpan(dated.map((x) => Number(x.w.date.slice(0, 4))));
+        const watchesPerYear = watchYears.map((y) => {
+            const ys = dated.filter((x) => x.w.date.startsWith(String(y)));
+            return { label: String(y), values: [ys.filter((x) => x.first).length, ys.filter((x) => !x.first).length] };
+        });
+        const watchSeries = [{ name: "First watches", color: slot(0) }, { name: "Rewatches", color: slot(3) }];
 
         // cumulative, month by month
         const byMonth = countBy(W, (r) => r.fy * 12 + r.fm);
@@ -233,6 +379,12 @@
         });
 
         return section("s-time", "Watching over time", "Grouped by month at the finest: titles imported from the old sheet only knew the month they were watched.", [
+            card("Watches per year", `Every dated watch, rewatches included${undated ? ` · ${plural(undated, "watch", "watches")} with no date left out` : ""}`, (el) => columns(el, { items: watchesPerYear, series: watchSeries, label: "Watches per year, first watches and rewatches stacked" }), {
+                size: "is-wide",
+                extra: legend(watchSeries),
+                head: ["Year", "First watches", "Rewatches"],
+                rows: watchesPerYear.map((p) => [p.label, p.values[0], p.values[1]]),
+            }),
             card("Titles first watched per year", "", (el) => columns(el, { items: perYear, series: typeSeries, label: "Titles first watched per year, films and series stacked" }), {
                 size: "is-wide",
                 extra: legend(typeSeries),
@@ -715,6 +867,7 @@
                     </li>`)
                     .join("")}</ol>
                 ${shown ? `
+                <a class="link person-page-link" href="/people/${shown.id}">${esc(shown.name)}'s page: everything they've made or been in →</a>
                 <div class="person-titles" aria-label="${esc(shown.name)}'s titles">
                     ${shown.titles
                         .sort((a, b) => (b.r10 ?? -1) - (a.r10 ?? -1))
@@ -756,6 +909,7 @@
     }
 
     document.getElementById("statsRoot").addEventListener("click", (e) => {
+        if (e.target.closest("[data-goal-edit]")) return editGoal();
         const sort = e.target.closest("[data-people-sort]");
         const person = e.target.closest("[data-person]");
         if (sort) {
@@ -862,7 +1016,7 @@
         const count = document.getElementById("statsCount");
         if (count) count.textContent = F.length === all.length ? `All ${plural(all.length, "title")}` : `${fmt(F.length)} of ${plural(all.length, "title")}`;
         document.getElementById("statsRoot").innerHTML = F.length
-            ? [kpis(F), timeSection(F), ratingSection(F), genreSection(F), peopleSection(F), collectionSection(F), rewatchSection(F), bogdanSection(F), eraSection(F), lengthSection(F), seriesSection(F), recordsSection(F), qualitySection(F)].join("")
+            ? [goalSection(), kpis(F), timeSection(F), ratingSection(F), crowdSection(F), genreSection(F), originSection(F), peopleSection(F), collectionSection(F), rewatchSection(F), bogdanSection(F), eraSection(F), lengthSection(F), seriesSection(F), recordsSection(F), qualitySection(F)].join("")
             : `<div class="empty"><h2>Nothing matches</h2><p class="muted">Try a wider year range or a different type.</p></div>`;
         drawAll();
     }
@@ -955,6 +1109,14 @@
     };
     TitleModal.configure({
         lookup: (type, id) => everything.find((t) => t.tmdbId === id && t.tmdbMediaType === type),
+        // a watch changed in the popup: the numbers as they are now
+        async onTitleChanged() {
+            const resp = await fetch("/api/titles", { cache: "no-store" });
+            if (!resp.ok) return;
+            setTitles(await resp.json());
+            if (current === "collection") render();
+        },
+        lookupTitle: (id) => everything.find((t) => t.id === id),
         async showRelease(id) {
             const r = await fetchRelease(id);
             if (r) ReleaseDialogs.open(r, releaseCtx);
@@ -974,10 +1136,12 @@
         try {
             // people are a nice-to-have: the page draws without them
             const people = fetch("/api/titles/people", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+            const goalList = fetch("/api/goals", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []);
             const resp = await fetch("/api/titles", { cache: "no-store" });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             setTitles(await resp.json());
             credits = await people;
+            goals = await goalList;
             buildGenres();
             renderFilters();
             tabs.collection.rendered = true;
@@ -999,6 +1163,7 @@
         titles: () => everything,
         watched: () => all,
         credits: () => credits,
+        goals: () => goals,
         hoursText,
         addTab: (name, tab) => (tabs[name] = { draws: [], ...tab }),
         redraw: () => drawAll(),

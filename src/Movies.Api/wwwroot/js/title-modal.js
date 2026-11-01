@@ -9,6 +9,8 @@
 //   onOpened(row)   after the popup renders (the collection page's admin bar)
 //   lookup(mediaType, tmdbId)   the title with that TMDB id, if you have it (franchise progress)
 //   addToWatchlist(parts)       optional, for editors: add a franchise's films ({ id, title }) to the watchlist
+//   onTitleChanged(title)       after an editor adds, changes or deletes a watch here: refresh the page's data
+//   lookupTitle(id)             the page's copy of a title (after onTitleChanged), to show it as the page has it
 //
 // The popup shares a layer with the release popups and other dialogs (js/auth.js), and whichever
 // was opened last is on top. TitleModal.open(row, { front: true }) brings it over an open release;
@@ -113,31 +115,90 @@
         return `${Math.floor(days / 365.25)} years`;
     }
 
-    // First watch, the watch with Bogdan and the latest watch, in date order. A date shared by two
-    // of them is one point on the line.
+    const canEditWatches = () => !!(window.WatchDialog && window.Auth?.me?.canEdit);
+
+    // Every watch, oldest first, with the day it went on the watchlist among them. Watches with no date
+    // are one line at the end ("3 more watches, dates unknown"), which an editor can open to date them.
+    // An editor can open any watch to change or delete it, and add one.
     function watchLogHtml(row) {
-        const points = new Map();
-        const add = (iso, label) => iso && points.set(iso, [...(points.get(iso) ?? []), label]);
-        add(row.firstWatch, row.watchCount > 1 ? "First watch" : "Watched");
-        if (row.latestWatch !== row.firstWatch) add(row.latestWatch, "Latest watch");
-        add(row.dateWithBogdan, "With Bogdan");
-        add(row.watchlistAddedOn, "Added to watchlist");
-        if (points.size === 0) return "";
-        const cls = (labels) =>
-            labels.includes("With Bogdan") ? ' class="is-bogdan"' : labels.length === 1 && labels[0] === "Added to watchlist" ? ' class="is-watchlist"' : "";
-        const items = [...points]
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([iso, labels]) => `
-                <li${cls(labels)}>
-                    <time datetime="${iso}">${formatLongDate(iso)}</time>
-                    <span>${labels.join(", ")}</span>
-                </li>`)
-            .join("");
+        const watches = row.watches ?? [];
+        const edit = canEditWatches();
+        if (!watches.length && !row.watchlistAddedOn && !edit) return "";
+        const dated = watches.filter((w) => w.date);
+        const undated = watches.filter((w) => !w.date);
+        const marks = (w) =>
+            [w.withBogdan ? `<span class="tag tag-bogdan">With Bogdan</span>` : "", w.inCinema ? `<span class="tag tag-cinema">In the cinema</span>` : ""].join("");
+        const item = (w, nth) => {
+            const what = !w.date ? "" : dated.length === 1 && !undated.length ? "Watched" : nth === 0 && !undated.length ? "First watch" : "";
+            const inner = `
+                    <span class="watch-line">${w.date ? `<time datetime="${w.date}">${formatLongDate(w.date)}</time>` : `<span class="watch-unknown">Date unknown</span>`}${what ? `<span class="watch-what">${what}</span>` : ""}${marks(w)}</span>
+                    ${w.notes ? `<span class="watch-note">${esc(w.notes)}</span>` : ""}`;
+            return `
+                <li class="${w.withBogdan ? "is-bogdan" : ""}${w.inCinema ? " is-cinema" : ""}${w.date ? "" : " is-undated"}">
+                    ${edit ? `<button type="button" class="watch-edit" data-watch="${w.id}" title="Change or delete this watch">${inner}</button>` : inner}
+                </li>`;
+        };
+        const points = [
+            ...dated.map((w, i) => ({ at: w.date, html: item(w, i) })),
+            ...(row.watchlistAddedOn
+                ? [{ at: row.watchlistAddedOn, html: `<li class="is-watchlist"><span class="watch-line"><time datetime="${row.watchlistAddedOn}">${formatLongDate(row.watchlistAddedOn)}</time><span class="watch-what">Added to your watchlist</span></span></li>` }]
+                : []),
+        ].sort((a, b) => a.at.localeCompare(b.at));
+        // "3 more watches, dates unknown" ("1 watch, date unknown" when it's the only one)
+        const undatedText = `${undated.length}${dated.length ? " more" : ""} ${undated.length === 1 ? "watch, date" : "watches, dates"} unknown`;
+        const undatedHtml = !undated.length
+            ? ""
+            : edit
+              ? `<li class="is-undated watch-group">
+                    <details>
+                        <summary>${undatedText}<span class="faint"> · open to add the date${undated.length === 1 ? "" : "s"}</span></summary>
+                        <ol class="watch-log watch-log-inner">${undated.map((w) => item(w)).join("")}</ol>
+                    </details>
+                 </li>`
+              : `<li class="is-undated"><span class="watch-line"><span class="watch-unknown">${undatedText}</span>${undated.some((w) => w.withBogdan) ? `<span class="tag tag-bogdan">With Bogdan</span>` : ""}</span></li>`;
         return `
-        <section class="modal-section">
-            <h3>Watch history</h3>
-            <ol class="watch-log">${items}</ol>
+        <section class="modal-section watch-section">
+            <div class="section-head">
+                <h3>Watch history${watches.length ? ` <span class="count">${watches.length}</span>` : ""}</h3>
+                ${edit ? `<span class="section-actions">${watches.length ? `<a href="/watches?title=${row.id}" class="link">All watches</a>` : ""}<button type="button" class="btn btn-small" data-add-watch>+ Add a watch</button></span>` : ""}
+            </div>
+            ${points.length || undatedHtml ? `<ol class="watch-log">${points.map((p) => p.html).join("")}${undatedHtml}</ol>` : `<p class="faint">No watches yet.</p>`}
         </section>`;
+    }
+
+    // after a watch is added, changed or deleted: the page's data, then this popup, as they are now
+    async function watchChanged(fresh, message, undo) {
+        if (config.onTitleChanged) await config.onTitleChanged(fresh);
+        // the page's fresh copy of the title (with what the page adds to it), else the one the API sent
+        if (current?.id === fresh.id) render(config.lookupTitle?.(fresh.id) ?? { ...current, ...fresh });
+        if (window.App?.showSuccess) window.App.showSuccess(message, undo);
+        else window.Auth?.showSuccess?.(message);
+    }
+
+    function wireWatches(row) {
+        if (!canEditWatches()) return;
+        const scroll = $("modalScroll");
+        scroll.querySelector("[data-add-watch]")?.addEventListener("click", () =>
+            WatchDialog.open({
+                title: row,
+                onSaved: (fresh, { watchId }) =>
+                    watchChanged(fresh, `Added a watch of ${fresh.name} (${fresh.watchCount} in all)`, {
+                        label: "Undo",
+                        run: async () => watchChanged(Lists.normalise(await Auth.api("DELETE", `/api/watches/${watchId}`)), "Removed that watch"),
+                    }),
+            }),
+        );
+        scroll.querySelectorAll("[data-watch]").forEach((b) => {
+            b.onclick = () => {
+                const watch = row.watches.find((w) => w.id === Number(b.dataset.watch));
+                if (!watch) return;
+                WatchDialog.open({
+                    title: row,
+                    watch,
+                    onSaved: (fresh, { deleted }) => watchChanged(fresh, deleted ? `Deleted a watch of ${fresh.name}` : `Saved the watch`),
+                });
+            };
+        });
     }
 
     // On the watchlist: how long it's been waiting, where a watched title shows its rating.
@@ -174,6 +235,7 @@
         return `
         <aside class="stub" aria-label="${W ? "On your watchlist" : "Verdict and value"}">
             ${W ? waitingHtml(row) : ratingHtml(row, true) || `<p class="stub-unrated">Not rated yet</p>`}
+            ${crowdHtml(row)}
             ${facts.length ? `<dl class="stub-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>` : ""}
             ${paid || formats || cex ? `
             <section class="stub-copy" aria-label="Your copy">
@@ -191,15 +253,55 @@
         </aside>`;
     }
 
-    // "Directed by Ridley Scott · Starring Sigourney Weaver, Tom Skerritt" (a series: "Created by")
+    // "Directed by Ridley Scott · Starring Sigourney Weaver, Tom Skerritt" (a series: "Created by"), each
+    // name a link to that person's page
     function creditsHtml(row) {
+        const person = (name, id) => (id ? `<a href="/people/${id}" class="person-link">${esc(name)}</a>` : esc(name));
         const parts = [];
-        if (row.directors?.length) parts.push(`${row.type === "Series" ? "Created" : "Directed"} by ${row.directors.map(esc).join(", ")}`);
-        if (row.cast?.length) parts.push(`Starring ${row.cast.slice(0, 4).map(esc).join(", ")}`);
+        if (row.directors?.length) parts.push(`${row.type === "Series" ? "Created" : "Directed"} by ${row.directors.map((n, i) => person(n, row.directorIds?.[i])).join(", ")}`);
+        if (row.cast?.length) parts.push(`Starring ${row.cast.slice(0, 4).map((n, i) => person(n, row.castIds?.[i])).join(", ")}`);
         return parts.length ? `<p class="modal-credits">${parts.join(" · ")}</p>` : "";
     }
 
-    // The trailer plays in a dialog over the popup (closing it stops the video).
+    // "Japanese · Japan", from TMDB's original language and the countries it's from
+    const languageNames = new Intl.DisplayNames(["en-GB"], { type: "language" });
+    const regionNames = new Intl.DisplayNames(["en-GB"], { type: "region" });
+    const languageName = (code) => {
+        try {
+            return code ? languageNames.of(code) : "";
+        } catch {
+            return code;
+        }
+    };
+    const countryName = (code) => {
+        try {
+            return code ? regionNames.of(code) : "";
+        } catch {
+            return code;
+        }
+    };
+    function originHtml(row) {
+        const bits = [languageName(row.originalLanguage), (row.countries ?? []).slice(0, 3).map(countryName).join(", ")].filter(Boolean);
+        return bits.length ? `<p class="modal-origin">${esc(bits.join(" · "))}</p>` : "";
+    }
+
+    // TMDB's score, and how far yours is from it (an 11, an all-time favourite, counts as 10)
+    function crowdHtml(row) {
+        if (row.voteAverage == null) return "";
+        const votes = row.voteCount ? `${Number(row.voteCount).toLocaleString("en-GB")} votes on TMDB` : "TMDB";
+        let verdict = "";
+        if (row.rating != null && row.list !== "watchlist") {
+            const diff = Math.round((Math.min(10, row.rating) - row.voteAverage) * 10) / 10;
+            verdict = Math.abs(diff) < 0.5 ? "About the same as you" : diff > 0 ? `You rated it ${diff} higher` : `You rated it ${-diff} lower`;
+        }
+        return `
+            <p class="stub-crowd" title="${esc(votes)}">
+                <span class="stub-crowd-score"><span class="sr-only">TMDB users rate it </span>${row.voteAverage.toFixed(1)}</span>
+                <span class="stub-crowd-label">TMDB users</span>
+                ${verdict ? `<span class="stub-crowd-diff">${verdict}</span>` : ""}
+            </p>`;
+    }
+
     function openTrailer(row) {
         const key = encodeURIComponent(row.trailerKey);
         const d = Auth.dialog(
@@ -275,7 +377,7 @@
         box.querySelector("[data-parts-all]")?.addEventListener("click", (e) => {
             box.querySelector(".franchise-list").classList.add("is-expanded");
             e.currentTarget.remove();
-            fitPoster();
+            fitTicket();
         });
         // yours open here; a click on one you don't have goes to TMDB
         box.querySelectorAll("[data-part-title]").forEach((a) => {
@@ -293,23 +395,19 @@
         };
         box.querySelectorAll("[data-part-add]").forEach((b) => (b.onclick = () => add([parts[Number(b.dataset.partAdd)]], b)));
         box.querySelector("[data-parts-add]")?.addEventListener("click", (e) => add(missing, e.currentTarget));
-        fitPoster(); // the stub grew
+        fitTicket(); // the stub grew
     }
 
-    // The poster is never cropped, so when the ticket is taller than the poster, the poster column
-    // widens (up to a limit) until the poster fills the height instead of leaving a gap under it.
-    function fitPoster() {
-        const ticket = document.querySelector("#modalScroll .ticket");
-        const poster = ticket?.querySelector(".modal-poster");
-        if (!poster) return;
-        ticket.style.removeProperty("--poster-w");
-        if (matchMedia("(max-width: 760px)").matches) return;
-        for (let i = 0; i < 3; i++) {
-            if (ticket.offsetHeight - poster.offsetHeight <= 1) break;
-            ticket.style.setProperty("--poster-w", `${Math.min(480, Math.ceil((ticket.offsetHeight * 2) / 3))}px`);
-        }
+    // On a computer the ticket is exactly as tall as its poster (site.css sizes both), so a long
+    // synopsis or franchise scrolls inside its own column. A column with more below fades out at its
+    // foot (.has-more) to say so. On a phone the whole sheet scrolls instead.
+    function markOverflow(el) {
+        el.classList.toggle("has-more", el.scrollHeight - el.scrollTop - el.clientHeight > 2);
     }
-    window.addEventListener("resize", () => current && fitPoster());
+    function fitTicket() {
+        document.querySelectorAll("#modalScroll .ticket-main, #modalScroll .stub").forEach(markOverflow);
+    }
+    window.addEventListener("resize", () => current && fitTicket());
 
     // Releases with a CeX product, each product once.
     const cexReleases = (row) => [...new Map(row.releases.filter((r) => r.cexSku).map((r) => [r.cexSku, r])).values()];
@@ -352,33 +450,43 @@
             ...row.genres.map((g) => `<span class="tag">${esc(g)}</span>`),
             row.withBogdan ? `<span class="tag tag-bogdan">With Bogdan</span>` : "",
             row.watchedInCinema ? `<span class="tag tag-cinema">In cinema</span>` : "",
+            // your own tags: each a link to everything else with it
+            ...(row.tags ?? []).map((t) => `<a class="tag tag-own" href="${row.list === "watchlist" ? "/watchlist" : "/"}?tag=${encodeURIComponent(t.toLowerCase())}">#${esc(t)}</a>`),
         ].join("");
+
+        // long names step the title down a size, so they don't fill the ticket
+        const titleSize = row.name.length > 48 ? " is-very-long" : row.name.length > 26 ? " is-long" : "";
 
         scroll.innerHTML = `
         <div class="ticket${row.posterUrl ? "" : " no-poster"}">
             ${row.posterUrl ? `<div class="ticket-poster"><img class="modal-poster" src="${esc(row.posterUrl)}" alt="Poster for ${esc(row.name)}"></div>` : ""}
-            <header class="ticket-head">
-                <div class="ticket-head-text">
-                    <div class="tags">${tags}</div>
-                    <h2 class="modal-title" id="modalTitle">${esc(row.name)}${row.releaseYear ? ` <span class="modal-year">${row.releaseYear}</span>` : ""}</h2>
-                    ${creditsHtml(row)}
-                    ${row.trailerKey ? `<button type="button" class="btn btn-small modal-trailer" data-trailer><span aria-hidden="true">▶</span> Watch the trailer</button>` : ""}
-                </div>
-            </header>
-            <div class="ticket-actions"><div id="modalAdminBar"></div></div>
+            <div class="ticket-main">
+                <header class="ticket-head">
+                    <div class="ticket-head-text">
+                        <div class="tags">${tags}</div>
+                        <h2 class="modal-title${titleSize}" id="modalTitle">${esc(row.name)}${row.releaseYear ? ` <span class="modal-year">${row.releaseYear}</span>` : ""}</h2>
+                        ${creditsHtml(row)}
+                        ${originHtml(row)}
+                        ${row.trailerKey ? `<button type="button" class="btn btn-small modal-trailer" data-trailer><span aria-hidden="true">▶</span> Watch the trailer</button>` : ""}
+                    </div>
+                </header>
+                <div class="ticket-actions"><div id="modalAdminBar"></div></div>
+                ${watchLogHtml(row) || row.comments || row.overview ? `
+                <div class="ticket-body">
+                    ${row.overview ? `<p class="modal-overview">${esc(row.overview)}</p>` : ""}
+                    ${watchLogHtml(row)}
+                    ${row.comments ? `<blockquote class="modal-note">${esc(row.comments)}</blockquote>` : ""}
+                </div>` : ""}
+            </div>
             ${stubHtml(row)}
-            ${watchLogHtml(row) || row.comments || row.overview ? `
-            <div class="ticket-body">
-                ${row.overview ? `<p class="modal-overview">${esc(row.overview)}</p>` : ""}
-                ${watchLogHtml(row)}
-                ${row.comments ? `<blockquote class="modal-note">${esc(row.comments)}</blockquote>` : ""}
-            </div>` : ""}
         </div>`;
 
         scroll.scrollTop = 0;
-        fitPoster();
+        for (const part of scroll.querySelectorAll(".ticket-main, .stub")) part.addEventListener("scroll", () => markOverflow(part), { passive: true });
+        fitTicket();
 
         updateNav();
+        wireWatches(row);
         scroll.querySelector("[data-trailer]")?.addEventListener("click", () => openTrailer(row));
         config.onOpened?.(row);
         if (config.showRelease)
@@ -411,7 +519,7 @@
                     : `<p class="status-bad">CeX didn't return prices for <a href="${esc(link)}" target="_blank" rel="noopener" class="link">${esc(sku)}</a>.</p>`;
             }
             $("cexPricing").innerHTML = rows;
-            fitPoster();
+            fitTicket();
         }
     }
 
@@ -510,5 +618,7 @@
         waitText,
         formatLongDate,
         runtimeText,
+        languageName,
+        countryName,
     };
 })();

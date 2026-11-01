@@ -68,12 +68,22 @@
         }
     }
 
+    // a watch dated today (with Bogdan, in the cinema and notes to fill in if you like); Undo takes it off again
     const addWatch = (row) =>
-        save(
-            row,
-            { watchCount: (row.watchCount || 0) + 1, latestWatch: TitleEditor.todayIso(), firstWatch: row.firstWatch ?? TitleEditor.todayIso() },
-            (saved) => `+1 watch for ${saved.name} (${saved.watchCount} total)`,
-        );
+        WatchDialog.open({
+            title: row,
+            onSaved: (saved, { watchId }) =>
+                afterSave(saved, `Added a watch of ${saved.name} (${saved.watchCount} in all)`, {
+                    label: "Undo",
+                    run: async () => {
+                        try {
+                            await afterSave(Lists.normalise(await api("DELETE", `/api/watches/${watchId}`)), `Took that watch of ${row.name} off again`);
+                        } catch (e) {
+                            App.showError(e.message);
+                        }
+                    },
+                }),
+        });
 
     // Onto the watchlist, keeping its watches and rating: it's waiting to be watched again. Undo puts it
     // back as it was, date and all.
@@ -140,7 +150,7 @@
                 </span>
                 ${onWatchlist
                     ? `<button type="button" data-mark class="btn btn-primary" title="Rate it and move it to your Watchlog">Mark as watched</button>`
-                    : `<button type="button" data-watch class="btn" title="Add one to the watch count and set the latest watch to today">Watched again</button>
+                    : `<button type="button" data-watch class="btn" title="Add a watch dated today (you can change the date, and add Bogdan, the cinema or a note)">Watched again</button>
                        <button type="button" data-move class="btn" title="Put it on your watchlist to watch again. It keeps its watches and rating">Move to watchlist</button>`}
                 <button type="button" data-delete class="btn btn-danger">Delete</button>`;
             editorLink(bar.querySelector("[data-edit]"), row);

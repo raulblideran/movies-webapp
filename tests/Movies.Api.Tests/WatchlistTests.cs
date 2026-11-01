@@ -82,8 +82,8 @@ public class WatchlistTests : IClassFixture<TestApp>
         // watched: the same title moves to the Watchlog, with its added date, poster and disc
         var watched = await client.PutAsJsonAsync($"/api/titles/{id}", new
         {
-            name = "Prometheus", type = "Film", list = "Watched", watchlistAddedOn = "2026-01-02", rating = 6, watchCount = 1,
-            firstWatch = "2026-03-01", latestWatch = "2026-03-01", genres = new[] { "Sci-Fi" }, posterPath = "/alien.jpg", tmdbId = 348, tmdbMediaType = "movie",
+            name = "Prometheus", type = "Film", list = "Watched", watchlistAddedOn = "2026-01-02", rating = 6,
+            watches = new[] { new { date = "2026-03-01" } }, genres = new[] { "Sci-Fi" }, posterPath = "/alien.jpg", tmdbId = 348, tmdbMediaType = "movie",
         });
         Assert.Equal(HttpStatusCode.OK, watched.StatusCode);
         var title = await JsonAsync(watched);

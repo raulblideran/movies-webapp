@@ -200,6 +200,7 @@
             rating: row.rating,
             rewatchPotential: row.rewatchPotential,
             genres: row.genres,
+            tags: row.tags ?? [],
             seasons: row.seasons,
             episodesTotal: row.episodesTotal,
             withBogdan: !!row.withBogdan,
@@ -238,19 +239,18 @@
         const today = todayIso();
         const isNew = !row;
         if (markWatched) {
-            // one more watch, today; a title seen before keeps its first watch
-            row = { ...row, list: "watched", watchCount: (row.watchCount || 0) + 1, latestWatch: today, firstWatch: row.firstWatch ?? today };
+            // one more watch, today; a title seen before keeps the watches it has
+            row = { ...row, list: "watched", watches: [...(row.watches ?? []), { date: today, withBogdan: false, inCinema: false, notes: null }] };
         }
         const W = (row?.list ?? list) === "watchlist"; // the watchlist's shorter form
         row = row ?? {
             name: "",
             type: "Film",
             list: W ? "watchlist" : "watched",
-            watchCount: W ? 0 : 1,
-            firstWatch: W ? null : today,
-            latestWatch: W ? null : today,
+            watches: W ? [] : [{ date: today, withBogdan: false, inCinema: false, notes: null }],
             watchlistAddedOn: W ? today : null,
             genres: [],
+            tags: [],
             releases: [],
             withBogdan: false,
             watchedInCinema: false,
@@ -272,6 +272,10 @@
                     <div>
                         ${f("Genres", `<div data-genres data-label="Add a genre"></div>`)}
                         <div data-genre-suggest class="genre-suggest hidden"></div>
+                    </div>
+                    <div>
+                        ${f("Your tags", `<div data-tags data-label="Add a tag"></div>`)}
+                        <p class="field-hint">Your own labels, like Christmas or Comfort films. They become a filter.</p>
                     </div>`;
 
         container.innerHTML = `
@@ -301,24 +305,22 @@
                         ${f("Added to watchlist", date("watchlistAddedOn", row.watchlistAddedOn))}
                     </div>
                     ${genresField}` : `
-                    <div class="row row-4">
+                    <div class="row row-5">
                         ${f("Rating out of 10", num("rating", row.rating, `min="0" max="11" step="0.5" placeholder="?"`))}
                         ${f("Rewatch out of 10", num("rewatchPotential", row.rewatchPotential, `min="0" max="10" step="1"`))}
-                        ${f("Watch count", num("watchCount", row.watchCount, `min="0" step="1"`))}
                         ${f("Release year", num("releaseYear", row.releaseYear, `min="1870" max="2200"`))}
-                    </div>
-                    <div class="row row-4">
-                        ${f("First watch", date("firstWatch", row.firstWatch))}
-                        ${f("Latest watch", date("latestWatch", row.latestWatch))}
                         ${f("Seasons", num("seasons", row.seasons, `min="0"`))}
                         ${f("Episodes", num("episodesTotal", row.episodesTotal, `min="0"`))}
                     </div>
-                    ${genresField}
-                    <div class="row row-3" style="align-items:end">
-                        <label class="check" style="padding-bottom:10px"><input type="checkbox" name="withBogdan" ${row.withBogdan ? "checked" : ""}> Watched with Bogdan</label>
-                        ${f("Date with Bogdan", date("dateWithBogdan", row.dateWithBogdan))}
-                        <label class="check" style="padding-bottom:10px"><input type="checkbox" name="watchedInCinema" ${row.watchedInCinema ? "checked" : ""}> Watched in cinema</label>
-                    </div>`}
+                    <fieldset class="editor-watches" data-watches>
+                        <legend class="label">Watches <span class="count" data-watch-count></span></legend>
+                        <ol class="watch-rows" data-watch-rows></ol>
+                        <div class="watch-add">
+                            <button type="button" class="btn btn-small" data-add-watch>+ Add a watch</button>
+                            <button type="button" class="btn btn-small" data-add-undated title="Watched before, but you don't know when">+ One with no date</button>
+                        </div>
+                    </fieldset>
+                    ${genresField}`}
                     <div class="editor-releases" data-releases>${releasesInner(row, isNew)}</div>
                     ${f(W ? "Notes" : "Comments", `<textarea name="comments" rows="3" maxlength="4000" class="input"${W ? ` placeholder="Who recommended it, where to watch it…"` : ""}>${v(row.comments)}</textarea>`)}
                     <div class="actions">
@@ -344,6 +346,64 @@
         const form = d.$("form");
         form.querySelectorAll("[data-date]").forEach(DatePicker.attach);
         const genres = chipInput(d.$("[data-genres]"), row.genres, unique(allRows, (r) => r.genres), `genreOptions-${uid}`);
+        const tags = chipInput(d.$("[data-tags]"), row.tags ?? [], unique(allRows, (r) => r.tags ?? []), `tagOptions-${uid}`);
+
+        // ---------- the watches (the Watchlog's form): one row each, saved with the title ----------
+
+        const watchRows = d.$("[data-watch-rows]");
+        function addWatchRow(w) {
+            const li = document.createElement("li");
+            li.className = "watch-row";
+            if (w.id) li.dataset.id = w.id;
+            li.innerHTML = `
+                <input data-date data-w="date" class="input" value="${v(w.date)}" aria-label="Date watched (empty if you don't know)" placeholder="Date unknown">
+                <label class="check"><input type="checkbox" data-w="withBogdan" ${w.withBogdan ? "checked" : ""}> Bogdan</label>
+                <label class="check"><input type="checkbox" data-w="inCinema" ${w.inCinema ? "checked" : ""}> Cinema</label>
+                <input data-w="notes" class="input" maxlength="2000" value="${v(w.notes)}" placeholder="Notes" aria-label="Notes on this watch">
+                <button type="button" class="btn btn-small" data-remove-watch aria-label="Remove this watch" title="Remove this watch">×</button>`;
+            DatePicker.attach(li.querySelector("[data-date]"));
+            li.querySelector("[data-date]").placeholder = "Date unknown"; // empty: watched, but not sure when
+            li.querySelector("[data-remove-watch]").onclick = () => {
+                li.remove();
+                countWatches();
+            };
+            watchRows.appendChild(li);
+            countWatches();
+            return li;
+        }
+        function countWatches() {
+            const n = watchRows?.children.length ?? 0;
+            const el = d.$("[data-watch-count]");
+            if (el) el.textContent = n ? String(n) : "none yet";
+        }
+        // [{ id, date, withBogdan, inCinema, notes }], or null when a date isn't one (the field is focused)
+        function readWatches() {
+            if (!watchRows) return [];
+            const out = [];
+            for (const li of watchRows.children) {
+                const dateInput = li.querySelector('[data-w="date"]');
+                const date = DatePicker.iso(dateInput);
+                if (date === undefined) {
+                    dateInput.focus();
+                    d.error("A watch's date isn't a date. Use dd/mm/yyyy, or leave it empty if you don't know.");
+                    return null;
+                }
+                out.push({
+                    id: li.dataset.id ? Number(li.dataset.id) : null,
+                    date,
+                    withBogdan: li.querySelector('[data-w="withBogdan"]').checked,
+                    inCinema: li.querySelector('[data-w="inCinema"]').checked,
+                    notes: li.querySelector('[data-w="notes"]').value.trim() || null,
+                });
+            }
+            return out;
+        }
+        if (watchRows) {
+            (row.watches ?? []).forEach(addWatchRow);
+            d.$("[data-add-watch]").onclick = () => addWatchRow({ date: today }).querySelector("[data-date]").focus();
+            d.$("[data-add-undated]").onclick = () => addWatchRow({ date: null }).querySelector('[data-w="notes"]').focus();
+            countWatches();
+        }
 
         const renderPoster = () => {
             const el = d.$("[data-poster]");
@@ -526,8 +586,8 @@
         };
 
         d.$("[data-cancel]").onclick = () => onCancel?.();
-        if (markWatched && row.watchCount > 1)
-            note(`Watch number ${row.watchCount}: you've seen it before, so its first watch and rating are kept. Change the rating if it's moved.`);
+        if (markWatched && row.watches.length > 1)
+            note(`Watch number ${row.watches.length}: you've seen it before, so its watches and rating are kept. Change the rating if it's moved.`);
 
         // a plain click stays on the page; Ctrl/Cmd/Shift/middle click still opens the releases page
         const plain = (e) => e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
@@ -576,6 +636,7 @@
                 seasons: numOrNull(form.seasons.value),
                 episodesTotal: numOrNull(form.episodesTotal.value),
                 genres: genres.get(),
+                tags: tags.get(),
                 comments: form.comments.value,
                 ...poster,
             };
@@ -586,18 +647,15 @@
                 // the watch fields aren't on this form: a title waiting for a rewatch keeps its watches
                 body = { ...toRequest(row), ...shared, ...dates, list: "Watchlist" };
             } else {
-                const dates = readDates([["firstWatch", "First watch"], ["latestWatch", "Latest watch"], ["dateWithBogdan", "Date with Bogdan"]]);
-                if (!dates) return;
+                const watches = readWatches();
+                if (!watches) return;
                 body = {
                     ...shared,
-                    ...dates,
                     list: "Watched",
                     watchlistAddedOn: row.watchlistAddedOn ?? null,
                     rating: numOrNull(form.rating.value),
                     rewatchPotential: numOrNull(form.rewatchPotential.value),
-                    watchCount: numOrNull(form.watchCount.value) ?? 0,
-                    withBogdan: form.withBogdan.checked,
-                    watchedInCinema: form.watchedInCinema.checked,
+                    watches,
                 };
             }
             busy(d, form.querySelector("button[type=submit]"), async () => {
@@ -608,8 +666,10 @@
         };
 
         // Unsaved changes: anything different from how the form opened (the TMDB search box doesn't count).
+        const watchesNow = () =>
+            [...(watchRows?.children ?? [])].map((li) => [...li.querySelectorAll("[data-w]")].map((i) => (i.type === "checkbox" ? i.checked : i.value)));
         const snapshot = () =>
-            JSON.stringify([[...new FormData(form)].filter(([k]) => k !== "tmdbQuery"), genres.peek(), poster]);
+            JSON.stringify([[...new FormData(form)].filter(([k]) => k !== "tmdbQuery"), genres.peek(), tags.peek(), poster, watchesNow()]);
         let initial = snapshot();
         let saved = false;
         const isDirty = () => !saved && snapshot() !== initial;

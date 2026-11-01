@@ -26,7 +26,12 @@ public class WatchedInCinemaTests : IClassFixture<TestApp>
         var fetched = await _app.CreateClient().GetFromJsonAsync<JsonElement>($"/api/titles/{id}");
         Assert.True(fetched.GetProperty("watchedInCinema").GetBoolean());
 
-        var off = await (await client.PutAsJsonAsync($"/api/titles/{id}", new { body.name, body.type, body.rating, body.watchCount, body.genres, watchedInCinema = false })).Content.ReadFromJsonAsync<JsonElement>();
+        // it's worked out from the watches now: the flag sent with a save changes nothing, the watch does
+        var kept = await (await client.PutAsJsonAsync($"/api/titles/{id}", new { body.name, body.type, body.rating, body.watchCount, body.genres, watchedInCinema = false })).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(kept.GetProperty("watchedInCinema").GetBoolean());
+        var watch = kept.GetProperty("watches")[0];
+        Assert.True(watch.GetProperty("inCinema").GetBoolean());
+        var off = await (await client.PutAsJsonAsync($"/api/watches/{watch.GetProperty("id").GetInt32()}", new { inCinema = false })).Content.ReadFromJsonAsync<JsonElement>();
         Assert.False(off.GetProperty("watchedInCinema").GetBoolean());
     }
 }

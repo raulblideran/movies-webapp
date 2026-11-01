@@ -1195,6 +1195,15 @@ textarea.code {
 .tag-rewatch {
     --tag: var(--tag-rewatch);
 }
+/* your own tags, links to everything else with the tag */
+.tag-own {
+    --tag: var(--accent-2);
+    text-decoration: none;
+}
+a.tag-own:hover,
+a.tag-own:focus-visible {
+    background: color-mix(in srgb, var(--tag) 28%, transparent);
+}
 
 .tags-large .tag {
     font-size: 14px;
@@ -1301,12 +1310,15 @@ textarea.code {
    rewatch). Everything is drawn from theme tokens, so each theme restyles it. */
 .panel-title {
     --stub-w: 264px;
-    --poster-w: min(380px, calc((100vh - 68px) * 2 / 3));
-    --poster-w: min(380px, calc((100dvh - 68px) * 2 / 3));
+    /* The poster sets the ticket's height: as tall as the window allows (up to 960px), unless the
+       window is too narrow to leave the details room beside it. The ticket is never taller. */
+    --ticket-max-h: min(960px, calc(100vh - 70px));
+    --ticket-max-h: min(960px, calc(100dvh - 70px));
+    --poster-w: min(calc(var(--ticket-max-h) * 2 / 3), calc((100vw - 160px - var(--stub-w)) / 2));
     --notch: 13px;
     /* the notches where the stub tears off, cut out of the top and bottom edges */
     --notch-x: calc(100% - var(--stub-w) - 1px);
-    max-width: 1220px;
+    max-width: calc(var(--poster-w) + var(--stub-w) + 640px);
     display: flex;
     overflow: hidden;
     padding: 0;
@@ -1326,22 +1338,42 @@ textarea.code {
     scrollbar-color: var(--line-strong) transparent;
 }
 
-/* poster | details | stub. The poster is as large as the screen height allows, always 2:3. */
+/* poster | details | stub, one row exactly the poster's height (always 2:3). The details and the
+   stub each scroll on their own when they hold more (js/title-modal.js fades their foot). */
 .ticket {
     display: grid;
     grid-template-columns: var(--poster-w) minmax(0, 1fr) var(--stub-w);
-    grid-template-rows: auto auto 1fr;
-    min-height: 100%;
+    grid-template-rows: minmax(0, 1fr);
+    height: calc(var(--poster-w) * 3 / 2);
 }
 
+/* no poster to match: as tall as it needs, up to the same limit */
 .ticket.no-poster {
     grid-template-columns: minmax(0, 1fr) var(--stub-w);
+    height: auto;
+    max-height: var(--ticket-max-h);
 }
 
 .ticket-poster {
     grid-column: 1;
-    grid-row: 1 / span 3;
+    grid-row: 1;
     background: var(--poster-bg);
+}
+
+.ticket-main {
+    grid-column: -3;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.ticket-main.has-more,
+.stub.has-more {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), #0000);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), #0000);
 }
 
 .ticket-poster .modal-poster {
@@ -1352,15 +1384,11 @@ textarea.code {
 }
 
 .ticket-head {
-    grid-column: -3;
-    grid-row: 1;
     padding: 36px 32px 0;
 }
 
 /* Edit / Watched again / Delete, when signed in (admin.js fills #modalAdminBar) */
 .ticket-actions {
-    grid-column: -3;
-    grid-row: 2;
     padding: 20px 32px 0;
 }
 
@@ -1383,6 +1411,15 @@ textarea.code {
     margin: 12px 0 0;
 }
 
+@media (min-width: 761px) {
+    .ticket-head .modal-title.is-long {
+        font-size: clamp(28px, 3.4vw, 42px);
+    }
+    .ticket-head .modal-title.is-very-long {
+        font-size: clamp(24px, 2.6vw, 34px);
+    }
+}
+
 .modal-year {
     font-family: var(--font-body);
     font-size: 0.42em;
@@ -1398,7 +1435,10 @@ textarea.code {
 
 .stub {
     grid-column: -2;
-    grid-row: 1 / span 3;
+    grid-row: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1474,8 +1514,6 @@ textarea.code {
 /* ---- body: watch history, note, your copy ---- */
 
 .ticket-body {
-    grid-column: -3;
-    grid-row: 3;
     display: flex;
     flex-direction: column;
     gap: 30px;
@@ -1494,47 +1532,49 @@ textarea.code {
 }
 
 /* A line through the dates, in order. Labels sit under each point. */
+/* Watch history: a line down the left with a point for each watch, oldest first. Bogdan's watches are in
+   his colour and cinema ones ringed; the ones with no date, at the end, and the day it went on the
+   watchlist are hollow. An editor can open any of them (.watch-edit). */
 .watch-log {
-    display: grid;
-    grid-auto-columns: minmax(0, 1fr);
-    grid-auto-flow: column;
+    display: flex;
+    flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-.watch-log li {
+.watch-log > li {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 22px 12px 0 0;
+    padding: 0 0 14px 30px;
 }
 
-/* the line, then the point */
-.watch-log li::before {
-    content: "";
-    position: absolute;
-    top: 6px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--line-strong);
-}
-
-.watch-log li:last-child::before {
-    right: auto;
-    width: 12px;
-}
-
-.watch-log li:only-child::before {
-    display: none;
-}
-
-.watch-log li::after {
+.watch-log > li::before {
     content: "";
     position: absolute;
     top: 0;
+    bottom: 0;
+    left: 6px;
+    width: 2px;
+    background: var(--line-strong);
+}
+
+.watch-log > li:first-child::before {
+    top: 10px;
+}
+
+.watch-log > li:last-child::before {
+    bottom: auto;
+    height: 10px;
+}
+
+.watch-log > li:only-child::before {
+    display: none;
+}
+
+.watch-log > li::after {
+    content: "";
+    position: absolute;
+    top: 4px;
     left: 0;
     width: 14px;
     height: 14px;
@@ -1544,32 +1584,190 @@ textarea.code {
     box-shadow: 0 0 0 2px var(--accent);
 }
 
-.watch-log li.is-bogdan::after {
+.watch-log > li.is-bogdan::after {
     background: var(--tag-bogdan);
     box-shadow: 0 0 0 2px var(--tag-bogdan);
 }
 
-/* the day it went on the watchlist: a hollow point, before it was watched */
-.watch-log li.is-watchlist::after {
+.watch-log > li.is-cinema::after {
+    box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px var(--surface), 0 0 0 5px var(--ink-2);
+}
+
+.watch-log > li.is-undated::after,
+.watch-log > li.is-watchlist::after {
     background: var(--surface);
 }
 
+.watch-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+}
+
 .watch-log time {
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
 }
 
-.watch-log span {
+.watch-what,
+.watch-unknown {
     font-size: 14px;
     color: var(--ink-3);
+}
+
+.watch-unknown {
+    font-style: italic;
+}
+
+.watch-line .tag {
+    align-self: center;
+}
+
+.watch-note {
+    display: block;
+    margin-top: 3px;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--ink-2);
+    overflow-wrap: anywhere;
+}
+
+.watch-edit {
+    display: block;
+    width: calc(100% + 16px);
+    margin: -5px -8px -3px;
+    padding: 5px 8px 3px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.watch-edit:hover,
+.watch-edit:focus-visible {
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.watch-edit:hover .watch-line::after,
+.watch-edit:focus-visible .watch-line::after {
+    content: "Edit";
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.watch-group summary {
+    cursor: pointer;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--ink-2);
+}
+
+.watch-group summary .faint {
+    font-style: normal;
+}
+
+/* the undated watches, opened: a plain list under their point */
+.watch-log-inner {
+    margin-top: 10px;
+}
+
+.watch-log-inner > li {
+    padding-left: 0;
+    padding-bottom: 10px;
+}
+
+.watch-log-inner > li::before,
+.watch-log-inner > li::after {
+    display: none;
+}
+
+.section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    margin-bottom: 14px;
+}
+
+.modal-section .section-head h3 {
+    margin: 0;
+}
+
+.section-head .count {
+    margin-left: 4px;
+    font-weight: 600;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.section-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 14px;
 }
 
 /* from TMDB: who made it and who's in it, the synopsis, and the trailer */
 .modal-credits {
     margin: 8px 0 0;
     font-size: 15px;
+    color: var(--ink-2);
+}
+
+.person-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+    text-underline-offset: 3px;
+}
+
+.person-link:hover,
+.person-link:focus-visible {
+    color: var(--accent);
+    text-decoration-color: currentColor;
+}
+
+/* "Japanese · Japan" */
+.modal-origin {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: var(--ink-3);
+}
+
+/* TMDB users' score in the stub, under yours */
+.stub-crowd {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin: 0;
+}
+
+.stub-crowd-score {
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    font-size: 26px;
+    line-height: 1.1;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.stub-crowd-label,
+.stub-crowd-diff {
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.stub-crowd-diff {
     color: var(--ink-2);
 }
 
@@ -2013,11 +2211,20 @@ textarea.code {
         grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
         /* the free space beside the cover goes above the title, so the text sits at its foot */
         grid-template-rows: 1fr auto auto;
-        min-height: 0;
+        height: auto;
+        max-height: none;
     }
-    /* the stub's parts join the grid directly */
+    /* the details' and the stub's parts join the grid directly, and the whole sheet scrolls */
+    .ticket-main,
     .stub {
         display: contents;
+    }
+    /* in this order under the cover: actions, your copy, the history, then the franchise */
+    .stub-copy {
+        order: 1;
+    }
+    .ticket-body {
+        order: 2;
     }
     .ticket-poster {
         grid-column: 1;
@@ -2109,7 +2316,7 @@ textarea.code {
     }
     .stub-franchise {
         grid-column: 1 / -1;
-        order: 1;
+        order: 3;
         min-width: 0; /* long titles truncate instead of widening the ticket */
         width: auto;
         margin: 0 16px 24px;
@@ -2118,24 +2325,17 @@ textarea.code {
         gap: 24px;
         padding: 22px 16px 28px;
     }
-    .watch-log {
-        grid-auto-flow: row;
+    .stub-crowd {
+        grid-column: 1 / -1;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 4px 8px;
+        margin: 14px 16px 0;
+        text-align: left;
     }
-    .watch-log li {
-        padding: 0 0 18px 28px;
-    }
-    .watch-log li::before,
-    .watch-log li:last-child::before {
-        top: 0;
-        bottom: 0;
-        left: 6px;
-        right: auto;
-        width: 2px;
-        height: auto;
-    }
-    .watch-log li:last-child::before {
-        bottom: auto;
-        height: 8px;
+    .stub-crowd-score {
+        font-size: 20px;
     }
 }
 
@@ -2643,6 +2843,10 @@ textarea.code {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.row-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 /* TMDB link: paste a themoviedb.org link to fill the form */
 .tmdb-link {
     display: flex;
@@ -2679,6 +2883,7 @@ textarea.code {
 }
 
 @media (max-width: 640px) {
+    .row-5,
     .row-4,
     .row-3 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4592,5 +4797,652 @@ textarea.code {
     }
     .leader {
         --sweep: 270deg;
+    }
+}
+
+/* ---------- watches: dots on the cards, the editor's rows, the watch dialog, the Watches page ---------- */
+
+/* one dot per watch: hollow with no date, Bogdan's colour with him, ringed for the cinema */
+.pips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin: 2px 0 8px;
+}
+
+.pip {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.pip.is-bogdan {
+    border-color: var(--tag-bogdan);
+    background: var(--tag-bogdan);
+}
+
+.pip.is-undated {
+    background: transparent;
+}
+
+.pip.is-cinema {
+    outline: 1.5px solid var(--ink-2);
+    outline-offset: 1.5px;
+}
+
+.pip-more,
+.pip-count {
+    margin-left: 2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.pip-count {
+    margin-left: 6px;
+    color: var(--ink-2);
+}
+
+.field-hint {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.editor-watches {
+    min-width: 0;
+    margin: 0;
+    padding: 12px 14px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+.editor-watches legend {
+    padding: 0 6px;
+}
+
+.editor-watches .count {
+    margin-left: 4px;
+    color: var(--ink-3);
+    font-weight: 600;
+}
+
+.watch-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+}
+
+.watch-rows:empty {
+    display: none;
+}
+
+.watch-row {
+    display: grid;
+    grid-template-columns: minmax(130px, 160px) auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+.watch-add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.watch-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+}
+
+/* a title picked by typing: the watch dialog's, the Watches page's filter */
+.title-pick,
+.title-filter {
+    position: relative;
+}
+
+.title-filter {
+    flex: 1 1 320px;
+    min-width: 0;
+}
+
+.title-filter .search {
+    width: 100%;
+}
+
+.title-pick-list {
+    position: absolute;
+    z-index: 30;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 300px;
+    margin: 4px 0 0;
+    padding: 4px;
+    overflow-y: auto;
+    list-style: none;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    box-shadow: var(--shadow);
+}
+
+.title-pick-list button {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.title-pick-list button:hover,
+.title-pick-list button:focus-visible {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.watch-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.watch-title img,
+.watch-title-blank {
+    flex: none;
+    width: 30px;
+    height: 45px;
+    border-radius: 3px;
+    background: var(--poster-bg);
+    object-fit: cover;
+}
+
+.picked-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    font-size: 14px;
+    color: var(--ink-2);
+}
+
+.chip-count {
+    margin-left: 2px;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+    /* the date and ×, then the checks, then the notes; a dashed line between watches */
+    .watch-row {
+        grid-template-columns: auto auto minmax(0, 1fr) auto;
+    }
+    .watch-row .date-field {
+        grid-column: 1 / 4;
+    }
+    .watch-row [data-remove-watch] {
+        grid-row: 1;
+        grid-column: 4;
+    }
+    .watch-row .check {
+        grid-row: 2;
+    }
+    .watch-row [data-w="notes"] {
+        grid-row: 3;
+        grid-column: 1 / -1;
+    }
+    .watch-rows > li + li {
+        padding-top: 10px;
+        border-top: 1px dashed var(--line);
+    }
+}
+
+/* ---------- Stats: this year's goal, and the link from People to a person's page ---------- */
+
+.goal-card {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 28px;
+    padding: 20px 24px;
+    border: 1px solid var(--line-strong);
+    border-radius: calc(var(--radius) + 2px);
+    background: var(--surface);
+}
+
+.goal-card.is-empty {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 20px;
+    color: var(--ink-2);
+}
+
+.goal-card.is-empty p {
+    margin: 0;
+}
+
+.goal-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.goal-head h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.goal-figure {
+    margin: 0;
+    font-size: 17px;
+    color: var(--ink-2);
+}
+
+.goal-figure strong {
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    font-size: 40px;
+    line-height: 1;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+/* the bar fills with the watches so far; the tick is where you'd be on pace today */
+.goal-bar {
+    position: relative;
+    height: 12px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.goal-bar span {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+    background: var(--accent);
+}
+
+.goal-card.is-done .goal-bar span {
+    background: var(--ok);
+}
+
+.goal-bar i {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--ink);
+}
+
+.goal-note {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ink-3);
+}
+
+.person-page-link {
+    display: inline-block;
+    margin: 4px 0 12px;
+    font-size: 14px;
+}
+
+/* ---------- a person's page (/people/{id}) ---------- */
+
+.person-page {
+    padding-top: 36px;
+}
+
+.loading-inline {
+    padding: 60px 0;
+    text-align: center;
+}
+
+.person-hero {
+    display: grid;
+    grid-template-columns: minmax(160px, 240px) minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+    margin-bottom: 44px;
+}
+
+.person-photo {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    border-radius: var(--radius);
+    object-fit: cover;
+    background: var(--poster-bg);
+    box-shadow: var(--shadow);
+}
+
+.person-photo-blank {
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-size: 64px;
+    color: var(--ink-3);
+}
+
+.person-known {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+
+.person-title {
+    margin: 6px 0 4px;
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    text-transform: var(--display-case);
+    letter-spacing: var(--display-tracking);
+    font-size: clamp(36px, 5vw, 64px);
+    line-height: 0.98;
+}
+
+.person-life {
+    margin: 0 0 20px;
+    color: var(--ink-3);
+}
+
+.person-figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin: 0 0 20px;
+}
+
+.person-figures dt {
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.person-figures dd {
+    margin: 2px 0 0;
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    font-size: 28px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.person-bio {
+    max-width: 75ch;
+    color: var(--ink-2);
+    line-height: 1.6;
+}
+
+.person-bio summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.person-bio summary::-webkit-details-marker {
+    display: none;
+}
+
+.person-bio[open] summary {
+    display: none;
+}
+
+.person-bio p {
+    margin: 0 0 10px;
+}
+
+.person-section {
+    margin-bottom: 44px;
+}
+
+.person-section h2 {
+    margin: 0 0 6px;
+    font-size: 22px;
+}
+
+.person-section h2 .count {
+    margin-left: 6px;
+    font-size: 16px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.person-section > .muted {
+    margin: 0 0 14px;
+}
+
+.person-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 20px 16px;
+    margin: 14px 0 16px;
+}
+
+.person-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.person-card img,
+.person-card-blank {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    background: var(--poster-bg);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--line);
+    transition: transform 0.15s ease;
+}
+
+.person-card-blank {
+    display: grid;
+    place-items: center;
+    padding: 10px;
+    font-size: 14px;
+    text-align: center;
+    color: var(--ink-3);
+}
+
+a.person-card:hover img,
+a.person-card:focus-visible img,
+.person-card-poster:hover img {
+    transform: translateY(-3px);
+}
+
+.person-card > .rating {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+}
+
+.person-card-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    min-width: 0;
+}
+
+.person-card-name {
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.person-card-role,
+.person-card-score {
+    font-size: 13px;
+    color: var(--ink-3);
+    overflow-wrap: anywhere;
+}
+
+.person-card .pips {
+    margin: 2px 0 0;
+}
+
+.person-card .btn {
+    margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+    .person-page {
+        padding-top: 20px;
+    }
+    .person-hero {
+        grid-template-columns: 110px minmax(0, 1fr);
+        gap: 16px;
+    }
+    .person-figures dd {
+        font-size: 22px;
+    }
+    .person-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+}
+
+/* ---------- Coming soon (the Watchlist page): a strip of films on their way ---------- */
+
+.coming-soon {
+    margin-bottom: 28px;
+    padding: 18px 20px 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: calc(var(--radius) + 2px);
+    background: var(--surface);
+}
+
+.coming-soon.is-collapsed {
+    padding-bottom: 18px;
+}
+
+.coming-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 14px;
+}
+
+.coming-head h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.coming-head p {
+    flex: 1 1 260px;
+    margin: 0;
+    font-size: 14px;
+}
+
+.soon-strip {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(150px, 170px);
+    gap: 16px;
+    margin-top: 16px;
+    padding-bottom: 14px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+}
+
+.soon-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.soon-poster img,
+.soon-blank {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    background: var(--poster-bg);
+    box-shadow: 0 0 0 1px var(--line);
+}
+
+.soon-blank {
+    display: grid;
+    place-items: center;
+    padding: 10px;
+    font-size: 13px;
+    text-align: center;
+    color: var(--ink-3);
+}
+
+.soon-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+}
+
+.soon-text h3 {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.3;
+}
+
+.soon-when,
+.soon-why {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-2);
+}
+
+.soon-why {
+    color: var(--ink-3);
+}
+
+.soon-text .btn {
+    margin-top: 4px;
+}
+
+.soon-tba {
+    margin: 4px 0 12px;
+}
+
+.soon-tba summary {
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-2);
+}
+
+.soon-tba .count {
+    margin-left: 4px;
+    color: var(--ink-3);
+}
+
+@media (max-width: 640px) {
+    .coming-soon {
+        padding: 14px 14px 4px;
+    }
+    .soon-strip {
+        grid-auto-columns: 132px;
     }
 }

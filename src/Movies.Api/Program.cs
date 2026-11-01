@@ -112,6 +112,7 @@ builder.Services.AddHttpClient<TmdbClient>(c =>
     c.Timeout = TimeSpan.FromSeconds(10);
 });
 builder.Services.AddScoped<TmdbMetadataService>();
+builder.Services.AddScoped<ComingSoonService>();
 builder.Services.AddHostedService<TmdbMetadataRefreshService>();
 builder.Services.Configure<CexOptions>(config.GetSection("Cex"));
 builder.Services.AddScoped<CexItemsService>();
@@ -211,6 +212,9 @@ app.MapGet("/titles/{id:int}/edit", (HttpContext ctx) => Page(ctx, "edit.html"))
 app.MapGet("/watchlist", (HttpContext ctx) => Page(ctx, "watchlist.html"));
 app.MapGet("/watchlist.html", (HttpContext ctx) => Page(ctx, "watchlist.html"));
 app.MapGet("/watchlist/new", (HttpContext ctx) => Page(ctx, "edit.html"));
+app.MapGet("/watches", (HttpContext ctx) => Page(ctx, "watches.html"));
+app.MapGet("/watches.html", (HttpContext ctx) => Page(ctx, "watches.html"));
+app.MapGet("/people/{id:int}", (HttpContext ctx) => Page(ctx, "person.html"));
 
 // The service worker carries the build stamp, so each deploy installs a new worker with a fresh cache.
 // It must never be cached for long, or browsers would keep running an old one.
@@ -226,6 +230,7 @@ app.MapGet("/sw.js", (HttpContext ctx) =>
     return Results.Content(js, "text/javascript; charset=utf-8");
 });
 app.MapTitlesEndpoints();
+app.MapWatchesEndpoints();
 app.MapReleasesEndpoints();
 app.MapExternalEndpoints();
 app.MapAuthEndpoints();

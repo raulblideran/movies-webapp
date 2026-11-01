@@ -16,6 +16,10 @@ let activeFilters = {
     physicalFormat: "all",
     special: "all",
     runtime: "all",
+    decade: "all",
+    tag: "all",
+    language: "all",
+    watchCount: "all",
 };
 // the page's sort menu marks its default
 const DEFAULT_SORT = document.querySelector('#sortDropdown [aria-checked="true"]')?.dataset.sort ?? "name";
@@ -24,7 +28,7 @@ let currentSort = DEFAULT_SORT;
 // ---------- the view in the URL: search, sort, filters and grid/table, so Back, a refresh or a shared
 // link land on the same view, e.g. /watchlist?type=film&runtime=under-90 ----------
 
-const URL_FILTERS = { type: "type", genre: "genre", rating: "rating", format: "physicalFormat", special: "special", runtime: "runtime" };
+const URL_FILTERS = { type: "type", genre: "genre", rating: "rating", format: "physicalFormat", special: "special", runtime: "runtime", decade: "decade", tag: "tag", lang: "language", watches: "watchCount" };
 const VIEW_KEY = `view:${LIST === "watchlist" ? "watchlist" : "titles"}`;
 
 (function readUrl() {
@@ -44,8 +48,8 @@ const VIEW_KEY = `view:${LIST === "watchlist" ? "watchlist" : "titles"}`;
         } catch {
             // storage unavailable: the grid it is
         }
-    const active = Object.values(activeFilters).filter((v) => v !== "all").length;
-    document.getElementById("filterCount").textContent = active ? `(${active})` : "";
+    if (!/^(all|\d+)$/.test(activeFilters.watchCount)) activeFilters.watchCount = "all"; // a count, or nothing
+    updateFilterCount();
 })();
 
 let urlTimer = null;
@@ -88,7 +92,6 @@ function detailFields(row) {
     if (row.list === "watchlist")
         return [
             ["Added", formatDate(row.watchlistAddedOn)],
-            ["Seen", row.watchCount ? (row.watchCount === 1 ? "Once" : `${row.watchCount} times`) : ""],
             ["Seasons", row.seasons != null ? String(row.seasons) : ""],
             ["Episodes", row.episodesTotal != null ? String(row.episodesTotal) : ""],
             ["Genre", row.genres.join("/")],
@@ -97,12 +100,10 @@ function detailFields(row) {
         ].filter(([, v]) => v !== "");
     return [
         ["First watch", formatDate(row.firstWatch)],
-        ["Watch count", row.watchCount ? String(row.watchCount) : ""],
-        ["Latest watch", formatDate(row.latestWatch)],
+        ["Latest watch", row.latestWatch !== row.firstWatch ? formatDate(row.latestWatch) : ""],
         ["Seasons", row.seasons != null ? String(row.seasons) : ""],
         ["Episodes", row.episodesTotal != null ? String(row.episodesTotal) : ""],
         ["Genre", row.genres.join("/")],
-        ["With Bogdan", formatDate(row.dateWithBogdan)],
         ["Comments", row.comments || ""],
         ["Price (£)", Shelf.titleShare(row) != null ? Shelf.titleShare(row).toFixed(2) : ""],
     ].filter(([, v]) => v !== "");
@@ -123,6 +124,9 @@ function searchTextFor(row) {
         row.releaseYear,
         ...(row.directors ?? []),
         ...(row.cast ?? []),
+        ...(row.tags ?? []).map((t) => `#${t} ${t}`),
+        ...(row.watches ?? []).map((w) => w.notes),
+        TitleModal.languageName(row.originalLanguage),
     ]
         .filter(Boolean)
         .join(" ")
@@ -285,6 +289,27 @@ function createFilters() {
     fill("genreFilters", "genre", [["all", "All"], ...uniqueValues((r) => r.genres)]);
     fill("ratingFilters", "rating", ["All", "10", "9-10", "8-9", "7-8", "<7"].map((r) => [r.toLowerCase(), r]));
     fill("runtimeFilters", "runtime", RUNTIMES.map(([value, label]) => [value, label]));
+    // only the decades this list has titles from (and the chosen one, which may have come from a link)
+    const hasDecade = ([value, , test]) =>
+        value === "all" || value === activeFilters.decade || allData.some((r) => r.releaseYear && test(r.releaseYear));
+    fill("decadeFilters", "decade", DECADES.filter(hasDecade).map(([value, label]) => [value, label]));
+    // your own tags, and the languages they're in (most titles first): groups with nothing to pick stay hidden
+    const tags = uniqueValues((r) => r.tags ?? []);
+    fill("tagFilters", "tag", [["all", "All"], ...tags.map(([value, label]) => [value, `#${label}`])]);
+    document.getElementById("tagFilters")?.closest(".filter-group").classList.toggle("hidden", tags.length === 0);
+    const languages = new Map();
+    for (const r of allData) if (r.originalLanguage) languages.set(r.originalLanguage, (languages.get(r.originalLanguage) ?? 0) + 1);
+    const byCount = [...languages].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    fill("languageFilters", "language", [["all", "All"], ...byCount.map(([code, n]) => [code, `${TitleModal.languageName(code)} (${n})`])]);
+    document.getElementById("languageFilters")?.closest(".filter-group").classList.toggle("hidden", byCount.length < 2);
+    // how many times you've watched them: a chip for each count your titles have (and the chosen one, from a link)
+    const times = new Map();
+    for (const r of allData) times.set(r.watchCount || 0, (times.get(r.watchCount || 0) ?? 0) + 1);
+    if (activeFilters.watchCount !== "all" && !times.has(Number(activeFilters.watchCount))) times.set(Number(activeFilters.watchCount), 0);
+    const timesLabel = (n) => (n === 0 ? "Not seen" : n === 1 ? "Once" : n === 2 ? "Twice" : `${n}×`);
+    const byTimes = [...times].sort((a, b) => a[0] - b[0]);
+    fill("watchCountFilters", "watchCount", [["all", "All"], ...byTimes.map(([n, c]) => [String(n), `${timesLabel(n)} (${c})`])]);
+    document.getElementById("watchCountFilters")?.closest(".filter-group").classList.toggle("hidden", byTimes.length < 2);
     fill("physicalFormatFilters", "physicalFormat", [["all", "All"], ...uniqueValues((r) => r.releases.map(Shelf.label))]);
     fill(
         "specialFilters",
@@ -305,6 +330,13 @@ const RUNTIMES = [
     ["over-150", "Over 2h30", (m) => m > 150],
 ];
 
+// Release decades. Titles without a release year only show under "All".
+const DECADES = [
+    ["all", "All", () => true],
+    ...[2020, 2010, 2000, 1990, 1980].map((d) => [`${d}s`, `${d}s`, (y) => y >= d && y < d + 10]),
+    ["older", "Before 1980", (y) => y < 1980],
+];
+
 function setFilter(category, value, button) {
     activeFilters[category] = value;
 
@@ -312,9 +344,23 @@ function setFilter(category, value, button) {
         .querySelectorAll(`#${category}Filters button`)
         .forEach((btn) => btn.setAttribute("aria-pressed", String(btn === button)));
 
+    updateFilterCount();
+    applyFilters();
+    writeUrl({ now: true });
+}
+
+// "Filters (2)", and the Clear filters button while any are on
+function updateFilterCount() {
     const active = Object.values(activeFilters).filter((v) => v !== "all").length;
     document.getElementById("filterCount").textContent = active ? `(${active})` : "";
+    document.getElementById("clearFilters")?.classList.toggle("hidden", !active);
+}
 
+// Every filter back to All (the search and the sort stay as they are).
+function clearFilters() {
+    for (const key of Object.keys(activeFilters)) activeFilters[key] = "all";
+    createFilters(); // the chips, pressed as they are now
+    updateFilterCount();
     applyFilters();
     writeUrl({ now: true });
 }
@@ -338,6 +384,17 @@ function applyFilters() {
         if (activeFilters.runtime !== "all") {
             const band = RUNTIMES.find(([v]) => v === activeFilters.runtime);
             if (!row.runtime || (band && !band[2](row.runtime))) return false;
+        }
+
+        if (activeFilters.tag !== "all" && !(row.tags ?? []).some((t) => t.toLowerCase() === activeFilters.tag)) return false;
+
+        if (activeFilters.language !== "all" && row.originalLanguage !== activeFilters.language) return false;
+
+        if (activeFilters.watchCount !== "all" && (row.watchCount || 0) !== Number(activeFilters.watchCount)) return false;
+
+        if (activeFilters.decade !== "all") {
+            const band = DECADES.find(([v]) => v === activeFilters.decade);
+            if (!row.releaseYear || (band && !band[2](row.releaseYear))) return false;
         }
 
         if (
@@ -542,7 +599,7 @@ function displayCards(data) {
 
     if (data.length === 0) {
         grid.innerHTML = allData.length
-            ? `<div class="empty"><h2>Nothing matches</h2><p class="muted">Try a shorter search or clear some filters.</p></div>`
+            ? `<div class="empty"><h2>Nothing matches</h2><p class="muted">Try a shorter search or clear some filters.</p>${Object.values(activeFilters).some((v) => v !== "all") ? `<button type="button" class="btn" onclick="clearFilters()">Clear all filters</button>` : ""}</div>`
             : IS_WATCHLIST
               ? `<div class="empty"><h2>Nothing on your watchlist</h2><p class="muted">Add the films and series you want to watch, and mark them as watched from here.</p></div>`
               : "";
@@ -565,6 +622,7 @@ function displayCards(data) {
             <div class="card-body">
                 <h3 class="card-title">${escapeHtml(row.name)}${row.releaseYear ? ` <span class="card-year">${row.releaseYear}</span>` : ""}</h3>
                 <div class="tags">${tagsHtml(row)}</div>
+                ${WatchDialog.pipsHtml(row)}
                 <dl class="facts">${factsHtml(row, { skip: ["Genre", "Price (£)"] })}</dl>
             </div>`;
         fragment.appendChild(card);
@@ -592,6 +650,9 @@ TitleModal.configure({
     onOpened: (row) => window.Admin?.onModalOpened(row),
     lookup: (type, id) => everyTitle().find((r) => r.tmdbId === id && r.tmdbMediaType === type),
     addToWatchlist: (parts) => addToWatchlist(parts),
+    // a watch added, changed or deleted in the popup: the cards and filters as they are now
+    onTitleChanged: () => loadTitles({ quiet: true }),
+    lookupTitle: (id) => everyTitle().find((r) => r.id === id),
 });
 
 // A franchise's missing films, from the popup: each one's TMDB details, onto the watchlist.
@@ -667,6 +728,8 @@ window.App = {
     getOther: () => otherData,
     // what's on screen, in order (search and filters applied): Pick for me picks from these
     getShown: () => shownRows,
+    // films from TMDB ([{ id, title }]) onto the watchlist (Coming soon, franchise progress)
+    addToWatchlist: (parts) => addToWatchlist(parts),
     openModal,
     closeModal,
     showRelease,

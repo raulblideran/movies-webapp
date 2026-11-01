@@ -12,6 +12,8 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
     public DbSet<CexPriceSnapshot> CexPriceSnapshots => Set<CexPriceSnapshot>();
     public DbSet<PhysicalRelease> Releases => Set<PhysicalRelease>();
     public DbSet<TitleRelease> TitleReleases => Set<TitleRelease>();
+    public DbSet<Watch> Watches => Set<Watch>();
+    public DbSet<YearGoal> YearGoals => Set<YearGoal>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -38,8 +40,23 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
                         (a, b) => a!.SequenceEqual(b!),
                         v => v.Aggregate(0, (h, c) => HashCode.Combine(h, c.GetHashCode())),
                         v => v.ToList()));
+            e.Property(t => t.VoteAverage).HasPrecision(3, 1);
+            e.Property(t => t.OriginalLanguage).HasMaxLength(10);
             e.HasIndex(t => t.Name);
             e.HasIndex(t => t.List);
+        });
+
+        builder.Entity<Watch>(e =>
+        {
+            e.Property(w => w.Notes).HasMaxLength(2000);
+            e.HasOne(w => w.Title).WithMany(t => t.Watches).HasForeignKey(w => w.TitleId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(w => new { w.TitleId, w.Date });
+        });
+
+        builder.Entity<YearGoal>(e =>
+        {
+            e.HasKey(g => g.Year);
+            e.Property(g => g.Year).ValueGeneratedNever();
         });
 
         builder.Entity<CexItem>(e =>

@@ -142,6 +142,9 @@
     };
     TitleModal.configure({
         lookup: (type, id) => [...titles.values()].find((t) => t.tmdbId === id && t.tmdbMediaType === type),
+        // a watch changed in the popup: the page's copy of the titles as they are now
+        onTitleChanged: () => load(),
+        lookupTitle: (id) => titles.get(id),
         // a release listed on the title opens over it
         showRelease(id) {
             const r = releases.find((x) => x.id === id);

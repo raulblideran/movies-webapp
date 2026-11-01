@@ -98,6 +98,8 @@
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="rating-asc">Rating, lowest first</button>
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="date-latest">Latest watch</button>
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="date-first">First watch</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="year-desc">Release year, newest first</button>
+                            <button type="button" role="menuitemradio" aria-checked="false" data-sort="year-asc">Release year, oldest first</button>
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="watch-count">Watch count</button>
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="runtime-asc">Shortest first</button>
                             <button type="button" role="menuitemradio" aria-checked="false" data-sort="runtime-desc">Longest first</button>
@@ -114,6 +116,7 @@
                         Filters <span id="filterCount"></span>
                         <span class="caret" aria-hidden="true">▼</span>
                     </button>
+                    <button type="button" id="clearFilters" class="btn hidden" onclick="clearFilters()">Clear filters</button>
                     <div id="viewToggle"></div>
                     <div id="adminControls"></div>
                 </div>
@@ -130,6 +133,22 @@
                     <div class="filter-group">
                         <h3>Length</h3>
                         <div class="chips" id="runtimeFilters"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Released</h3>
+                        <div class="chips" id="decadeFilters"></div>
+                    </div>
+                    <div class="filter-group hidden">
+                        <h3>Times watched</h3>
+                        <div class="chips" id="watchCountFilters"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Language</h3>
+                        <div class="chips" id="languageFilters"></div>
+                    </div>
+                    <div class="filter-group hidden">
+                        <h3>Your tags</h3>
+                        <div class="chips" id="tagFilters"></div>
                     </div>
                     <div class="filter-group">
                         <h3>Rating</h3>
@@ -176,6 +195,7 @@
         <script src="js/auth.js"></script>
         <script src="js/release-dialogs.js"></script>
         <script src="js/datepicker.js"></script>
+        <script src="js/watch-dialog.js"></script>
         <script src="js/editor.js"></script>
         <script src="js/admin.js"></script>
     </body>

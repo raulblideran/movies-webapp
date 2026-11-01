@@ -576,6 +576,7 @@
                     <span>Signed in as <b>${esc(me.userName)}</b></span>
                     <button type="button" data-account class="link">Account</button>
                     ${me.isAdmin ? `<button type="button" data-users class="link">Users</button>` : ""}
+                    ${me.canEdit ? `<a href="/watches" class="link">Watches</a>` : ""}
                     ${me.canEdit && document.body.dataset.exportUrl ? `<a href="${document.body.dataset.exportUrl}" class="link">Export CSV</a>` : ""}
                     <button type="button" data-logout class="link">Sign out</button>`;
                 footer.querySelector("[data-account]").onclick = openAccount;

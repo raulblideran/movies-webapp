@@ -33,6 +33,8 @@ public static class Startup
     public static async Task MigrateAsync(MoviesDbContext db)
     {
         var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+        // titles had a summary of their viewings before each one was its own watch
+        var seedWatches = pending.Any(m => m.EndsWith("_Watches"));
         List<ReleaseConversion.Shelf>? shelves = null;
         if (pending.Any(m => m.EndsWith("_DropTitleShelfColumns")))
         {
@@ -50,6 +52,19 @@ public static class Startup
             }
             await db.SaveChangesAsync();
         }
+        if (seedWatches) await SeedWatchesAsync(db);
+    }
+
+    /// <summary>Each title's watches, from the summary it had before watches existed (WatchSummary.FromSummary).</summary>
+    public static async Task SeedWatchesAsync(MoviesDbContext db)
+    {
+        var titles = await db.Titles.Include(t => t.Watches).Where(t => !t.Watches.Any()).ToListAsync();
+        foreach (var t in titles)
+        {
+            t.Watches = WatchSummary.FromSummary(t);
+            WatchSummary.Apply(t);
+        }
+        await db.SaveChangesAsync();
     }
 
     /// <summary>The titles' old formats, prices and CeX links, read while their columns still exist.</summary>

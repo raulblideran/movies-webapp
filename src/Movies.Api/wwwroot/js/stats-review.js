@@ -1,9 +1,9 @@
 // Stats page, Year in review tab (#review, #review-2025): one year of watching at a glance. Built from the
 // blocks js/stats.js shares as window.StatsKit.
 //
-// Titles only keep their first and latest watch dates (and a count), so a year's figures are worked out
-// from those: "new" means first watched that year, "rewatched" means its latest watch was that year and it
-// had been seen before. Watches in between have no date and can't be placed in a year.
+// A year's figures come from the watches dated in it: "new" means its first dated watch was that year,
+// "rewatched" means watched that year after first seeing it in an earlier one. Watches with no date
+// can't be placed in a year, so they're left out (date them on the Watches page and they count).
 
 (function () {
     const K = window.StatsKit;
@@ -20,7 +20,7 @@
     // every year something happened in, newest first, and this year even if it's quiet so far
     function years() {
         const ys = new Set([thisYear()]);
-        for (const r of K.watched()) [r.fy, r.ly].forEach((y) => y && ys.add(y));
+        for (const r of K.watched()) for (const w of r.watches ?? []) if (w.date) ys.add(yearOf(w.date));
         for (const r of K.titles()) if (r.watchlistAddedOn) ys.add(yearOf(r.watchlistAddedOn));
         return [...ys].sort((a, b) => b - a);
     }
@@ -28,34 +28,41 @@
     // In January the year that just ended is the interesting one.
     function defaultYear() {
         const now = new Date();
-        const hasData = (y) => K.watched().some((r) => r.fy === y || r.ly === y);
+        const hasData = (y) => K.watched().some((r) => (r.watches ?? []).some((w) => yearOf(w.date) === y));
         return now.getMonth() === 0 && hasData(thisYear() - 1) ? thisYear() - 1 : thisYear();
     }
 
-    // A year's watching, from first/latest dates.
+    // A year's watching, from the watches dated in it.
     function yearData(Y) {
         const W = K.watched();
-        const fresh = W.filter((r) => r.fy === Y);
-        const rewatched = W.filter((r) => r.ly === Y && r.watchCount >= 2 && r.fy != null && r.fy < Y);
-        const seen = [...new Set([...fresh, ...rewatched])];
-        // watches in the year: a title first seen this year counts all its watches if the latest was this
-        // year too (they all fall in it); otherwise one. A rewatch counts one.
-        const watchesIn = (r) => (r.fy === Y ? (r.ly === Y ? r.watchCount || 1 : 1) : 1);
+        const inYear = new Map();
+        for (const r of W) {
+            const ws = (r.watches ?? []).filter((w) => yearOf(w.date) === Y);
+            if (ws.length) inYear.set(r, ws);
+        }
+        const seen = [...inYear.keys()];
+        const fresh = seen.filter((r) => r.fy === Y);
+        const rewatched = seen.filter((r) => r.fy != null && r.fy < Y);
+        const watchesIn = (r) => inYear.get(r)?.length ?? 0;
+        const yearWatches = [...inYear.values()].flat();
         const minutesPerWatch = (r) => (!r.runtime ? null : r.type === "Series" ? (r.episodesTotal ? r.runtime * r.episodesTotal : null) : r.runtime);
         const minutes = sum(seen.map((r) => (minutesPerWatch(r) ?? 0) * watchesIn(r)));
         const rated = fresh.filter((r) => r.r10 != null);
         const all = K.titles();
         const addedToWatchlist = all.filter((r) => yearOf(r.watchlistAddedOn) === Y);
-        const crossedOff = all.filter((r) => r.list === "watched" && r.watchlistAddedOn && r.latestWatch && yearOf(r.latestWatch) === Y && r.latestWatch >= r.watchlistAddedOn);
+        // off the watchlist: its first watch on or after the day it was added, in this year
+        const watchedAfter = (r) => (r.watches ?? []).map((w) => w.date).filter((d) => d && d >= r.watchlistAddedOn).sort()[0];
+        const crossedOff = all.filter((r) => r.list === "watched" && r.watchlistAddedOn && yearOf(watchedAfter(r)) === Y);
         return {
             Y, fresh, rewatched, seen, minutes, rated,
             avg: rated.length ? mean(rated.map((r) => r.r10)) : null,
-            withBogdan: W.filter((r) => yearOf(r.dateWithBogdan) === Y).length,
+            withBogdan: seen.filter((r) => inYear.get(r).some((w) => w.withBogdan)).length,
+            inCinema: yearWatches.filter((w) => w.inCinema).length,
             favourites: fresh.filter((r) => r.fav),
-            watches: sum(seen.map(watchesIn)),
+            watches: yearWatches.length,
             addedToWatchlist,
             crossedOff,
-            wait: crossedOff.length ? mean(crossedOff.map((r) => days(r.watchlistAddedOn, r.latestWatch))) : null,
+            wait: crossedOff.length ? mean(crossedOff.map((r) => days(r.watchlistAddedOn, watchedAfter(r)))) : null,
             noRuntime: seen.filter((r) => minutesPerWatch(r) == null).length,
         };
     }
@@ -126,13 +133,15 @@
             return;
         }
 
+        const goal = K.goals?.().find((g) => g.year === year);
         const tiles = [
             ["New titles", fmt(d.fresh.length), `${plural(d.fresh.filter((r) => r.type === "Film").length, "film")} · ${fmt(d.fresh.filter((r) => r.type === "Series").length)} series · ${delta(d.fresh.length, prev.fresh.length)}`],
-            ["Rewatched", fmt(d.rewatched.length), "seen before, watched again"],
+            ["Watches", fmt(d.watches), `${plural(d.rewatched.length, "title")} seen before, watched again`],
             ["Screen time", K.hoursText(d.minutes || null), `about ${fmt(d.minutes / 60, 0)} hours${d.noRuntime ? ` · ${plural(d.noRuntime, "title")} without a runtime` : ""}`],
             ["Average rating", d.avg != null ? fmt(d.avg, 2) : "–", d.rated.length ? `${plural(d.rated.length, "new title")} rated · ${delta(d.avg, prev.avg, 2)}` : "nothing rated"],
-            ["With Bogdan", fmt(d.withBogdan), plural(d.withBogdan, "title")],
+            ["With Bogdan", fmt(d.withBogdan), `${plural(d.withBogdan, "title")}${d.inCinema ? ` · ${plural(d.inCinema, "trip")} to the cinema` : ""}`],
             ["New favourites", fmt(d.favourites.length), "rated off the scale (11/10)"],
+            ...(goal ? [["Goal", `${fmt(d.watches)} of ${fmt(goal.target)}`, d.watches >= goal.target ? "made it" : soFar ? `${plural(goal.target - d.watches, "watch", "watches")} to go` : `${plural(goal.target - d.watches, "watch", "watches")} short`]] : []),
             ["Onto the watchlist", fmt(d.addedToWatchlist.length), plural(d.addedToWatchlist.length, "title") + " added"],
             ["Off the watchlist", fmt(d.crossedOff.length), d.wait != null ? `after ${fmt(d.wait, 0)} days on average` : "watched from the watchlist"],
         ];
@@ -162,7 +171,7 @@
 
         root.innerHTML = [
             chips,
-            `<p class="review-note muted">${soFar ? "So far this year. " : ""}Titles keep their first and latest watch dates, so “new” means first watched in ${year} and “rewatched” means seen before and watched again in ${year}; screen time is an estimate.</p>`,
+            `<p class="review-note muted">${soFar ? "So far this year. " : ""}Counted from the watches dated in ${year}: “new” means first watched in ${year}, and a title seen before counts again for each watch. Watches with no date can't be placed in a year. Screen time is an estimate.</p>`,
             kpiTiles(tiles),
             best.length
                 ? `<section class="viz-section" aria-labelledby="rv-best">

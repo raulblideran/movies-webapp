@@ -395,6 +395,10 @@ namespace Movies.Api.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("TEXT");
 
+                    b.PrimitiveCollection<string>("Countries")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -428,6 +432,10 @@ namespace Movies.Api.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("OriginalLanguage")
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Overview")
                         .HasMaxLength(4000)
                         .HasColumnType("TEXT");
@@ -452,6 +460,10 @@ namespace Movies.Api.Data.Migrations
                     b.Property<int?>("Seasons")
                         .HasColumnType("INTEGER");
 
+                    b.PrimitiveCollection<string>("Tags")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("TmdbId")
                         .HasColumnType("INTEGER");
 
@@ -473,6 +485,13 @@ namespace Movies.Api.Data.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("VoteAverage")
+                        .HasPrecision(3, 1)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("VoteCount")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("WatchCount")
                         .HasColumnType("INTEGER");
@@ -508,6 +527,60 @@ namespace Movies.Api.Data.Migrations
                     b.HasIndex("ReleaseId");
 
                     b.ToTable("TitleReleases");
+                });
+
+            modelBuilder.Entity("Movies.Api.Data.Watch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("InCinema")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TitleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("WithBogdan")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TitleId", "Date");
+
+                    b.ToTable("Watches");
+                });
+
+            modelBuilder.Entity("Movies.Api.Data.YearGoal", b =>
+                {
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Year");
+
+                    b.ToTable("YearGoals");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -580,6 +653,17 @@ namespace Movies.Api.Data.Migrations
                     b.Navigation("Title");
                 });
 
+            modelBuilder.Entity("Movies.Api.Data.Watch", b =>
+                {
+                    b.HasOne("Movies.Api.Data.Title", "Title")
+                        .WithMany("Watches")
+                        .HasForeignKey("TitleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Title");
+                });
+
             modelBuilder.Entity("Movies.Api.Data.PhysicalRelease", b =>
                 {
                     b.Navigation("TitleLinks");
@@ -588,6 +672,8 @@ namespace Movies.Api.Data.Migrations
             modelBuilder.Entity("Movies.Api.Data.Title", b =>
                 {
                     b.Navigation("ReleaseLinks");
+
+                    b.Navigation("Watches");
                 });
 #pragma warning restore 612, 618
         }

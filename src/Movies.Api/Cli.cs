@@ -10,10 +10,11 @@ namespace Movies.Api;
 /// <summary>
 ///   import (--file path.csv | --url https://…csv) [--replace] [--no-posters]
 ///   create-user &lt;username&gt; [--role Admin|Editor]     (password read from stdin / prompt)
+///   fill-years [--dry-run]       release years (and matching covers) for titles without one, from TMDB
 /// </summary>
 public static class Cli
 {
-    public static bool IsCommand(string arg) => arg is "import" or "create-user" or "cex-add";
+    public static bool IsCommand(string arg) => arg is "import" or "create-user" or "cex-add" or "fill-years";
 
     public static async Task<int> RunAsync(IServiceProvider services, string[] args)
     {
@@ -26,6 +27,7 @@ public static class Cli
                 "import" => await ImportAsync(sp, args[1..]),
                 "create-user" => await CreateUserAsync(sp, args[1..]),
                 "cex-add" => await CexAddAsync(sp, args[1..]),
+                "fill-years" => await FillYearsAsync(sp, args[1..]),
                 _ => 1,
             };
         }
@@ -104,6 +106,11 @@ public static class Cli
             await db.Titles.Where(t => t.List == TitleList.Watched).ExecuteDeleteAsync();
             await db.Releases.ExecuteDeleteAsync();
         }
+        foreach (var t in parsed.Titles)
+        {
+            t.Watches = WatchSummary.FromSummary(t);
+            WatchSummary.Apply(t);
+        }
         db.Titles.AddRange(parsed.Titles);
         await db.SaveChangesAsync();
         // The sheet's formats, prices and CeX links become releases (now that the titles have ids).
@@ -168,6 +175,100 @@ public static class Cli
             await Task.Delay(300);
         }
         return failed == 0 ? 0 : 1;
+    }
+
+    /// <summary>
+    /// fill-years [--dry-run]: a release year for every title without one, from TMDB.
+    /// <list type="bullet">
+    /// <item>A title linked to TMDB takes that film's (or series') year. If its cover isn't one of that film's
+    /// posters, it gets the film's main poster, so the cover always matches the film.</item>
+    /// <item>One without a link is looked up by name: the most popular film (or series, for a series) of that
+    /// name, unless one of the results has the cover it already shows. It's linked to that one, and its cover,
+    /// year and TMDB details come from it.</item>
+    /// </list>
+    /// Linked titles whose name finds a much more popular film are listed to check, not changed.
+    /// </summary>
+    private static async Task<int> FillYearsAsync(IServiceProvider sp, string[] args)
+    {
+        var dryRun = args.Contains("--dry-run");
+        var tmdb = sp.GetRequiredService<TmdbClient>();
+        if (!tmdb.Enabled) throw new CliException("Tmdb__ApiKey isn't set.");
+        var db = sp.GetRequiredService<MoviesDbContext>();
+        var titles = await db.Titles.Where(t => t.ReleaseYear == null).OrderBy(t => t.Name).ToListAsync();
+        Console.WriteLine($"{titles.Count} titles without a release year{(dryRun ? " (dry run: nothing is saved)" : "")}.");
+
+        int filled = 0, covers = 0, linked = 0;
+        var problems = new List<string>();
+        var check = new List<string>();
+        foreach (var t in titles)
+        {
+            var mediaType = t.Type == TitleType.Series ? "tv" : "movie";
+            try
+            {
+                var byName = (await tmdb.SearchAsync(t.Name)).Where(r => r.MediaType == mediaType)
+                    .OrderByDescending(r => r.Popularity ?? 0).ToList();
+                var note = "";
+                if (t.TmdbId is null || t.TmdbMediaType is null)
+                {
+                    var pick = byName.FirstOrDefault(r => t.PosterPath is not null && r.PosterPath == t.PosterPath) ?? byName.FirstOrDefault();
+                    if (pick is null)
+                    {
+                        problems.Add($"{t.Name}: nothing on TMDB by that name");
+                        continue;
+                    }
+                    (t.TmdbId, t.TmdbMediaType) = (pick.Id, mediaType);
+                    t.TmdbSyncedAt = null;
+                    linked++;
+                    note += $" linked to {mediaType}/{pick.Id} “{pick.DisplayTitle}”";
+                }
+                else if (byName.FirstOrDefault() is { } top && top.Id != t.TmdbId
+                         && byName.FirstOrDefault(r => r.Id == t.TmdbId) is var mine
+                         && (mine is null || (mine.Popularity ?? 0) * 5 < (top.Popularity ?? 0)))
+                    check.Add($"{t.Name}: linked to {t.TmdbMediaType}/{t.TmdbId}, but the most popular “{top.DisplayTitle}” ({top.Date?[..Math.Min(4, top.Date.Length)]}) is {mediaType}/{top.Id}");
+
+                var d = await tmdb.GetDetailsAsync(t.TmdbMediaType!, t.TmdbId!.Value);
+                if (d is null)
+                {
+                    problems.Add($"{t.Name}: TMDB has nothing at {t.TmdbMediaType}/{t.TmdbId}");
+                    continue;
+                }
+                if (d.Year is null)
+                {
+                    problems.Add($"{t.Name}: TMDB has no release date for {t.TmdbMediaType}/{t.TmdbId}");
+                    continue;
+                }
+                t.ReleaseYear = d.Year;
+                filled++;
+                var posters = await tmdb.GetPosterPathsAsync(t.TmdbMediaType!, t.TmdbId.Value);
+                if (d.PosterPath is not null && (t.PosterPath is null || !posters.Contains(t.PosterPath)))
+                {
+                    t.PosterPath = d.PosterPath;
+                    covers++;
+                    note += " · new cover";
+                }
+                TmdbMetadataService.Apply(t, d);
+                Console.WriteLine($"  {t.Name} → {d.Year}{note}");
+            }
+            catch (TmdbUnavailableException)
+            {
+                problems.Add($"{t.Name}: TMDB couldn't be reached");
+            }
+            await Task.Delay(40); // well under TMDB's rate limit
+        }
+
+        if (!dryRun) await db.SaveChangesAsync();
+        Console.WriteLine($"{(dryRun ? "Would fill" : "Filled")} {filled} release years ({linked} newly linked to TMDB, {covers} covers changed to match).");
+        if (problems.Count > 0)
+        {
+            Console.WriteLine($"{problems.Count} left without a year:");
+            foreach (var p in problems) Console.WriteLine("  - " + p);
+        }
+        if (check.Count > 0)
+        {
+            Console.WriteLine($"{check.Count} TMDB links to check (left as they are):");
+            foreach (var c in check) Console.WriteLine("  - " + c);
+        }
+        return 0;
     }
 
     private static string ReadPassword(string prompt)

@@ -20,6 +20,10 @@ public class TmdbMetadataService(MoviesDbContext db, TmdbClient tmdb, ILogger<Tm
         t.CollectionId = null;
         t.CollectionName = null;
         t.Credits = [];
+        t.VoteAverage = null;
+        t.VoteCount = null;
+        t.OriginalLanguage = null;
+        t.Countries = [];
         t.TmdbSyncedAt = null;
     }
 
@@ -31,6 +35,10 @@ public class TmdbMetadataService(MoviesDbContext db, TmdbClient tmdb, ILogger<Tm
         t.CollectionId = d.CollectionId;
         t.CollectionName = d.CollectionName;
         t.Credits = d.Credits ?? [];
+        t.VoteAverage = d.VoteAverage;
+        t.VoteCount = d.VoteCount;
+        t.OriginalLanguage = d.OriginalLanguage;
+        t.Countries = d.Countries ?? [];
         t.TmdbSyncedAt = DateTime.UtcNow;
     }
 

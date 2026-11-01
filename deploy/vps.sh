@@ -9,6 +9,7 @@
 #   ./deploy/vps.sh delete-user <name>
 #   ./deploy/vps.sh import <local.csv> [--replace]
 #   ./deploy/vps.sh cex-add <cex-link> [<cex-link> …]   track CeX products on /cex
+#   ./deploy/vps.sh fill-years [--dry-run]               release years (and matching covers) for titles without one
 #   ./deploy/vps.sh backup           run a backup now and download the newest one to ./backups/
 #   ./deploy/vps.sh ssh
 #
@@ -84,6 +85,9 @@ case "$cmd" in
         ;;
     cex-add)
         ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm --read-only -v movies-data:/data --env-file /home/movies/.config/movies/app.env $IMAGE cex-add $(printf '%q ' "$@")"
+        ;;
+    fill-years)
+        ssh "$HOST" "cd / && sudo -u movies XDG_RUNTIME_DIR=/run/user/\$(id -u movies) podman run --rm --read-only -v movies-data:/data --env-file /home/movies/.config/movies/app.env $IMAGE fill-years $(printf '%q ' "$@")"
         ;;
     restore)
         file="${1:?usage: restore <backup.db>}"

@@ -33,7 +33,15 @@ public record TitleDto(
     string? CollectionName,
     List<string> Directors,
     List<string> Cast,
-    DateTime UpdatedAt)
+    DateTime UpdatedAt,
+    List<WatchDto> Watches,
+    List<string> Tags,
+    decimal? VoteAverage,
+    int? VoteCount,
+    string? OriginalLanguage,
+    List<string> Countries,
+    List<int> DirectorIds,
+    List<int> CastIds)
 {
     public const string PosterBaseUrl = "https://image.tmdb.org/t/p/w500";
     /// <summary>How many of the cast the title list carries (the Stats page gets them all from /api/titles/people).</summary>
@@ -53,9 +61,50 @@ public record TitleDto(
         t.TrailerKey,
         t.CollectionId,
         t.CollectionName,
-        t.Credits.Where(c => c.Job != Credit.Cast).Select(c => c.Name).ToList(),
-        t.Credits.Where(c => c.Job == Credit.Cast).OrderBy(c => c.Order).Take(CastShown).Select(c => c.Name).ToList(),
-        t.UpdatedAt);
+        Makers(t).Select(c => c.Name).ToList(),
+        TopCast(t).Select(c => c.Name).ToList(),
+        t.UpdatedAt,
+        t.Watches.OrderBy(w => w.Date is null).ThenBy(w => w.Date).ThenBy(w => w.Id).Select(WatchDto.From).ToList(),
+        t.Tags,
+        t.VoteAverage,
+        t.VoteCount,
+        t.OriginalLanguage,
+        t.Countries,
+        Makers(t).Select(c => c.Id).ToList(),
+        TopCast(t).Select(c => c.Id).ToList());
+
+    private static IEnumerable<Credit> Makers(Title t) => t.Credits.Where(c => c.Job != Credit.Cast);
+    private static IEnumerable<Credit> TopCast(Title t) => t.Credits.Where(c => c.Job == Credit.Cast).OrderBy(c => c.Order).Take(CastShown);
+}
+
+/// <summary>One viewing. Dated ones come in date order; undated ones (date null) after them.</summary>
+public record WatchDto(int Id, DateOnly? Date, bool WithBogdan, bool InCinema, string? Notes)
+{
+    public static WatchDto From(Watch w) => new(w.Id, w.Date, w.WithBogdan, w.InCinema, w.Notes);
+}
+
+/// <summary>A watch to add or change. On a title's save, one with the id of an existing watch changes it.</summary>
+public record WatchRequest(int? Id, DateOnly? Date, bool WithBogdan, bool InCinema, string? Notes)
+{
+    public string? Error() =>
+        Date is { } d && (d.Year < 1900 || d > UkTime.Today().AddDays(1)) ? "A watch's date can't be in the future (or before 1900)."
+        : Notes?.Length > 2000 ? "A watch's notes are too long."
+        : null;
+
+    public void ApplyTo(Watch w)
+    {
+        w.Date = Date;
+        w.WithBogdan = WithBogdan;
+        w.InCinema = InCinema;
+        w.Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim();
+    }
+
+    public Watch ToWatch()
+    {
+        var w = new Watch();
+        ApplyTo(w);
+        return w;
+    }
 }
 
 public record PersonDto(string Name, string? PhotoUrl)
@@ -88,7 +137,9 @@ public record TitleUpsertRequest(
     string? PosterPath,
     bool WatchedInCinema = false,
     TitleList List = TitleList.Watched,
-    DateOnly? WatchlistAddedOn = null)
+    DateOnly? WatchlistAddedOn = null,
+    List<string>? Tags = null,
+    List<WatchRequest>? Watches = null)
 {
     public Dictionary<string, string[]> Validate()
     {
@@ -111,27 +162,29 @@ public record TitleUpsertRequest(
         if (!Enum.IsDefined(List)) Add(nameof(List), "List must be Watched or Watchlist.");
         if (WatchlistAddedOn is { } added && (added.Year < 1900 || added > UkTime.Today().AddDays(1)))
             Add(nameof(WatchlistAddedOn), "The date it went on the watchlist can't be in the future.");
+        if (Tags?.Count > 30 || Tags?.Any(x => x?.Length > 60) == true) Add(nameof(Tags), "Too many tags, or a tag that's too long.");
+        if (Watches?.Count > 1000) Add(nameof(Watches), "That's a lot of watches.");
+        if (Watches?.Select(w => w.Error()).FirstOrDefault(e => e is not null) is { } watchError) Add(nameof(Watches), watchError);
         return errors;
     }
 
+    private static List<string> Clean(List<string>? xs) =>
+        (xs ?? []).Where(x => x is not null).Select(x => x.Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>
+    /// Everything but the watches. The watch fields (first and latest watch, count, Bogdan, cinema) are
+    /// worked out from the watches, so they're only read from a new title sent without any (WithWatches).
+    /// </summary>
     public void ApplyTo(Title t)
     {
-        static List<string> Clean(List<string>? xs) =>
-            (xs ?? []).Select(x => x.Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-
         t.Name = Name!.Trim();
         t.Type = Type;
-        t.FirstWatch = FirstWatch;
-        t.LatestWatch = LatestWatch;
-        t.WatchCount = WatchCount;
         t.Rating = Rating;
         t.RewatchPotential = RewatchPotential;
         t.Genres = Clean(Genres);
+        if (Tags is not null) t.Tags = Clean(Tags);
         t.Seasons = Seasons;
         t.EpisodesTotal = EpisodesTotal;
-        t.WithBogdan = WithBogdan;
-        t.DateWithBogdan = DateWithBogdan;
-        t.WatchedInCinema = WatchedInCinema;
         t.Comments = string.IsNullOrWhiteSpace(Comments) ? null : Comments.Trim();
         t.ReleaseYear = ReleaseYear;
         t.TmdbId = TmdbId;
@@ -141,5 +194,47 @@ public record TitleUpsertRequest(
         // The date is saved as sent (so Undo can clear it), except that something on the watchlist always
         // has one: the date it already had, or today.
         t.WatchlistAddedOn = WatchlistAddedOn ?? (List == TitleList.Watchlist ? t.WatchlistAddedOn ?? UkTime.Today() : null);
+    }
+
+    /// <summary>
+    /// The title's watches as this request has them, then its summary. Watches left out (null) stay as they
+    /// are; a new title sent without any gets them from the summary fields (WatchSummary.FromSummary). Sent,
+    /// they're the whole list: one with an existing watch's id changes it, one without is added, and the
+    /// title's other watches are removed. Expects t.Watches loaded.
+    /// </summary>
+    public void WithWatches(Title t, bool isNew)
+    {
+        if (Watches is null)
+        {
+            if (isNew)
+            {
+                (t.FirstWatch, t.LatestWatch, t.WatchCount) = (FirstWatch, LatestWatch, WatchCount);
+                (t.WithBogdan, t.DateWithBogdan, t.WatchedInCinema) = (WithBogdan, DateWithBogdan, WatchedInCinema);
+                t.Watches = WatchSummary.FromSummary(t);
+            }
+        }
+        else
+        {
+            var kept = new HashSet<Watch>();
+            foreach (var req in Watches)
+            {
+                var existing = req.Id is { } id ? t.Watches.FirstOrDefault(w => w.Id == id && id != 0) : null;
+                if (existing is null) kept.Add(AddTo(t, req));
+                else
+                {
+                    req.ApplyTo(existing);
+                    kept.Add(existing);
+                }
+            }
+            t.Watches.RemoveAll(w => !kept.Contains(w));
+        }
+        WatchSummary.Apply(t);
+    }
+
+    private static Watch AddTo(Title t, WatchRequest req)
+    {
+        var w = req.ToWatch();
+        t.Watches.Add(w);
+        return w;
     }
 }

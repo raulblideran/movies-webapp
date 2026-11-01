@@ -1,6 +1,21 @@
-# Watch diary: design notes (not built)
+# Watch diary: one record per watch
 
-Status: **proposal only**. Nothing here is implemented. Raul is still deciding whether to have it.
+Status: **built on 2026-11-01**, in a simpler form than the proposal below. Each watch (`Data/Watch.cs`) has a
+date (or none), notes, "in the cinema" and "with Bogdan". There's no date precision and no per-watch rating.
+The title's first/latest watch, count, Bogdan and cinema fields stay as a summary, worked out again whenever its
+watches change (`WatchSummary.Apply`), so the cards, filters and the CSV export read them as before.
+
+The `Watches` migration seeded every title's watches from its old summary (`WatchSummary.FromSummary`, run by
+`Startup.MigrateAsync`). It follows the rules below, plus:
+
+- A count of 1 with two different dates is one watch on the first date. Its notes keep the other date.
+- A title with dates but a count of 0 still gets its dated watch.
+- "In the cinema" goes on the first watch.
+- A "with Bogdan" date with no room left in the count becomes a watch of its own.
+
+Undated watches are dated by hand, from the title popup, the edit form or the Watches page (`/watches`).
+
+The proposal as it was written follows.
 
 ## The idea
 

@@ -40,6 +40,7 @@ public static class TitlesEndpoints
             if (errors.Count > 0) return Results.ValidationProblem(errors);
             var t = new Title { Name = "" };
             req.ApplyTo(t);
+            req.WithWatches(t, isNew: true);
             await meta.RefreshAfterSaveAsync(t, tmdbChanged: true, ct);
             db.Titles.Add(t);
             await db.SaveChangesAsync(ct);
@@ -54,6 +55,7 @@ public static class TitlesEndpoints
             if (t is null) return Results.NotFound();
             var (oldId, oldType) = (t.TmdbId, t.TmdbMediaType);
             req.ApplyTo(t);
+            req.WithWatches(t, isNew: false);
             await meta.RefreshAfterSaveAsync(t, tmdbChanged: t.TmdbId != oldId || t.TmdbMediaType != oldType, ct);
             await db.SaveChangesAsync(ct);
             return Results.Ok(TitleDto.From(t));
@@ -95,7 +97,7 @@ public static class TitlesEndpoints
         }).RequireAuthorization(Policies.Editor);
     }
 
-    /// <summary>Titles with their releases (and each release's title count) for TitleDto.</summary>
+    /// <summary>Titles with their watches and releases (and each release's title count) for TitleDto.</summary>
     public static IQueryable<Title> WithReleases(IQueryable<Title> q) =>
-        q.Include(t => t.ReleaseLinks).ThenInclude(l => l.Release).ThenInclude(r => r.TitleLinks).AsSplitQuery();
+        q.Include(t => t.Watches).Include(t => t.ReleaseLinks).ThenInclude(l => l.Release).ThenInclude(r => r.TitleLinks).AsSplitQuery();
 }
