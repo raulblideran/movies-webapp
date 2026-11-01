@@ -200,10 +200,12 @@ public record TitleUpsertRequest(
     /// The title's watches as this request has them, then its summary. Watches left out (null) stay as they
     /// are; a new title sent without any gets them from the summary fields (WatchSummary.FromSummary). Sent,
     /// they're the whole list: one with an existing watch's id changes it, one without is added, and the
-    /// title's other watches are removed. Expects t.Watches loaded.
+    /// title's other watches are removed. Expects t.Watches loaded. Returns the watches it added or gave a
+    /// new date, to check against the release date (WatchSummary.BeforeRelease).
     /// </summary>
-    public void WithWatches(Title t, bool isNew)
+    public List<Watch> WithWatches(Title t, bool isNew)
     {
+        var dated = new List<Watch>();
         if (Watches is null)
         {
             if (isNew)
@@ -211,6 +213,7 @@ public record TitleUpsertRequest(
                 (t.FirstWatch, t.LatestWatch, t.WatchCount) = (FirstWatch, LatestWatch, WatchCount);
                 (t.WithBogdan, t.DateWithBogdan, t.WatchedInCinema) = (WithBogdan, DateWithBogdan, WatchedInCinema);
                 t.Watches = WatchSummary.FromSummary(t);
+                dated.AddRange(t.Watches);
             }
         }
         else
@@ -219,9 +222,15 @@ public record TitleUpsertRequest(
             foreach (var req in Watches)
             {
                 var existing = req.Id is { } id ? t.Watches.FirstOrDefault(w => w.Id == id && id != 0) : null;
-                if (existing is null) kept.Add(AddTo(t, req));
+                if (existing is null)
+                {
+                    var added = AddTo(t, req);
+                    kept.Add(added);
+                    dated.Add(added);
+                }
                 else
                 {
+                    if (req.Date != existing.Date) dated.Add(existing);
                     req.ApplyTo(existing);
                     kept.Add(existing);
                 }
@@ -229,6 +238,7 @@ public record TitleUpsertRequest(
             t.Watches.RemoveAll(w => !kept.Contains(w));
         }
         WatchSummary.Apply(t);
+        return dated;
     }
 
     private static Watch AddTo(Title t, WatchRequest req)

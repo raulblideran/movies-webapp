@@ -78,6 +78,8 @@ public class Title : ITimestamped
     /// <summary>Minutes: a film's length, or a series' episode length.</summary>
     public int? Runtime { get; set; }
     public string? Overview { get; set; }
+    /// <summary>TMDB's release date (a series: its first air date). Watches can't be dated before it (WatchSummary.ReleasedOn).</summary>
+    public DateOnly? ReleaseDate { get; set; }
     /// <summary>The YouTube id of its trailer.</summary>
     public string? TrailerKey { get; set; }
     /// <summary>The TMDB collection (franchise) a film belongs to, e.g. "Alien Collection".</summary>

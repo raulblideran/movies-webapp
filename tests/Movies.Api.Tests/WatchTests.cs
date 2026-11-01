@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.DependencyInjection;
 using Movies.Api.Data;
 
 namespace Movies.Api.Tests;
@@ -99,6 +100,28 @@ public class WatchSeedingTests
         Assert.Equal((4, D("2015-03-10"), D("2025-08-12")), (t.WatchCount, t.FirstWatch, t.LatestWatch));
         Assert.Equal((true, D("2020-05-05"), true), (t.WithBogdan, t.DateWithBogdan, t.WatchedInCinema));
     }
+
+    [Theory]
+    [InlineData("2021-05-28", 2021, "2021-05-28")] // TMDB's day
+    [InlineData("2021-05-28", null, "2021-05-28")]
+    [InlineData("2021-05-28", 2022, "2021-05-28")]
+    [InlineData("2021-05-28", 2020, "2020-01-01")] // the year typed in is earlier: the link may be wrong
+    [InlineData(null, 2021, "2021-01-01")]
+    [InlineData(null, null, null)]
+    public void A_title_came_out_on_its_TMDB_date_or_else_at_the_start_of_its_year(string? date, int? year, string? expected) =>
+        Assert.Equal(expected is null ? null : D(expected),
+            WatchSummary.ReleasedOn(new Title { Name = "x", ReleaseDate = date is null ? null : D(date), ReleaseYear = year }));
+
+    [Fact]
+    public void Only_a_watch_dated_before_the_release_is_refused()
+    {
+        var t = new Title { Name = "A Quiet Place Part II", ReleaseDate = D("2021-05-28"), ReleaseYear = 2021 };
+        Assert.Equal("That's before A Quiet Place Part II came out (28/05/2021).",
+            WatchSummary.BeforeRelease(t, [new Watch { Date = D("2021-06-03") }, new Watch { Date = D("2021-05-27") }]));
+        Assert.Null(WatchSummary.BeforeRelease(t, [new Watch { Date = D("2021-05-28") }, new Watch()])); // the day itself, and undated
+        Assert.Equal("That's before Shrek came out (2001).", WatchSummary.BeforeRelease(new Title { Name = "Shrek", ReleaseYear = 2001 }, [new Watch { Date = D("2000-12-31") }]));
+        Assert.Null(WatchSummary.BeforeRelease(new Title { Name = "?" }, [new Watch { Date = D("1950-01-01") }]));
+    }
 }
 
 /// <summary>A database from before watches existed gets them when the app starts.</summary>
@@ -156,13 +179,13 @@ public class WatchesApiTests : IClassFixture<TestApp>
         return await _app.SignedInWithMfaAsync(userName, "correct-horse-battery");
     }
 
-    private static async Task<JsonElement> JsonAsync(HttpResponseMessage resp)
+    internal static async Task<JsonElement> JsonAsync(HttpResponseMessage resp)
     {
         Assert.True(resp.IsSuccessStatusCode, await resp.Content.ReadAsStringAsync());
         return await resp.Content.ReadFromJsonAsync<JsonElement>();
     }
 
-    private static List<JsonElement> Watches(JsonElement title) => title.GetProperty("watches").EnumerateArray().ToList();
+    internal static List<JsonElement> Watches(JsonElement title) => title.GetProperty("watches").EnumerateArray().ToList();
 
     [Fact]
     public async Task A_new_title_takes_its_watches_and_works_out_its_summary()
@@ -268,5 +291,106 @@ public class WatchesApiTests : IClassFixture<TestApp>
         Assert.Equal(120, g.GetProperty("target").GetInt32());
         Assert.Equal(HttpStatusCode.Unauthorized, (await _app.CreateClient().PutAsJsonAsync("/api/goals/2027", new { target = 5 })).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/goals/2027")).StatusCode);
+    }
+}
+
+/// <summary>
+/// No watch dated before the title came out, as far as is known (WatchSummary.ReleasedOn). A class of its own,
+/// for its own sign-in rate limit.
+/// </summary>
+public class WatchReleaseDateTests : IClassFixture<TestApp>
+{
+    private readonly TestApp _app;
+    public WatchReleaseDateTests(TestApp app) => _app = app;
+
+    private async Task<HttpClient> EditorAsync(string userName)
+    {
+        await _app.CreateUserAsync(userName, "correct-horse-battery", "Editor");
+        return await _app.SignedInWithMfaAsync(userName, "correct-horse-battery");
+    }
+
+    private static Task<JsonElement> JsonAsync(HttpResponseMessage resp) => WatchesApiTests.JsonAsync(resp);
+    private static List<JsonElement> Watches(JsonElement title) => WatchesApiTests.Watches(title);
+    private static async Task<JsonElement> TitleAsync(HttpClient client, int id) => await JsonAsync(await client.GetAsync($"/api/titles/{id}"));
+
+    private async Task SetReleaseDateAsync(int titleId, string date)
+    {
+        using var scope = _app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MoviesDbContext>();
+        await db.Titles.Where(t => t.Id == titleId).ExecuteUpdateAsync(s => s.SetProperty(t => t.ReleaseDate, DateOnly.Parse(date)));
+    }
+
+    [Fact]
+    public async Task A_watch_from_before_the_release_is_refused()
+    {
+        var client = await EditorAsync("w-early");
+        var t = await JsonAsync(await client.PostAsJsonAsync("/api/titles", new
+        {
+            name = "Dune: Part Two", type = "Film", releaseYear = 2024, watches = new[] { new { date = "2024-03-10" } },
+        }));
+        var id = t.GetProperty("id").GetInt32();
+        var firstId = Watches(t)[0].GetProperty("id").GetInt32();
+
+        // only the year is known: the year before is refused, any day of the year is fine
+        var early = await client.PostAsJsonAsync($"/api/titles/{id}/watches", new { date = "2023-12-31" });
+        Assert.Equal(HttpStatusCode.BadRequest, early.StatusCode);
+        Assert.Contains("That's before Dune: Part Two came out (2024).", await early.Content.ReadAsStringAsync());
+
+        // with TMDB's date, the day before is refused and the day itself is fine
+        await SetReleaseDateAsync(id, "2024-03-01");
+        early = await client.PostAsJsonAsync($"/api/titles/{id}/watches", new { date = "2024-02-29" });
+        Assert.Equal(HttpStatusCode.BadRequest, early.StatusCode);
+        Assert.Contains("(01/03/2024)", await early.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync($"/api/titles/{id}/watches", new { date = "2024-03-01" })).StatusCode);
+
+        // moving a watch earlier, on its own or with the title, is refused and changes nothing
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync($"/api/watches/{firstId}", new { date = "2024-02-01" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync($"/api/titles/{id}", new
+        {
+            name = "Dune: Part Two", type = "Film", releaseYear = 2024, watches = new[] { new { id = firstId, date = "2024-02-01" } },
+        })).StatusCode);
+        t = await TitleAsync(client, id);
+        Assert.Equal((2, "2024-03-01"), (t.GetProperty("watchCount").GetInt32(), t.GetProperty("firstWatch").GetString()));
+    }
+
+    [Fact]
+    public async Task A_watch_already_dated_before_the_release_doesnt_block_other_changes()
+    {
+        var client = await EditorAsync("w-legacy");
+        var t = await JsonAsync(await client.PostAsJsonAsync("/api/titles", new { name = "We Can Be Heroes", type = "Film", watches = new[] { new { date = "2020-12-10" } } }));
+        var id = t.GetProperty("id").GetInt32();
+        var watchId = Watches(t)[0].GetProperty("id").GetInt32();
+        await SetReleaseDateAsync(id, "2020-12-25"); // as an old import could have it
+
+        t = await JsonAsync(await client.PutAsJsonAsync($"/api/watches/{watchId}", new { date = "2020-12-10", notes = "Christmas" }));
+        Assert.Equal("Christmas", Watches(t)[0].GetProperty("notes").GetString());
+        t = await JsonAsync(await client.PutAsJsonAsync($"/api/titles/{id}", new
+        {
+            name = "We Can Be Heroes", type = "Film", rating = 6, watches = new[] { new { id = watchId, date = "2020-12-10" } },
+        }));
+        Assert.Equal(6, t.GetProperty("rating").GetDecimal());
+
+        // and it can be put right
+        t = await JsonAsync(await client.PutAsJsonAsync($"/api/watches/{watchId}", new { date = "2020-12-26" }));
+        Assert.Equal("2020-12-26", t.GetProperty("firstWatch").GetString());
+    }
+
+    [Fact]
+    public async Task A_new_title_watched_before_its_release_year_is_refused()
+    {
+        var client = await EditorAsync("w-early-new");
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/titles", new
+        {
+            name = "Encanto", type = "Film", releaseYear = 2021, watches = new[] { new { date = "2020-11-24" } },
+        })).StatusCode);
+        // the same through the old summary fields
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/titles", new
+        {
+            name = "Encanto", type = "Film", releaseYear = 2021, watchCount = 1, firstWatch = "2020-11-24",
+        })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/titles", new
+        {
+            name = "Encanto", type = "Film", releaseYear = 2021, watches = new[] { new { date = "2021-11-24" } },
+        })).StatusCode);
     }
 }

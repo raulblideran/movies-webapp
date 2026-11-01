@@ -42,6 +42,7 @@ public class TmdbMetadataTests : IClassFixture<TestApp>
         }
         """));
         Assert.Equal<int?>(117, d.Runtime);
+        Assert.Equal(new DateOnly(1979, 5, 25), d.ReleaseDate);
         Assert.Equal("The crew of a commercial spacecraft…", d.Overview);
         Assert.Equal("official", d.TrailerKey);
         Assert.Equal<int?>(8091, d.CollectionId);
@@ -66,6 +67,7 @@ public class TmdbMetadataTests : IClassFixture<TestApp>
         }
         """));
         Assert.Equal<int?>(58, d.Runtime);
+        Assert.Equal(new DateOnly(2011, 4, 17), d.ReleaseDate); // its first air date
         Assert.Null(d.CollectionId);
         Assert.Null(d.TrailerKey);
         Assert.Equal(new[] { "David Benioff:Creator", "D. B. Weiss:Creator", "Emilia Clarke:Cast", "Guest:Cast" },

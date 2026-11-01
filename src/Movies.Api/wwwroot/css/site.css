@@ -848,6 +848,11 @@ textarea.code {
     margin: 0 auto;
 }
 
+/* a second row (the filter chips) sits a little below the first */
+.toolbar-row + .toolbar-row {
+    margin-top: 10px;
+}
+
 .search {
     flex: 1 1 280px;
     position: relative;
@@ -4487,7 +4492,6 @@ a.tag-own:focus-visible {
 /* ---------- physical releases (releases.html, js/releases.js) ---------- */
 
 .release-filters {
-    margin-top: 10px;
     gap: 10px 22px;
 }
 

@@ -462,6 +462,9 @@ namespace Movies.Api.Data.Migrations
                         .HasPrecision(4, 1)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateOnly?>("ReleaseDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("ReleaseYear")
                         .HasColumnType("INTEGER");
 

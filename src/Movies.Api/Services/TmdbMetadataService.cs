@@ -16,6 +16,7 @@ public class TmdbMetadataService(MoviesDbContext db, TmdbClient tmdb, ILogger<Tm
     {
         t.Runtime = null;
         t.Overview = null;
+        t.ReleaseDate = null;
         t.TrailerKey = null;
         t.CollectionId = null;
         t.CollectionName = null;
@@ -31,6 +32,7 @@ public class TmdbMetadataService(MoviesDbContext db, TmdbClient tmdb, ILogger<Tm
     {
         t.Runtime = d.Runtime;
         t.Overview = d.Overview is { Length: > 4000 } o ? o[..4000] : d.Overview;
+        t.ReleaseDate = d.ReleaseDate;
         t.TrailerKey = d.TrailerKey;
         t.CollectionId = d.CollectionId;
         t.CollectionName = d.CollectionName;

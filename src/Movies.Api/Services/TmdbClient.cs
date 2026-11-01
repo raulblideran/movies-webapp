@@ -133,7 +133,8 @@ public record TmdbDetails(
     decimal? VoteAverage = null,
     int? VoteCount = null,
     string? OriginalLanguage = null,
-    List<string>? Countries = null)
+    List<string>? Countries = null,
+    DateOnly? ReleaseDate = null)
 {
     /// <summary>How many of the cast are kept: the top-billed (a series: the most episodes).</summary>
     public const int CastKept = 10;
@@ -176,7 +177,9 @@ public record TmdbDetails(
             OriginalLanguage: string.IsNullOrWhiteSpace(d.OriginalLanguage) ? null : d.OriginalLanguage,
             // where it's from: TMDB's origin country, else where it was made
             Countries: (d.OriginCountry is { Count: > 0 } origin ? origin : (d.ProductionCountries ?? []).Select(c => c.Code ?? ""))
-                .Where(c => c.Length == 2).Distinct().ToList());
+                .Where(c => c.Length == 2).Distinct().ToList(),
+            ReleaseDate: DateOnly.TryParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var released) ? released : null);
     }
 
     /// <summary>A YouTube trailer: official first, then English, then the newest. A teaser if there's no trailer.</summary>

@@ -40,8 +40,9 @@ public static class TitlesEndpoints
             if (errors.Count > 0) return Results.ValidationProblem(errors);
             var t = new Title { Name = "" };
             req.ApplyTo(t);
-            req.WithWatches(t, isNew: true);
+            var dated = req.WithWatches(t, isNew: true);
             await meta.RefreshAfterSaveAsync(t, tmdbChanged: true, ct);
+            if (WatchSummary.BeforeRelease(t, dated) is { } early) return Results.ValidationProblem(new Dictionary<string, string[]> { ["Watches"] = [early] });
             db.Titles.Add(t);
             await db.SaveChangesAsync(ct);
             return Results.Created($"/api/titles/{t.Id}", TitleDto.From(t));
@@ -55,8 +56,10 @@ public static class TitlesEndpoints
             if (t is null) return Results.NotFound();
             var (oldId, oldType) = (t.TmdbId, t.TmdbMediaType);
             req.ApplyTo(t);
-            req.WithWatches(t, isNew: false);
+            var dated = req.WithWatches(t, isNew: false);
             await meta.RefreshAfterSaveAsync(t, tmdbChanged: t.TmdbId != oldId || t.TmdbMediaType != oldType, ct);
+            // checked once the TMDB link (and so the release date) is up to date; returning unsaved drops the changes
+            if (WatchSummary.BeforeRelease(t, dated) is { } early) return Results.ValidationProblem(new Dictionary<string, string[]> { ["Watches"] = [early] });
             await db.SaveChangesAsync(ct);
             return Results.Ok(TitleDto.From(t));
         });

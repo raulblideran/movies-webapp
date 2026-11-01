@@ -16,6 +16,26 @@ public static class WatchSummary
     }
 
     /// <summary>
+    /// The first day it could have been watched: TMDB's release date, unless the release year typed in is
+    /// earlier (a sign the TMDB link or its date is off), then 1 January of that year. Null when neither is known.
+    /// </summary>
+    public static DateOnly? ReleasedOn(Title t) =>
+        t.ReleaseDate is { } d && (t.ReleaseYear is null || t.ReleaseYear >= d.Year) ? d
+        : t.ReleaseYear is { } y ? new DateOnly(y, 1, 1)
+        : null;
+
+    /// <summary>
+    /// Why these watches (new or re-dated ones) can't be saved: one is dated before the title came out.
+    /// Null when they're fine. Watches already on the title aren't checked, so an old wrong date never blocks a save.
+    /// </summary>
+    public static string? BeforeRelease(Title t, IEnumerable<Watch> watches)
+    {
+        if (ReleasedOn(t) is not { } released || !watches.Any(w => w.Date < released)) return null;
+        var when = t.ReleaseDate == released ? released.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : released.Year.ToString();
+        return $"That's before {t.Name} came out ({when}).";
+    }
+
+    /// <summary>
     /// Watches for a title that only has the old summary (first and latest watch, a count, Bogdan, cinema),
     /// without guessing any dates:
     /// <list type="bullet">

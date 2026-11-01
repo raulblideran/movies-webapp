@@ -21,6 +21,7 @@ public static class WatchesEndpoints
             var t = await TitlesEndpoints.WithReleases(db.Titles).FirstOrDefaultAsync(x => x.Id == titleId);
             if (t is null) return Results.NotFound();
             var w = req.ToWatch();
+            if (WatchSummary.BeforeRelease(t, [w]) is { } early) return Results.ValidationProblem(new Dictionary<string, string[]> { ["Watch"] = [early] });
             t.Watches.Add(w);
             WatchSummary.Apply(t);
             await db.SaveChangesAsync();
@@ -32,7 +33,11 @@ public static class WatchesEndpoints
             if (req.Error() is { } error) return Results.ValidationProblem(new Dictionary<string, string[]> { ["Watch"] = [error] });
             var t = await TitleOfAsync(db, id);
             if (t is null) return Results.NotFound();
-            req.ApplyTo(t.Watches.First(w => w.Id == id));
+            var watch = t.Watches.First(w => w.Id == id);
+            // only a new date is checked: one that was already wrong doesn't stop its notes being changed
+            if (req.Date != watch.Date && WatchSummary.BeforeRelease(t, [req.ToWatch()]) is { } early)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["Watch"] = [early] });
+            req.ApplyTo(watch);
             WatchSummary.Apply(t);
             await db.SaveChangesAsync();
             return Results.Ok(TitleDto.From(t));
