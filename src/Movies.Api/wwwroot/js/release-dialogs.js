@@ -6,7 +6,12 @@
 //   find(id)          the release with that id
 //   onChanged(saved)  after a save (saved) or delete (null): reload, return the fresh release to show
 //   openTitle(id)     optional: show a title over the release instead of following its link
+//   list()            optional: the releases on screen, in order; previous/next step through them
+//   onStep(i)         optional: after stepping to list()[i], e.g. to keep the grid behind in step
 //   onOpen(r), onClose(r)   optional
+//
+// Like the title popup, a release fills the screen on phones, with × and previous / count / next
+// in a bar at the bottom; on a computer the arrows sit either side. Arrow keys and swipes step too.
 
 (function () {
     const { api, dialog, busy, esc, CLS } = Auth;
@@ -42,9 +47,27 @@
 
     // ---------- one release ----------
 
-    async function open(r, ctx) {
+    async function open(r, ctx, { stepped = false } = {}) {
         const ts = titlesOf(r, ctx);
         const canEdit = Auth.me.canEdit;
+        const list = ctx.list?.() ?? [];
+        const index = list.findIndex((x) => x.id === r.id);
+        const canStep = index >= 0 && list.length > 1;
+        const step = (by) => {
+            const target = list[index + by];
+            if (!target) return;
+            d.close();
+            open(target, ctx, { stepped: true });
+            ctx.onStep?.(index + by);
+        };
+        // ← / → while this release is the popup on top, and not while typing
+        const onArrow = (e) => {
+            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+            if (d.root !== [...document.querySelectorAll(".overlay:not(.hidden)")].pop()) return;
+            if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;
+            e.preventDefault();
+            step(e.key === "ArrowLeft" ? -1 : 1);
+        };
         const d = dialog(
             esc(r.name),
             `
@@ -78,8 +101,49 @@
                           .join("")}</ul>`
                     : `<p class="faint">No titles linked yet.</p>`}
             </section>`,
-            { wide: true, onClose: () => ctx.onClose?.(r) },
+            {
+                wide: true,
+                onClose: () => {
+                    document.removeEventListener("keydown", onArrow);
+                    ctx.onClose?.(r);
+                },
+            },
         );
+        d.root.classList.add("release-sheet");
+        if (stepped) d.root.classList.add("is-stepped"); // no rise animation between neighbours
+        if (canStep) {
+            d.root.classList.add("has-nav");
+            d.root.insertAdjacentHTML(
+                "beforeend",
+                `
+                <button type="button" class="modal-nav modal-prev" data-prev aria-label="Previous release"${index === 0 ? " disabled" : ` title="Previous: ${esc(list[index - 1].name)}"`}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
+                </button>
+                <button type="button" class="modal-nav modal-next" data-next aria-label="Next release"${index === list.length - 1 ? " disabled" : ` title="Next: ${esc(list[index + 1].name)}"`}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                </button>
+                <span class="modal-count" aria-live="polite">${index + 1} of ${list.length}</span>`,
+            );
+            d.$("[data-prev]").onclick = () => step(-1);
+            d.$("[data-next]").onclick = () => step(1);
+            document.addEventListener("keydown", onArrow);
+            // swipe left / right on touch screens
+            const panel = d.$(".panel");
+            let x0 = null;
+            let y0 = null;
+            panel.addEventListener("touchstart", (e) => ([x0, y0] = [e.touches[0].clientX, e.touches[0].clientY]), { passive: true });
+            panel.addEventListener(
+                "touchend",
+                (e) => {
+                    if (x0 == null) return;
+                    const dx = e.changedTouches[0].clientX - x0;
+                    const dy = e.changedTouches[0].clientY - y0;
+                    x0 = null;
+                    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1);
+                },
+                { passive: true },
+            );
+        }
         ctx.onOpen?.(r);
         photoFallback(d.root, ctx);
         // where the page can show a title itself, a plain click opens it over the release (which stays open)

@@ -2511,6 +2511,60 @@ a.tag-own:focus-visible {
     }
 }
 
+/* The release popup steps through the releases on screen like the title popup: arrows either side
+   on a computer; on phones a full-screen sheet over the same bottom bar (× left, ‹ count › right).
+   The arrows and count are the title popup's (.modal-nav, .modal-count). */
+.release-sheet.has-nav {
+    padding: 20px 80px 44px;
+}
+
+.release-sheet.has-nav > .panel {
+    max-height: calc(100vh - 68px);
+    max-height: calc(100dvh - 68px);
+}
+
+/* stepping to the next release swaps the popup: no fade or rise between neighbours */
+.release-sheet.is-stepped,
+.release-sheet.is-stepped > .panel {
+    animation: none;
+}
+
+@media (max-width: 760px) {
+    .release-sheet,
+    .release-sheet.has-nav {
+        --bar-h: calc(66px + env(safe-area-inset-bottom));
+        padding: 0 0 var(--bar-h);
+        place-items: stretch;
+        background: var(--surface-2);
+    }
+    .release-sheet > .panel,
+    .release-sheet.has-nav > .panel {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: none;
+        border: 0;
+        border-bottom: 1px solid var(--line-strong);
+        border-radius: 0;
+        box-shadow: none;
+        animation: none;
+    }
+    .release-sheet > .panel > .close {
+        position: fixed;
+        top: auto;
+        right: auto;
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        left: 12px;
+        width: 46px;
+        height: 46px;
+        font-size: 24px;
+    }
+    /* the heading no longer needs room for × at its end */
+    .release-sheet .panel-heading {
+        padding-right: 0;
+    }
+}
+
 @keyframes fade-in {
     from {
         opacity: 0;

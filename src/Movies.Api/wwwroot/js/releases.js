@@ -134,6 +134,10 @@
         },
         onOpen: (r) => setParam("release", r.id),
         onClose: () => setParam("release", null),
+        // previous / next in the popup go through the releases on screen, in the order shown
+        list: () => shown,
+        // keep the grid behind in step, so closing lands on the release you ended up on
+        onStep: (i) => document.querySelector(`#releasesGrid [data-i="${i}"]`)?.scrollIntoView({ block: "center" }),
         // a title on a release opens over it here instead of leaving for the collection page
         openTitle(id) {
             const t = titles.get(id);
