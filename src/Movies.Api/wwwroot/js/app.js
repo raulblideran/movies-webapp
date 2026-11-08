@@ -20,6 +20,7 @@ let activeFilters = {
     tag: "all",
     language: "all",
     watchCount: "all",
+    released: "all", // the watchlist's "Out yet?": released / unreleased (Lists.isReleased)
 };
 // the page's sort menu marks its default
 const DEFAULT_SORT = document.querySelector('#sortDropdown [aria-checked="true"]')?.dataset.sort ?? "name";
@@ -28,7 +29,7 @@ let currentSort = DEFAULT_SORT;
 // ---------- the view in the URL: search, sort, filters and grid/table, so Back, a refresh or a shared
 // link land on the same view, e.g. /watchlist?type=film&runtime=under-90 ----------
 
-const URL_FILTERS = { type: "type", genre: "genre", rating: "rating", format: "physicalFormat", special: "special", runtime: "runtime", decade: "decade", tag: "tag", lang: "language", watches: "watchCount" };
+const URL_FILTERS = { type: "type", genre: "genre", rating: "rating", format: "physicalFormat", special: "special", runtime: "runtime", decade: "decade", tag: "tag", lang: "language", watches: "watchCount", out: "released" };
 const VIEW_KEY = `view:${LIST === "watchlist" ? "watchlist" : "titles"}`;
 
 (function readUrl() {
@@ -48,6 +49,7 @@ const VIEW_KEY = `view:${LIST === "watchlist" ? "watchlist" : "titles"}`;
         } catch {
             // storage unavailable: the grid it is
         }
+    if (!["all", "released", "unreleased"].includes(activeFilters.released)) activeFilters.released = "all";
     if (!/^(all|\d+|over[12])$/.test(activeFilters.watchCount)) activeFilters.watchCount = "all"; // a count, "over1"/"over2" (more than once/twice), or nothing
     updateFilterCount();
 })();
@@ -317,6 +319,13 @@ function createFilters() {
         .map(([n, label]) => [`over${n}`, `${label} (${allData.filter((r) => r.watchCount > n).length})`]);
     fill("watchCountFilters", "watchCount", [["all", "All"], ...moreThan, ...byTimes.map(([n, c]) => [String(n), `${timesLabel(n)} (${c})`])]);
     document.getElementById("watchCountFilters")?.closest(".filter-group").classList.toggle("hidden", byTimes.length < 2);
+    // out yet? (the watchlist): both groups' counts, so you can see how much is still to come
+    const released = allData.filter((r) => Lists.isReleased(r)).length;
+    fill("releasedFilters", "released", [
+        ["all", "All"],
+        ["released", `Released (${released})`],
+        ["unreleased", `Unreleased (${allData.length - released})`],
+    ]);
     fill("physicalFormatFilters", "physicalFormat", [["all", "All"], ...uniqueValues((r) => r.releases.map(Shelf.label))]);
     fill(
         "specialFilters",
@@ -392,6 +401,8 @@ function applyFilters() {
             const band = RUNTIMES.find(([v]) => v === activeFilters.runtime);
             if (!row.runtime || (band && !band[2](row.runtime))) return false;
         }
+
+        if (activeFilters.released !== "all" && Lists.isReleased(row) !== (activeFilters.released === "released")) return false;
 
         if (activeFilters.tag !== "all" && !(row.tags ?? []).some((t) => t.toLowerCase() === activeFilters.tag)) return false;
 

@@ -12,9 +12,8 @@
     let d = null;
 
     const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // Only what's out already: TMDB's release date (a series: its first air date) is today or earlier.
-    // Without a date, the release year decides; with neither, there's no telling, so it counts as out.
-    const isOut = (r) => (r.releaseDate ? r.releaseDate <= TitleModal.todayIso() : !r.releaseYear || r.releaseYear <= new Date().getFullYear());
+    // Only what's out already (Lists.isReleased: the release date, or year, has come)
+    const isOut = (r) => Lists.isReleased(r);
     const randomOf = (xs) => xs[Math.floor(Math.random() * xs.length)];
 
     const tile = (r) => `

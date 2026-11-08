@@ -18,6 +18,15 @@
         return (await resp.json()).map(normalise);
     }
 
+    // Out already? TMDB's release date (a series: its first air date) is today or earlier. Without a date
+    // the release year decides; with neither there's no telling, so it counts as out. Used by the
+    // watchlist's "Out yet?" filter and by Pick for me.
+    const todayIso = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    };
+    const isReleased = (row) => (row.releaseDate ? row.releaseDate <= todayIso() : !row.releaseYear || row.releaseYear <= new Date().getFullYear());
+
     // The same film or series (by TMDB id) among rows, other than row itself.
     const sameTmdb = (row, rows) =>
         row.tmdbId ? rows.find((r) => r.id !== row.id && r.tmdbId === row.tmdbId && r.tmdbMediaType === row.tmdbMediaType) : null;
@@ -28,6 +37,7 @@
         normalise,
         loadAll,
         sameTmdb,
+        isReleased,
         editUrl: (id) => `/titles/${id}/edit`,
         // where a title opens: its list's page, with its popup open
         link: (row) => `${LISTS[row.list].page}?title=${row.id}`,
