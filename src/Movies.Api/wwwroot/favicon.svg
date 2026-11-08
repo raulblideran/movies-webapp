@@ -1,18 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- An admit-one ticket: gold, tilted, on deep teal. The PNG icons (favicon-32, apple-touch-icon, icons/) are drawn from this. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#e94560"/>
-      <stop offset="1" stop-color="#8b0000"/>
+      <stop offset="0" stop-color="#145a5c"/>
+      <stop offset="1" stop-color="#0a2f33"/>
     </linearGradient>
+    <!-- the ticket, with a half-circle notch out of each end -->
+    <mask id="ticket">
+      <rect x="4" y="18" width="56" height="28" rx="4" fill="#fff"/>
+      <circle cx="4" cy="32" r="6" fill="#000"/>
+      <circle cx="60" cy="32" r="6" fill="#000"/>
+    </mask>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#bg)"/>
-  <!-- clapper arm, opened slightly around the hinge -->
-  <g transform="rotate(-16 12 27)">
-    <rect x="12" y="18" width="40" height="9" rx="2" fill="#fff"/>
-    <path d="M19 18h6l-5 9h-6zM31 18h6l-5 9h-6zM43 18h6l-5 9h-6z" fill="#8b0000"/>
+  <g transform="rotate(-14 32 32)">
+    <rect x="4" y="18" width="56" height="28" fill="#f6c453" mask="url(#ticket)"/>
+    <!-- the tear-off line, and a star -->
+    <path d="M42 21V43" stroke="#0a2f33" stroke-width="2" stroke-dasharray="3 3"/>
+    <path d="M23 24 25.12 29.09 30.61 29.53 26.42 33.11 27.7 38.47 23 35.6 18.3 38.47 19.58 33.11 15.39 29.53 20.88 29.09Z" fill="#0a2f33"/>
   </g>
-  <!-- slate body -->
-  <rect x="12" y="29" width="40" height="23" rx="3" fill="#fff"/>
-  <path d="M15 29h6l-4 7h-6zM27 29h6l-4 7h-6zM39 29h6l-4 7h-6z" fill="#8b0000"/>
-  <rect x="12" y="36" width="40" height="1.5" fill="#8b0000" opacity=".35"/>
 </svg>
