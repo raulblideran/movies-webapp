@@ -47,6 +47,75 @@ public static class ReleasesEndpoints
             var deleted = await db.Releases.Where(r => r.Id == id).ExecuteDeleteAsync();
             return deleted == 0 ? Results.NotFound() : Results.NoContent();
         });
+
+        // ---------- your own cover (ReleaseCover), shown instead of CeX's picture ----------
+
+        // Anyone can see it. Its link carries a version (ReleaseDto.CoverUrl), so it can be cached for good.
+        releases.MapGet("/{id:int}/cover", async (int id, MoviesDbContext db, HttpContext ctx) =>
+        {
+            var c = await db.ReleaseCovers.AsNoTracking().FirstOrDefaultAsync(x => x.ReleaseId == id);
+            if (c is null) return Results.NotFound();
+            ctx.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            return Results.File(c.Data, c.ContentType);
+        });
+
+        // The body is the picture itself: the release editor shrinks it to a JPEG first.
+        write.MapPut("/{id:int}/cover", async (int id, HttpRequest request, MoviesDbContext db, CancellationToken ct) =>
+        {
+            var r = await db.Releases.Include(x => x.TitleLinks).FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (r is null) return Results.NotFound();
+            var data = await ReadUpToAsync(request.Body, MaxCoverBytes, ct);
+            if (data is null) return CoverProblem("That picture is too big (over 3 MB).");
+            if (ReleaseCover.Sniff(data) is not { } type) return CoverProblem("That isn't a JPEG, PNG or WebP picture.");
+
+            var now = DateTime.UtcNow;
+            var cover = await db.ReleaseCovers.FirstOrDefaultAsync(c => c.ReleaseId == id, ct);
+            if (cover is null) db.ReleaseCovers.Add(new ReleaseCover { ReleaseId = id, ContentType = type, Data = data, UpdatedAt = now });
+            else (cover.ContentType, cover.Data, cover.UpdatedAt) = (type, data, now);
+            r.CoverUpdatedAt = now;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(ReleaseDto.From(r));
+        });
+
+        // Back to CeX's picture (or the titles' posters).
+        write.MapDelete("/{id:int}/cover", async (int id, MoviesDbContext db, CancellationToken ct) =>
+        {
+            var r = await db.Releases.Include(x => x.TitleLinks).FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (r is null) return Results.NotFound();
+            await db.ReleaseCovers.Where(c => c.ReleaseId == id).ExecuteDeleteAsync(ct);
+            r.CoverUpdatedAt = null;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(ReleaseDto.From(r));
+        });
+
+        // A picture from a link pasted in the editor. The browser can't read another site's pictures, so the server
+        // fetches it (public internet only: CoverFetcher) and the editor shows and shrinks it before saving it.
+        write.MapGet("/cover-from", async (string? url, CoverFetcher fetcher, HttpContext ctx, CancellationToken ct) =>
+        {
+            var got = await fetcher.FetchAsync(url, ct);
+            if (got.Data is null) return CoverProblem(got.Error!);
+            ctx.Response.Headers.CacheControl = "no-store";
+            return Results.File(got.Data, got.ContentType);
+        });
+    }
+
+    private const int MaxCoverBytes = 3 * 1024 * 1024;
+
+    private static IResult CoverProblem(string message) =>
+        Results.ValidationProblem(new Dictionary<string, string[]> { ["Cover"] = [message] });
+
+    /// <summary>The whole body, or null once it's over max bytes.</summary>
+    private static async Task<byte[]?> ReadUpToAsync(Stream body, int max, CancellationToken ct)
+    {
+        using var buffer = new MemoryStream();
+        var chunk = new byte[81920];
+        int read;
+        while ((read = await body.ReadAsync(chunk, ct)) > 0)
+        {
+            if (buffer.Length + read > max) return null;
+            buffer.Write(chunk, 0, read);
+        }
+        return buffer.ToArray();
     }
 
     /// <summary>Validates and copies the request onto the release. Returns a problem result, or null when it applied.</summary>

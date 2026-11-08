@@ -33,12 +33,17 @@ public record ReleaseDto(
     SaleChannel? SoldVia,
     DateOnly? SoldOn,
     decimal? SoldFor,
-    TradeInPayout? Payout)
+    TradeInPayout? Payout,
+    // your own picture, shown instead of CeX's (ImageUrl); null without one
+    string? CoverUrl)
 {
     public static ReleaseDto From(PhysicalRelease r) => new(
         r.Id, r.Name, r.Format, r.Edition, r.PricePaid, r.PurchasedFrom, r.Notes, r.CexUrl, r.CexSku, r.CexBoxName, r.ImageUrl,
         r.TitleLinks.Select(l => l.TitleId).Order().ToList(), r.CreatedAt, r.UpdatedAt,
-        r.BoughtOn, r.SoldVia, r.SoldOn, r.SoldFor, r.Payout);
+        r.BoughtOn, r.SoldVia, r.SoldOn, r.SoldFor, r.Payout, CoverUrlOf(r));
+
+    public static string? CoverUrlOf(PhysicalRelease r) =>
+        r.CoverUpdatedAt is { } t ? $"/api/releases/{r.Id}/cover?v={t.Ticks}" : null;
 }
 
 public record ReleaseUpsertRequest(

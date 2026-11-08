@@ -12,6 +12,7 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
     public DbSet<CexPriceSnapshot> CexPriceSnapshots => Set<CexPriceSnapshot>();
     public DbSet<PhysicalRelease> Releases => Set<PhysicalRelease>();
     public DbSet<TitleRelease> TitleReleases => Set<TitleRelease>();
+    public DbSet<ReleaseCover> ReleaseCovers => Set<ReleaseCover>();
     public DbSet<Watch> Watches => Set<Watch>();
     public DbSet<YearGoal> YearGoals => Set<YearGoal>();
 
@@ -108,6 +109,13 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
             e.Property(r => r.CexBoxName).HasMaxLength(300);
             e.Property(r => r.ImageUrl).HasMaxLength(500);
             e.HasIndex(r => r.CexSku);
+        });
+
+        builder.Entity<ReleaseCover>(e =>
+        {
+            e.HasKey(c => c.ReleaseId);
+            e.HasOne(c => c.Release).WithOne().HasForeignKey<ReleaseCover>(c => c.ReleaseId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(c => c.ContentType).HasMaxLength(40);
         });
 
         builder.Entity<TitleRelease>(e =>

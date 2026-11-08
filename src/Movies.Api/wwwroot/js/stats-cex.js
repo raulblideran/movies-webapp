@@ -212,7 +212,7 @@
         const F = Object.keys(Shelf.FORMATS), E = Object.keys(Shelf.EDITIONS), P = Object.keys(PLACES);
         const count = (pred) => A.filter(pred).length;
         const usedP = P.filter((p) => count((i) => i.place === p));
-        const fmtColor = (k) => slot(F.indexOf(k)); // a colour per format, the same in every chart here
+        const fmtColor = (k) => slot(Shelf.FORMAT_SLOT[k]); // a colour per format, as on the release chips and the Watchlog tab
 
         const byFormat = F.map((k) => {
             const rs = A.filter((i) => i.rawFormat === k);

@@ -543,7 +543,7 @@ function tagsHtml(row, { formats = false } = {}) {
     if (row.list === "watchlist" && row.watchCount > 0) tags.push(`<span class="tag tag-rewatch">Rewatch</span>`);
     if (row.withBogdan) tags.push(`<span class="tag tag-bogdan">With Bogdan</span>`);
     if (row.watchedInCinema) tags.push(`<span class="tag tag-cinema">In cinema</span>`);
-    if (formats) for (const r of row.releases) tags.push(`<span class="tag tag-physical">${escapeHtml(Shelf.label(r))}</span>`);
+    if (formats) for (const r of row.releases) tags.push(Shelf.formatTag(r));
     else if (row.releases.length > 0) tags.push(`<span class="tag tag-physical">On the shelf</span>`);
     if ((row.rewatchPotential ?? 0) >= 9) tags.push(`<span class="tag tag-rewatch">High rewatch</span>`);
     return tags.join("");

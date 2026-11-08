@@ -3,6 +3,7 @@
 // and shelf.js.
 //   /releases?release=12          opens that release
 //   /releases?status=sold&via=Cex  what went, and where (status: shelf, the default, all or sold)
+//   /releases?titles=none          releases with no titles linked (something to fix)
 //   /releases?new=1&title=34      opens "Add a release" with that title already picked (editors)
 
 (function () {
@@ -12,7 +13,7 @@
     let releases = [];
     let titles = new Map(); // id → title
     // status: on the shelf (the default), all, or traded in / sold; via: where the sold ones went
-    const filter = { q: "", status: "shelf", via: "all", format: "all", edition: "all", place: "all", sort: "name" };
+    const filter = { q: "", status: "shelf", via: "all", titles: "all", format: "all", edition: "all", place: "all", sort: "name" };
     // the sorts about sales: picking one while the page shows the shelf switches to what went
     const SALE_SORTS = ["sold-recent", "sale-best", "sale-worst"];
     const DEFAULTS = { ...filter };
@@ -32,6 +33,7 @@
         } else filter.sort = DEFAULTS.sort;
         if (!["shelf", "all", "sold"].includes(filter.status)) filter.status = DEFAULTS.status;
         if (filter.via !== "all" && !(filter.via in CHANNELS)) filter.via = DEFAULTS.via;
+        if (!["all", "none"].includes(filter.titles)) filter.titles = DEFAULTS.titles;
         if (["grid", "table"].includes(p.get("view")))
             try {
                 localStorage.setItem("view:releases", p.get("view"));
@@ -134,6 +136,11 @@
         document.getElementById("viaFilters").classList.toggle("hidden", !showVia);
         if (!showVia) filter.via = "all";
         chips("viaFilters", "via", [["all", "Anywhere"], ...vias.map((k) => [k, `${k === "FacebookMarketplace" ? "FB Marketplace" : CHANNELS[k]} (${gone.filter((r) => r.soldVia === k).length})`])], { after: filters });
+        // releases with no titles linked: shown (and countable) only when there are some, as something to fix
+        const orphans = releases.filter((r) => inStatus(r) && inVia(r) && !r.titleIds.length).length;
+        document.getElementById("titleFilters").classList.toggle("hidden", !orphans);
+        if (!orphans) filter.titles = "all";
+        chips("titleFilters", "titles", [["all", "Any titles"], ["none", `No titles linked (${orphans})`]]);
         // the other groups count within the status (and channel) chosen
         const count = (pred) => releases.filter((r) => inStatus(r) && inVia(r) && pred(r)).length;
         chips("formatFilters", "format", [["all", "All formats"], ...Object.entries(FORMATS).filter(([k]) => count((r) => r.format === k)).map(([k, l]) => [k, `${l} (${count((r) => r.format === k)})`])]);
@@ -247,7 +254,7 @@
         { key: "name", label: "Name", value: (r) => r.name },
         { key: "format", label: "Format", value: (r) => FORMATS[r.format] },
         { key: "edition", label: "Edition", value: (r) => EDITIONS[r.edition] },
-        { key: "titles", label: "Titles", value: (r) => titlesOf(r).map((t) => t.name).join(", "), wrap: true },
+        { key: "titles", label: "Titles", value: (r) => titlesOf(r).map((t) => t.name).join(", "), html: (r) => (r.titleIds.length ? esc(titlesOf(r).map((t) => t.name).join(", ")) : `<span class="warn-text">None linked</span>`), wrap: true },
         { key: "count", label: "No.", value: (r) => r.titleIds.length, num: true },
         { key: "paid", label: "Paid", value: (r) => r.pricePaid, html: (r) => money(r.pricePaid), num: true },
         { key: "place", label: "Bought from", value: (r) => PLACES[r.purchasedFrom] },
@@ -265,7 +272,7 @@
         if (releases.length) writeUrl();
         const pool = releases.filter((r) => inStatus(r) && inVia(r));
         const list = pool
-            .filter((r) => (filter.format === "all" || r.format === filter.format) && (filter.edition === "all" || r.edition === filter.edition) && (filter.place === "all" || r.purchasedFrom === filter.place) && (!filter.q || r._search.includes(filter.q)))
+            .filter((r) => (filter.titles === "all" || !r.titleIds.length) && (filter.format === "all" || r.format === filter.format) && (filter.edition === "all" || r.edition === filter.edition) && (filter.place === "all" || r.purchasedFrom === filter.place) && (!filter.q || r._search.includes(filter.q)))
             .sort(sorters[filter.sort]);
         document.getElementById("releaseCount").textContent = list.length === pool.length ? "" : `${list.length} of ${pool.length}`;
         const grid = document.getElementById("releasesGrid");
@@ -301,12 +308,12 @@
                 const sold = isSold(r);
                 const net = saleNet(r);
                 return `
-                <button type="button" class="card release-card${sold ? " is-sold" : ""}" data-i="${i}">
-                    <div class="card-poster release-art${r.imageUrl ? " has-photo" : ""}${sold ? " is-sold" : ""}">${sold ? `<span class="sale-badge">${esc(saleBadge(r))}</span>` : ""}${art(r)}</div>
+                <button type="button" class="card release-card${sold ? " is-sold" : ""}${ts.length ? "" : " is-orphan"}" data-i="${i}">
+                    <div class="card-poster release-art${ReleaseDialogs.artClass(r)}${sold ? " is-sold" : ""}">${sold ? `<span class="sale-badge">${esc(saleBadge(r))}</span>` : ""}${art(r)}${ts.length ? "" : `<span class="orphan-badge" title="No titles are linked to this release: edit it and add the titles on it">No titles linked</span>`}</div>
                     <div class="card-body">
                         <h3 class="card-title">${esc(r.name)}</h3>
                         <div class="tags">
-                            <span class="tag tag-physical">${esc(label(r))}</span>
+                            ${Shelf.formatTag(r)}
                             ${ts.length > 1 ? `<span class="tag">${ts.length} titles</span>` : ""}
                         </div>
                         <dl class="facts">

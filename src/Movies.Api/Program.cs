@@ -126,6 +126,20 @@ builder.Services.AddHttpClient<CexClient>(c =>
     c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; movies-webapp)");
 });
 
+// Covers found on other sites (a link pasted in the release editor): public internet only, see CoverFetcher.
+builder.Services.AddHttpClient<CoverFetcher>(c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(15);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; movies-webapp)");
+}).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    ConnectCallback = CoverFetcher.ConnectPublicOnly,
+    AllowAutoRedirect = true,
+    MaxAutomaticRedirections = 3,
+    UseCookies = false,
+    AutomaticDecompression = System.Net.DecompressionMethods.All,
+});
+
 builder.Services.AddHttpClient<PostcodeClient>(c =>
 {
     c.BaseAddress = new Uri("https://api.postcodes.io/");

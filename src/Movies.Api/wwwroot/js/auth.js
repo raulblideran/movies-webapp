@@ -40,9 +40,13 @@
 
     // ---------- API ----------
 
+    // body: sent as JSON, or as itself when it's a Blob (a picture: the release cover)
     async function api(method, url, body) {
         const init = { method, credentials: "same-origin", headers: {} };
-        if (body !== undefined) {
+        if (body instanceof Blob) {
+            init.headers["Content-Type"] = body.type || "application/octet-stream";
+            init.body = body;
+        } else if (body !== undefined) {
             init.headers["Content-Type"] = "application/json";
             init.body = JSON.stringify(body);
         }

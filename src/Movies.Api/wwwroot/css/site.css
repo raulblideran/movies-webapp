@@ -1201,6 +1201,42 @@ textarea.code {
 .tag-physical {
     --tag: var(--tag-physical);
 }
+
+/* A release's format (js/shelf.js formatTag): each format in its chart colour, mixed towards the text colour so it
+   reads in every theme (lighter on dark ones, darker on light ones). 4K gold, Blu-ray blue, DVD green, as in Stats. */
+.tag-fmt {
+    --tag: color-mix(in oklab, var(--fmt, var(--tag-physical)) 68%, var(--ink));
+}
+.tag-uhd {
+    --fmt: var(--chart-1);
+}
+.tag-bluray {
+    --fmt: var(--chart-2);
+}
+.tag-dvd {
+    --fmt: var(--chart-3);
+}
+/* a steelbook: a metal sheen across the chip */
+.tag-fmt.tag-steelbook {
+    border-color: var(--tag);
+    background: linear-gradient(
+        120deg,
+        color-mix(in srgb, var(--tag) 30%, transparent),
+        color-mix(in srgb, var(--tag) 6%, transparent) 45%,
+        color-mix(in srgb, var(--tag) 28%, transparent) 70%,
+        color-mix(in srgb, var(--tag) 10%, transparent)
+    );
+}
+/* a box set: a second case stacked behind */
+.tag-fmt.tag-boxset {
+    box-shadow: 3px 3px 0 -1px var(--surface), 3px 3px 0 0 color-mix(in srgb, var(--tag) 60%, transparent);
+    margin-right: 3px;
+}
+
+/* something to fix: a release with no titles linked */
+.tag-warn {
+    --tag: var(--warn);
+}
 .tag-watchlist {
     --tag: var(--accent);
 }
@@ -4591,8 +4627,10 @@ a.tag-own:focus-visible {
     width: 100%;
 }
 
-/* CeX product photos are pack shots on white: show the whole box */
-.release-art.has-photo {
+/* CeX product photos are pack shots on white: show the whole box. Your own covers are framed the same way, so
+   they sit alongside CeX's. */
+.release-art.has-photo,
+.release-art.has-cover {
     background: #fff;
 }
 
@@ -4653,7 +4691,8 @@ a.tag-own:focus-visible {
     object-fit: cover;
 }
 
-.release-detail-art.has-photo > img {
+.release-detail-art.has-photo > img,
+.release-detail-art.has-cover > img {
     object-fit: contain;
 }
 
@@ -4686,6 +4725,161 @@ a.tag-own:focus-visible {
 .release-actions {
     margin-top: 18px;
     justify-content: flex-start;
+}
+
+/* ---------- your own cover (js/release-dialogs.js coverField) ---------- */
+
+
+.cover-box {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    gap: 8px 14px;
+    align-items: start;
+    padding: 10px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-sm);
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.cover-field.is-dropping .cover-box {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.cover-preview {
+    grid-row: span 2;
+    position: relative;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+    background: var(--poster-bg);
+}
+
+.cover-preview > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cover-preview .no-poster {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    padding: 6px;
+    font-size: 11px;
+    text-align: center;
+    color: var(--ink-3);
+}
+
+.cover-side,
+.cover-more {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.cover-status {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ink-2);
+}
+
+.cover-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* the file input is hidden inside its button: show the focus on the button */
+.cover-attach:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.cover-link {
+    display: flex;
+    gap: 6px;
+}
+
+.cover-link .input {
+    flex: 1;
+    min-width: 0;
+}
+
+.cover-more .field-hint {
+    margin: 0;
+}
+
+/* "Find one: Google Images · Blu-ray.com covers · …" (hidden links leave no stray dot) */
+.cover-find a:not(.hidden) ~ a:not(.hidden)::before {
+    content: "·";
+    display: inline-block;
+    margin: 0 6px;
+    color: var(--ink-3);
+}
+
+/* phones: the preview beside the status and buttons, the link and searches across the whole width below */
+@media (max-width: 640px) {
+    .cover-box {
+        grid-template-columns: 84px minmax(0, 1fr);
+        gap: 10px;
+    }
+    .cover-preview {
+        grid-row: auto;
+    }
+    .cover-more {
+        grid-column: 1 / -1;
+    }
+}
+
+/* a release with neither a picture nor a title's poster: its name, centred, in the popup too */
+.release-detail-art > .no-poster {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    padding: 12px;
+    text-align: center;
+    color: var(--ink-3);
+}
+
+/* ---------- a release with no titles linked: something to fix ---------- */
+
+.release-card.is-orphan .card-poster {
+    outline: 2px solid var(--warn);
+    outline-offset: 3px;
+}
+
+.orphan-badge {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    padding: 5px 8px;
+    background: var(--warn);
+    color: var(--bg);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.02em;
+}
+
+.release-warn {
+    margin: 0;
+    padding: 10px 14px;
+    border: 1px solid var(--warn);
+    border-left-width: 4px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--warn) 10%, transparent);
+    color: var(--ink);
+    font-size: 14px;
+}
+
+.warn-text {
+    color: var(--warn);
+    font-weight: 700;
 }
 
 /* ---------- traded in or sold (js/shelf.js saleLine / saleBadge) ---------- */

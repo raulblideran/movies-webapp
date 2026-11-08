@@ -40,8 +40,15 @@
     const titlesOf = (r, ctx) =>
         r.titleIds.map((id) => ctx.titles().get(id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
 
+    // The picture a release shows: your own cover, else CeX's photo; without either (or when it won't load),
+    // its titles' posters.
+    const pictureOf = (r) => r.coverUrl ?? r.imageUrl ?? null;
+    // the art box's class: CeX's pack shots sit on white; your own covers on the poster background
+    const artClass = (r) => (r.coverUrl ? " has-cover" : r.imageUrl ? " has-photo" : "");
+
     function art(r, ctx, { large = false, photo = true } = {}) {
-        if (r.imageUrl && photo) return `<img class="release-photo" data-release="${r.id}" src="${esc(r.imageUrl)}" alt="" loading="lazy">`;
+        const picture = pictureOf(r);
+        if (picture && photo) return `<img class="release-photo" data-release="${r.id}" src="${esc(picture)}" alt="" loading="lazy">`;
         const posters = titlesOf(r, ctx).filter((t) => t.posterUrl).slice(0, 4);
         if (posters.length === 0) return `<div class="no-poster">${esc(r.name)}</div>`;
         if (posters.length === 1) return `<img src="${esc(posters[0].posterUrl)}" alt="" loading="lazy">`;
@@ -58,7 +65,7 @@
                 const r = img && ctx.find(Number(img.dataset.release));
                 if (!r) return;
                 const box = img.parentElement;
-                box.classList.remove("has-photo");
+                box.classList.remove("has-photo", "has-cover");
                 // only the picture: a sold disc's badge stays on the box
                 img.outerHTML = art(r, ctx, { photo: false, large: box.classList.contains("release-detail-art") });
             },
@@ -94,11 +101,12 @@
             esc(r.name),
             `
             <div class="release-detail">
-                <div class="release-detail-art release-art${r.imageUrl ? " has-photo" : ""}${sold ? " is-sold" : ""}">${art(r, ctx, { large: true })}</div>
+                <div class="release-detail-art release-art${artClass(r)}${sold ? " is-sold" : ""}">${art(r, ctx, { large: true })}</div>
                 <div class="release-detail-info">
                     <div class="tags">
-                        <span class="tag tag-physical">${esc(FORMATS[r.format])}</span>
-                        ${r.edition !== "Standard" ? `<span class="tag">${esc(EDITIONS[r.edition])}</span>` : ""}
+                        ${Shelf.formatTag(r, { text: FORMATS[r.format], edition: false })}
+                        ${r.edition !== "Standard" ? Shelf.formatTag(r, { text: EDITIONS[r.edition] }) : ""}
+                        ${ts.length ? "" : `<span class="tag tag-warn">No titles linked</span>`}
                     </div>
                     ${sold ? saleBanner(r) : ""}
                     <dl class="facts release-facts">
@@ -114,7 +122,7 @@
                 </div>
             </div>
             <section class="release-titles">
-                <h3>${ts.length === 1 ? "The title on it" : `The ${ts.length} titles on it`}</h3>
+                <h3>${ts.length === 0 ? "Titles on it" : ts.length === 1 ? "The title on it" : `The ${ts.length} titles on it`}</h3>
                 ${ts.length
                     ? `<ul class="release-title-list">${ts
                           .map((t) => `
@@ -123,7 +131,7 @@
                             <span>${esc(t.name)}${t.releaseYear ? ` <span class="faint">${t.releaseYear}</span>` : ""}</span>
                         </a></li>`)
                           .join("")}</ul>`
-                    : `<p class="faint">No titles linked yet.</p>`}
+                    : `<p class="release-warn" role="note"><strong>No titles are linked to this release.</strong> ${canEdit ? "Edit it and add the titles on it, so" : "Until they are,"} it doesn't count towards any title's copy, price or CeX value.</p>`}
             </section>`,
             {
                 wide: true,
@@ -347,6 +355,197 @@
         return { get: () => picked };
     }
 
+    // ---------- the editor's cover: your own picture, instead of CeX's ----------
+
+    // A picture made small enough to keep (1200px at most on its longer side) as a JPEG. Transparency turns white.
+    async function shrink(file, longest = 1200) {
+        const bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, longest / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const g = canvas.getContext("2d");
+        g.fillStyle = "#fff";
+        g.fillRect(0, 0, canvas.width, canvas.height);
+        g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close?.();
+        return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't read that picture."))), "image/jpeg", 0.86));
+    }
+
+    // Searches on other sites for a cover, from what the form says now: the name (or its titles), format and
+    // edition, and the barcode when the CeX link has one (CeX's product ids for discs are their barcodes).
+    function findUrls(form, picker, r, ctx) {
+        const titles = picker.get().map((id) => ctx.titles().get(id)?.name).filter(Boolean);
+        const name = form.name.value.trim() || titles.join(" ") || r.cexBoxName || "";
+        const edition = form.edition.value === "Standard" ? "" : EDITIONS[form.edition.value];
+        const words = [name, FORMATS[form.format.value], edition].filter(Boolean).join(" ");
+        const sku = skuOf(form.cexUrl.value);
+        const barcode = sku && /^\d{8,14}$/.test(sku) ? sku : null;
+        const q = encodeURIComponent;
+        return {
+            images: `https://www.google.com/search?tbm=isch&q=${q(`${words} cover`)}`,
+            bluray: `https://www.google.com/search?tbm=isch&q=${q(`site:blu-ray.com ${words}`)}`,
+            barcode: barcode ? `https://www.google.com/search?tbm=isch&q=${q(barcode)}` : null,
+            amazon: `https://www.amazon.co.uk/s?k=${q(barcode ?? words)}`,
+        };
+    }
+
+    // The form's Cover: shows what the release will look like, takes a picture (attached, dropped, pasted, or from
+    // a link the server fetches) or removes yours, and saves that after the release (save(id)). Nothing is sent
+    // until then.
+    function coverField(d, form, r, ctx, picker) {
+        const box = d.$("[data-cover-drop]");
+        const preview = d.$("[data-cover-preview]");
+        const status = d.$("[data-cover-status]");
+        const fileInput = d.$("[data-cover-file]");
+        const linkInput = d.$("[data-cover-url]");
+        const fetchButton = d.$("[data-cover-fetch]");
+        const state = { action: "keep", blob: null, url: null }; // keep | set | remove
+        let problem = "";
+
+        const shownNow = () => (state.action === "set" ? { ...r, coverUrl: state.url } : state.action === "remove" ? { ...r, coverUrl: null } : r);
+        // a picture that won't load: the titles' posters, as on the cards
+        preview.addEventListener(
+            "error",
+            (e) => {
+                if (!e.target.classList?.contains("release-photo")) return;
+                preview.classList.remove("has-photo", "has-cover");
+                preview.innerHTML = art(shownNow(), ctx, { photo: false });
+            },
+            true,
+        );
+
+        function show() {
+            const shown = shownNow();
+            preview.className = `cover-preview release-art${artClass(shown)}`;
+            preview.innerHTML = art(shown, ctx);
+            const fallback = r.imageUrl ? "CeX's picture" : "the titles' posters";
+            status.textContent = problem || (
+                state.action === "set" ? "Your new picture: it's kept when you save."
+                : state.action === "remove" ? `Your picture goes when you save, and ${fallback} show${r.imageUrl ? "s" : ""} instead.`
+                : r.coverUrl ? "Your own picture."
+                : r.imageUrl ? "CeX's picture. Attach your own to show it instead."
+                : "No picture yet: the titles' posters show instead.");
+            status.classList.toggle("status-bad", !!problem);
+            d.$("[data-cover-remove]").classList.toggle("hidden", !(state.action === "keep" && r.coverUrl));
+            d.$("[data-cover-undo]").classList.toggle("hidden", state.action === "keep");
+        }
+        function fail(message) {
+            problem = message;
+            show();
+        }
+        async function take(file) {
+            if (!file?.type?.startsWith("image/")) return fail("That isn't a picture.");
+            problem = "";
+            status.textContent = "Reading the picture…";
+            try {
+                const blob = await shrink(file);
+                if (state.url) URL.revokeObjectURL(state.url);
+                Object.assign(state, { action: "set", blob, url: URL.createObjectURL(blob) });
+                show();
+            } catch {
+                fail("Couldn't read that picture.");
+            }
+        }
+        // the browser can't read another site's pictures: the server fetches it (public internet only)
+        async function fromLink(link = linkInput.value.trim()) {
+            if (!link) return linkInput.focus();
+            fetchButton.disabled = true;
+            problem = "";
+            status.textContent = "Fetching the picture…";
+            try {
+                const resp = await fetch(`/api/releases/cover-from?url=${encodeURIComponent(link)}`, { credentials: "same-origin" });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => null);
+                    throw new Error(data?.errors?.Cover?.[0] ?? data?.detail ?? `Couldn't fetch that picture (${resp.status}).`);
+                }
+                await take(await resp.blob());
+                if (!problem) linkInput.value = "";
+            } catch (e) {
+                fail(e.message);
+            } finally {
+                fetchButton.disabled = false;
+            }
+        }
+
+        fileInput.addEventListener("change", () => {
+            take(fileInput.files[0]);
+            fileInput.value = "";
+        });
+        fetchButton.onclick = () => fromLink();
+        // Enter in the link box fetches it rather than saving the form
+        linkInput.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            fromLink();
+        });
+        d.$("[data-cover-remove]").onclick = () => {
+            problem = "";
+            state.action = "remove";
+            show();
+        };
+        d.$("[data-cover-undo]").onclick = () => {
+            if (state.url) URL.revokeObjectURL(state.url);
+            Object.assign(state, { action: "keep", blob: null, url: null });
+            problem = "";
+            show();
+        };
+        // a picture pasted anywhere in the form (text pastes as usual)
+        d.root.addEventListener("paste", (e) => {
+            const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+            if (!file) return;
+            e.preventDefault();
+            take(file);
+        });
+        // a file dropped on the field, or a picture dragged from another tab (its link)
+        box.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            box.classList.add("is-dropping");
+        });
+        box.addEventListener("dragleave", (e) => {
+            if (!box.contains(e.relatedTarget)) box.classList.remove("is-dropping");
+        });
+        box.addEventListener("drop", (e) => {
+            e.preventDefault();
+            box.classList.remove("is-dropping");
+            const file = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith("image/"));
+            if (file) return take(file);
+            const link = (e.dataTransfer?.getData("text/uri-list") || e.dataTransfer?.getData("text/plain") || "").split("\n").find((l) => /^https?:\/\//.test(l.trim()));
+            if (link) {
+                linkInput.value = link.trim();
+                fromLink(link.trim());
+            } else fail("Drop a picture, or a picture from another tab.");
+        });
+
+        // the searches follow the form: refreshed just before a link is followed (click, middle click or keyboard)
+        const finds = d.$$("[data-find]");
+        const refreshFinds = () => {
+            const urls = findUrls(form, picker, r, ctx);
+            for (const a of finds) {
+                a.href = urls[a.dataset.find] ?? "#";
+                a.classList.toggle("hidden", !urls[a.dataset.find]);
+            }
+        };
+        finds.forEach((a) => ["pointerdown", "focus", "click"].forEach((ev) => a.addEventListener(ev, refreshFinds)));
+        form.cexUrl.addEventListener("input", refreshFinds);
+        refreshFinds();
+        show();
+
+        return {
+            // for the unsaved-changes check
+            change: () => (state.action === "set" ? `set:${state.blob.size}` : state.action),
+            // after the release is saved: the fresh release, or null when the cover didn't change
+            async save(id) {
+                if (state.action === "set") return api("PUT", `/api/releases/${id}/cover`, state.blob);
+                if (state.action === "remove") return api("DELETE", `/api/releases/${id}/cover`);
+                return null;
+            },
+            dispose() {
+                if (state.url) URL.revokeObjectURL(state.url);
+            },
+        };
+    }
+
     function edit(r, presetTitleIds, ctx) {
         const isNew = !r;
         r = r ?? { name: "", format: "BluRay", edition: "Standard", pricePaid: null, purchasedFrom: "Other", boughtOn: null, notes: "", cexUrl: "", titleIds: presetTitleIds, soldVia: null };
@@ -370,6 +569,33 @@
                 </div>
                 <div><label class="label" for="rel-cex">CeX link <span class="faint">(for its CeX value: it doesn't have to be where you bought it)</span></label>
                     <input id="rel-cex" name="cexUrl" class="input code" value="${v(r.cexUrl)}" placeholder="https://uk.webuy.com/product-detail?id=…"></div>
+                <div class="cover-field" data-cover-drop>
+                    <span class="label" id="rel-cover-label">Cover</span>
+                    <div class="cover-box">
+                        <div class="cover-preview release-art" data-cover-preview role="img" aria-labelledby="rel-cover-label"></div>
+                        <div class="cover-side">
+                            <p class="cover-status" data-cover-status aria-live="polite"></p>
+                            <div class="cover-buttons">
+                                <label class="btn btn-small cover-attach">Attach a picture<input type="file" accept="image/*" data-cover-file class="sr-only"></label>
+                                <button type="button" class="btn btn-small hidden" data-cover-remove>Remove your picture</button>
+                                <button type="button" class="btn btn-small hidden" data-cover-undo>Undo</button>
+                            </div>
+                        </div>
+                        <div class="cover-more">
+                            <div class="cover-link">
+                                <input class="input" data-cover-url inputmode="url" autocomplete="off" placeholder="…or paste a picture's link" aria-label="A picture's link">
+                                <button type="button" class="btn btn-small" data-cover-fetch>Use link</button>
+                            </div>
+                            <p class="field-hint cover-find">Find one:
+                                <a href="#" target="_blank" rel="noopener" data-find="images">Google Images</a>
+                                <a href="#" target="_blank" rel="noopener" data-find="bluray">Blu-ray.com covers</a>
+                                <a href="#" target="_blank" rel="noopener" data-find="barcode">by barcode</a>
+                                <a href="#" target="_blank" rel="noopener" data-find="amazon">Amazon UK</a>
+                            </p>
+                            <p class="field-hint">You can also drop a picture (or a picture from another tab) here, or paste one.</p>
+                        </div>
+                    </div>
+                </div>
                 <div><span class="label">Titles on it</span><div data-titles></div></div>
                 <div><label class="label" for="rel-notes">Notes</label><textarea id="rel-notes" name="notes" rows="2" maxlength="2000" class="input">${v(r.notes)}</textarea></div>
                 <fieldset class="sale-fields${wasSold ? " is-open" : ""}">
@@ -403,6 +629,7 @@
         const picker = titlePicker(d.$("[data-titles]"), r.titleIds, ctx.titles());
         const form = d.$("form");
         form.querySelectorAll("[data-date]").forEach(DatePicker.attach);
+        const cover = coverField(d, form, r, ctx, picker);
 
         // ---------- traded in or sold ----------
         const saleBox = d.$("[data-sale]");
@@ -470,7 +697,7 @@
         });
         showChannel();
 
-        const snapshot = () => JSON.stringify([[...new FormData(form)], picker.get()]);
+        const snapshot = () => JSON.stringify([[...new FormData(form)], picker.get(), cover.change()]);
         const initial = snapshot();
         d.guard(() => snapshot() !== initial);
         d.$("[data-cancel]").onclick = () => d.requestClose();
@@ -510,16 +737,25 @@
                 payout: sold && form.soldVia.value === "Cex" ? form.payout.value : null,
             };
             busy(d, form.querySelector("button[type=submit]"), async () => {
-                const saved = isNew ? await api("POST", "/api/releases", body) : await api("PUT", `/api/releases/${r.id}`, body);
+                let saved = isNew ? await api("POST", "/api/releases", body) : await api("PUT", `/api/releases/${r.id}`, body);
+                // the release is saved: a picture that won't upload doesn't keep the form open (saving again would add it twice)
+                let coverProblem = null;
+                try {
+                    saved = (await cover.save(saved.id)) ?? saved;
+                } catch (e) {
+                    coverProblem = e.message;
+                }
+                cover.dispose();
                 d.close();
                 const fresh = await ctx.onChanged(saved);
                 const verb = !isSold(saved) ? (wasSold ? `Put ${saved.name} back on the shelf` : null) : !wasSold ? `Marked ${saved.name} as ${saved.soldVia === "Cex" ? "traded in" : "sold"}` : null;
-                Auth.showSuccess(verb ?? (isNew ? `Added ${saved.name}` : `Saved ${saved.name}`));
+                if (coverProblem) Auth.showError(`Saved ${saved.name}, but not its picture: ${coverProblem}`);
+                else Auth.showSuccess(verb ?? (isNew ? `Added ${saved.name}` : `Saved ${saved.name}`));
                 if (fresh) open(fresh, ctx);
             });
         };
         form.name.focus();
     }
 
-    window.ReleaseDialogs = { art, photoFallback, open, edit };
+    window.ReleaseDialogs = { art, artClass, photoFallback, open, edit };
 })();

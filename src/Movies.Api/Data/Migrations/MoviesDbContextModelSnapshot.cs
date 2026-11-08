@@ -350,6 +350,9 @@ namespace Movies.Api.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("CoverUpdatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -408,6 +411,28 @@ namespace Movies.Api.Data.Migrations
                     b.HasIndex("CexSku");
 
                     b.ToTable("PhysicalReleases", (string)null);
+                });
+
+            modelBuilder.Entity("Movies.Api.Data.ReleaseCover", b =>
+                {
+                    b.Property<int>("ReleaseId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ReleaseId");
+
+                    b.ToTable("ReleaseCovers");
                 });
 
             modelBuilder.Entity("Movies.Api.Data.Title", b =>
@@ -667,6 +692,17 @@ namespace Movies.Api.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Movies.Api.Data.ReleaseCover", b =>
+                {
+                    b.HasOne("Movies.Api.Data.PhysicalRelease", "Release")
+                        .WithOne()
+                        .HasForeignKey("Movies.Api.Data.ReleaseCover", "ReleaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Release");
                 });
 
             modelBuilder.Entity("Movies.Api.Data.TitleRelease", b =>

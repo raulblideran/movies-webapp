@@ -12,6 +12,15 @@
     const PLACES = { Cex: "CeX", Hmv: "HMV", Ebay: "eBay", Zavvi: "Zavvi", Amazon: "Amazon", ForbiddenPlanet: "Forbidden Planet", Other: "Other" };
     // "4K Blu-ray Steelbook"; a standard edition is just the format
     const label = (r) => `${FORMATS[r.format] ?? r.format}${r.edition && r.edition !== "Standard" ? ` ${EDITIONS[r.edition] ?? r.edition}` : ""}`;
+    // Each format's colour: the theme's chart slot (0 = --chart-1), the same in the Stats charts. 4K gold, Blu-ray blue, DVD green.
+    const FORMAT_SLOT = { UltraHdBluRay: 0, BluRay: 1, Dvd: 2 };
+    // A release's chip, coloured by its format; a steelbook has a sheen, a box set looks stacked (css: .tag-fmt).
+    // text: the label (default "4K Blu-ray Steelbook"); edition: false for a chip about the format alone.
+    function formatTag(r, { text = label(r), edition = true } = {}) {
+        const kind = { Dvd: "dvd", BluRay: "bluray", UltraHdBluRay: "uhd" }[r.format] ?? "other";
+        const ed = !edition ? "" : r.edition === "Steelbook" ? " tag-steelbook" : r.edition === "BoxSet" ? " tag-boxset" : "";
+        return `<span class="tag tag-fmt tag-${kind}${ed}">${esc(text)}</span>`;
+    }
     // A title's part of what its releases cost (a box set's price is shared between its titles). Null when nothing has a price.
     const titleShare = (title) => {
         const priced = title.releases.filter((r) => r.pricePaid != null);
@@ -172,7 +181,7 @@
     }
 
     window.Shelf = {
-        FORMATS, EDITIONS, PLACES, CHANNELS, label, titleShare, money, esc, renderTable, viewToggle,
+        FORMATS, EDITIONS, PLACES, CHANNELS, FORMAT_SLOT, label, formatTag, titleShare, money, esc, renderTable, viewToggle,
         day, isSold, saleVerb, saleBadge, salePrice, saleLine, saleNet, signed, kept, nearestPoint,
     };
 })();

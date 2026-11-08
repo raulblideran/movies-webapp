@@ -76,6 +76,12 @@ public class PhysicalRelease : ITimestamped
     public string? CexBoxName { get; set; }
     public string? ImageUrl { get; set; }
 
+    /// <summary>
+    /// When your own picture (ReleaseCover) was last set; null without one. It's part of the picture's link, so a
+    /// new one is never served from a cache.
+    /// </summary>
+    public DateTime? CoverUpdatedAt { get; set; }
+
     public List<TitleRelease> TitleLinks { get; set; } = [];
 
     public DateTime CreatedAt { get; set; }
