@@ -82,6 +82,13 @@ public static class ReleasesEndpoints
         r.PricePaid = req.PricePaid;
         r.PurchasedFrom = req.PurchasedFrom;
         r.Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim();
+        r.BoughtOn = req.BoughtOn;
+
+        // Unticking "Traded in or sold" (no channel) clears the rest; cash or voucher is only a CeX thing.
+        r.SoldVia = req.SoldVia;
+        r.SoldOn = r.IsSold ? req.SoldOn : null;
+        r.SoldFor = r.IsSold ? req.SoldFor : null;
+        r.Payout = r.SoldVia == SaleChannel.Cex ? req.Payout : null;
 
         r.TitleLinks.RemoveAll(l => !titleIds.Contains(l.TitleId));
         foreach (var id in titleIds.Where(id => r.TitleLinks.All(l => l.TitleId != id)))

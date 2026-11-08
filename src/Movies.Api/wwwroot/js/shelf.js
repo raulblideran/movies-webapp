@@ -1,4 +1,5 @@
-// Shared by the collection pages: how releases are labelled, and the admin-only table view.
+// Shared by the collection pages: how releases are labelled (and, once traded in or sold, how that reads), and
+// the admin-only table view.
 // Needs auth.js (for Auth.me and esc).
 
 (function () {
@@ -17,6 +18,64 @@
         return priced.length ? priced.reduce((s, r) => s + r.pricePaid / Math.max(1, r.titleCount), 0) : null;
     };
     const money = (v) => (v == null ? "" : `£${Number(v).toFixed(2)}`);
+
+    // ---------- traded in or sold ----------
+    // A release with .soldVia has left the shelf: where it went, when (.soldOn), for how much (.soldFor) and, for a
+    // CeX trade-in, whether it was cash or voucher (.payout). It's kept as history.
+
+    // where a release can go, in the order the editor lists them
+    const CHANNELS = { Cex: "CeX", Ebay: "eBay", FacebookMarketplace: "Facebook Marketplace", Other: "Somewhere else" };
+    const SHORT_CHANNELS = { ...CHANNELS, FacebookMarketplace: "FB Marketplace", Other: "Other" };
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    // "3 Nov 2026"
+    const day = (iso) => {
+        if (!iso) return "";
+        const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+        return `${d} ${MONTHS[m - 1]} ${y}`;
+    };
+    const isSold = (r) => !!r?.soldVia;
+    // "Traded in" for CeX, "Sold" for the rest
+    const saleVerb = (r) => (r.soldVia === "Cex" ? "Traded in" : "Sold");
+    // the card badge: "Traded in · CeX", "Sold · eBay", "Sold · FB Marketplace", "Sold"
+    const saleBadge = (r) => (r.soldVia === "Other" ? "Sold" : `${saleVerb(r)} · ${SHORT_CHANNELS[r.soldVia] ?? r.soldVia}`);
+    // "£2.00 cash", "£3.00 in vouchers", "£4.50"
+    const salePrice = (r) => (r.soldFor == null ? "" : `${money(r.soldFor)}${r.soldVia === "Cex" && r.payout ? (r.payout === "Voucher" ? " in vouchers" : " cash") : ""}`);
+    // "Traded in to CeX on 3 Nov 2026 for £2.00 cash", "Sold on eBay on 3 Nov 2026 for £4.50", "Sold on 3 Nov 2026"
+    function saleLine(r) {
+        const where = { Cex: "Traded in to CeX", Ebay: "Sold on eBay", FacebookMarketplace: "Sold on Facebook Marketplace" }[r.soldVia] ?? "Sold";
+        return `${where}${r.soldOn ? ` on ${day(r.soldOn)}` : ""}${r.soldFor != null ? ` for ${salePrice(r)}` : ""}`;
+    }
+    // what came back less what it cost; null without both prices
+    const saleNet = (r) => (r.soldFor != null && r.pricePaid != null ? r.soldFor - r.pricePaid : null);
+    // "+£1.50", "−£3.00"
+    const signed = (n) => (n == null ? "" : `${n < 0 ? "−" : "+"}${money(Math.abs(n))}`);
+    // The daily CeX snapshot nearest a sale: the latest on or before the day (up to a week before), otherwise the
+    // first in the 3 days after. points: [{ date, sell, cash, exchange }], oldest first. Returns { point, days }
+    // (days from the sale: negative before it), or null.
+    function nearestPoint(points, soldOn) {
+        if (!points?.length || !soldOn) return null;
+        const t = (iso) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 864e5;
+        const sale = t(soldOn);
+        const before = points.filter((p) => t(p.date) <= sale && sale - t(p.date) <= 7).pop();
+        const after = before ? null : points.find((p) => t(p.date) > sale && t(p.date) - sale <= 3);
+        const point = before ?? after;
+        return point ? { point, days: Math.round(t(point.date) - sale) } : null;
+    }
+    // how long a disc was kept: "2 years 7 months", "5 months", "12 days"; null without both dates
+    function kept(r) {
+        if (!r.boughtOn || !r.soldOn) return null;
+        const [y1, m1, d1] = r.boughtOn.split("-").map(Number);
+        const [y2, m2, d2] = r.soldOn.split("-").map(Number);
+        let months = (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
+        if (months < 1) {
+            const days = Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 864e5);
+            return days === 1 ? "1 day" : `${days} days`;
+        }
+        const years = Math.floor(months / 12);
+        months %= 12;
+        const part = (n, w) => (n ? `${n} ${w}${n === 1 ? "" : "s"}` : "");
+        return [part(years, "year"), part(months, "month")].filter(Boolean).join(" ");
+    }
 
     // ---------- table view ----------
     // columns: [{ key, label, value: row => sortable value, html?: row => cell html, num?: true, wrap?: true }]
@@ -112,5 +171,8 @@
         return { get: () => view };
     }
 
-    window.Shelf = { FORMATS, EDITIONS, PLACES, label, titleShare, money, esc, renderTable, viewToggle };
+    window.Shelf = {
+        FORMATS, EDITIONS, PLACES, CHANNELS, label, titleShare, money, esc, renderTable, viewToggle,
+        day, isSold, saleVerb, saleBadge, salePrice, saleLine, saleNet, signed, kept, nearestPoint,
+    };
 })();

@@ -98,6 +98,10 @@ public class MoviesDbContext(DbContextOptions<MoviesDbContext> options)
             e.Property(r => r.Edition).HasConversion<string>().HasMaxLength(20);
             e.Property(r => r.PurchasedFrom).HasConversion<string>().HasMaxLength(20);
             e.Property(r => r.PricePaid).HasPrecision(10, 2);
+            e.Property(r => r.SoldVia).HasConversion<string>().HasMaxLength(20);
+            e.Property(r => r.SoldFor).HasPrecision(10, 2);
+            e.Property(r => r.Payout).HasConversion<string>().HasMaxLength(20);
+            e.Ignore(r => r.IsSold);
             e.Property(r => r.Notes).HasMaxLength(2000);
             e.Property(r => r.CexUrl).HasMaxLength(500);
             e.Property(r => r.CexSku).HasMaxLength(40);

@@ -26,7 +26,26 @@ public enum PurchasePlace
     ForbiddenPlanet,
 }
 
-/// <summary>A disc (or set of discs) on the shelf. A box set holds several titles; a title can be owned on several releases.</summary>
+/// <summary>Where a release went when it left the shelf. Null on a release means it's still on the shelf.</summary>
+public enum SaleChannel
+{
+    Cex,
+    Ebay,
+    FacebookMarketplace,
+    Other,
+}
+
+/// <summary>What CeX paid for a trade-in: cash, or the (higher) voucher price.</summary>
+public enum TradeInPayout
+{
+    Cash,
+    Voucher,
+}
+
+/// <summary>
+/// A disc (or set of discs) on the shelf. A box set holds several titles; a title can be owned on several releases.
+/// A release that was traded in or sold stays as history (SoldVia set), but isn't on the shelf any more.
+/// </summary>
 public class PhysicalRelease : ITimestamped
 {
     public int Id { get; set; }
@@ -35,7 +54,16 @@ public class PhysicalRelease : ITimestamped
     public ReleaseEdition Edition { get; set; }
     public decimal? PricePaid { get; set; }
     public PurchasePlace PurchasedFrom { get; set; }
+    /// <summary>When it was bought, if known (releases imported from the sheet don't have it).</summary>
+    public DateOnly? BoughtOn { get; set; }
     public string? Notes { get; set; }
+
+    // Traded in or sold: where (null = still on the shelf), when, for how much, and for a CeX trade-in, cash or voucher.
+    public SaleChannel? SoldVia { get; set; }
+    public DateOnly? SoldOn { get; set; }
+    public decimal? SoldFor { get; set; }
+    public TradeInPayout? Payout { get; set; }
+    public bool IsSold => SoldVia is not null;
 
     /// <summary>
     /// The CeX product page, wherever the release was bought: it's what the CeX value and the daily price history

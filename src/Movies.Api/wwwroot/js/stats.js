@@ -41,7 +41,8 @@
     let everything = [];
     let all = [];
     const setTitles = (rows) => {
-        everything = rows.map((r) => shape({ ...r, list: r.list === "Watchlist" ? "watchlist" : "watched" }));
+        // Lists.normalise: .releases is what's on the shelf now, .soldReleases what was traded in or sold
+        everything = rows.map((r) => shape(Lists.normalise(r)));
         all = everything.filter((r) => r.list === "watched" || r.watchCount > 0);
     };
     let genreInfo = { name: new Map(), color: new Map(), top: [] };
@@ -587,7 +588,9 @@
             .slice(0, 8);
         const pricey = [...P].sort((a, b) => b.pricePaid - a.pricePaid).slice(0, 8).map((r) => ({ label: r.name, value: r.pricePaid, valueLabel: gbp(r.pricePaid), full: r.name }));
 
-        return section("s-collection", "The shelf", `${plural(owned.length, "title")} on disc, ${plural(P.length, "title")} with a price paid.`, [
+        // discs traded in or sold aren't on the shelf: the Releases tab has them
+        const gone = new Set(F.flatMap((r) => (r.soldReleases ?? []).map((x) => x.id))).size;
+        return section("s-collection", "The shelf", `${plural(owned.length, "title")} on disc, ${plural(P.length, "title")} with a price paid.${gone ? ` ${gone === 1 ? "One disc you've traded in or sold is" : `${fmt(gone)} discs you've traded in or sold are`} on the Releases tab.` : ""}`, [
             card("Format", "Best format owned for each title", (el) => donut(el, { items: media, centerLabel: "titles", label: "Titles by disc format" }), {
                 head: ["Format", "Titles"],
                 rows: media.map((m) => [m.label, m.value]),

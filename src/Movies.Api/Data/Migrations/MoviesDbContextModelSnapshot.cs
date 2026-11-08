@@ -335,6 +335,9 @@ namespace Movies.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateOnly?>("BoughtOn")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CexBoxName")
                         .HasMaxLength(300)
                         .HasColumnType("TEXT");
@@ -373,12 +376,27 @@ namespace Movies.Api.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Payout")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal?>("PricePaid")
                         .HasPrecision(10, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PurchasedFrom")
                         .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("SoldFor")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("SoldOn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SoldVia")
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 

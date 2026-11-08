@@ -15,7 +15,27 @@
 
 (function () {
     const { api, dialog, busy, esc, CLS } = Auth;
-    const { FORMATS, EDITIONS, PLACES, money } = Shelf;
+    const { FORMATS, EDITIONS, PLACES, CHANNELS, money, day, isSold, saleLine, saleNet, signed, kept } = Shelf;
+
+    // today in this browser, yyyy-mm-dd
+    const todayIso = () => {
+        const n = new Date();
+        return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+    };
+    // the same, as a date field shows it (dd/mm/yyyy: js/datepicker.js)
+    const todayText = () => todayIso().split("-").reverse().join("/");
+    // the SKU in a CeX product link (or a bare SKU), as the server reads it; null otherwise
+    function skuOf(link) {
+        link = (link ?? "").trim();
+        const m = /[?&]id=([^&#]+)/.exec(link);
+        let sku = m ? m[1] : link;
+        try {
+            sku = decodeURIComponent(sku);
+        } catch {
+            return null;
+        }
+        return /^[A-Za-z0-9-]{1,40}$/.test(sku) ? sku : null;
+    }
 
     const titlesOf = (r, ctx) =>
         r.titleIds.map((id) => ctx.titles().get(id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
@@ -39,7 +59,8 @@
                 if (!r) return;
                 const box = img.parentElement;
                 box.classList.remove("has-photo");
-                box.innerHTML = art(r, ctx, { photo: false, large: box.classList.contains("release-detail-art") });
+                // only the picture: a sold disc's badge stays on the box
+                img.outerHTML = art(r, ctx, { photo: false, large: box.classList.contains("release-detail-art") });
             },
             true,
         );
@@ -50,6 +71,7 @@
     async function open(r, ctx, { stepped = false } = {}) {
         const ts = titlesOf(r, ctx);
         const canEdit = Auth.me.canEdit;
+        const sold = isSold(r);
         const list = ctx.list?.() ?? [];
         const index = list.findIndex((x) => x.id === r.id);
         const canStep = index >= 0 && list.length > 1;
@@ -72,20 +94,22 @@
             esc(r.name),
             `
             <div class="release-detail">
-                <div class="release-detail-art release-art${r.imageUrl ? " has-photo" : ""}">${art(r, ctx, { large: true })}</div>
+                <div class="release-detail-art release-art${r.imageUrl ? " has-photo" : ""}${sold ? " is-sold" : ""}">${art(r, ctx, { large: true })}</div>
                 <div class="release-detail-info">
                     <div class="tags">
                         <span class="tag tag-physical">${esc(FORMATS[r.format])}</span>
                         ${r.edition !== "Standard" ? `<span class="tag">${esc(EDITIONS[r.edition])}</span>` : ""}
                     </div>
+                    ${sold ? saleBanner(r) : ""}
                     <dl class="facts release-facts">
                         <dt>Paid</dt><dd>${r.pricePaid != null ? money(r.pricePaid) : "–"}${ts.length > 1 && r.pricePaid != null ? ` <span class="faint">(${money(r.pricePaid / ts.length)} a title)</span>` : ""}</dd>
                         <dt>Bought from</dt><dd>${esc(PLACES[r.purchasedFrom] ?? r.purchasedFrom)}</dd>
+                        ${r.boughtOn ? `<dt>Bought</dt><dd>${esc(day(r.boughtOn))}</dd>` : ""}
                         ${r.cexBoxName ? `<dt>At CeX</dt><dd>${esc(r.cexBoxName)}</dd>` : ""}
                         <dt>Added</dt><dd>${esc(r.createdAt.slice(0, 10).split("-").reverse().join("/"))}</dd>
                         ${r.notes ? `<dt class="sr-only">Notes</dt><dd class="wide release-notes">${esc(r.notes)}</dd>` : ""}
                     </dl>
-                    ${r.cexSku ? `<section class="release-cex"><h3>At CeX today</h3><div data-cex class="stub-cex"><p class="muted pulse">Checking prices…</p></div></section>` : ""}
+                    ${r.cexSku ? `<section class="release-cex"><h3>${sold ? "At CeX around the sale" : "At CeX today"}</h3><div data-cex class="stub-cex"><p class="muted pulse">${sold ? "Looking up CeX's prices then…" : "Checking prices…"}</p></div></section>` : ""}
                     ${canEdit ? `<div class="actions release-actions"><button type="button" data-edit class="btn">Edit</button><button type="button" data-delete class="btn btn-danger">Delete</button></div>` : ""}
                 </div>
             </div>
@@ -161,7 +185,9 @@
         });
         d.$("[data-delete]")?.addEventListener("click", () => remove(r, d, ctx));
 
-        if (r.cexSku) {
+        if (r.cexSku && sold) {
+            await cexAroundSale(r, d);
+        } else if (r.cexSku) {
             try {
                 const c = await api("GET", `/api/cex/${encodeURIComponent(r.cexSku)}`);
                 d.$("[data-cex]").innerHTML = `
@@ -176,6 +202,52 @@
             } catch {
                 if (d.root.isConnected) d.$("[data-cex]").innerHTML = `<p class="status-bad">CeX didn't return prices for <a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link">${esc(r.cexSku)}</a>.</p>`;
             }
+        }
+    }
+
+    // "Traded in to CeX on 3 Nov 2026 for £2.00 cash", then paid against got back (and how long it was kept)
+    function saleBanner(r) {
+        const net = saleNet(r);
+        const sums = [
+            r.pricePaid != null ? `Paid ${money(r.pricePaid)}` : "",
+            r.soldFor != null ? `got back ${money(r.soldFor)}` : "",
+            net != null ? `<span class="${net >= 0 ? "is-up" : "is-down"}">${Math.abs(net) < 0.005 ? "broke even" : signed(net)}</span>${r.pricePaid > 0 ? ` (${Math.round((r.soldFor / r.pricePaid) * 100)}% back)` : ""}` : "",
+            kept(r) ? `kept ${kept(r)}` : "",
+        ].filter(Boolean);
+        if (sums.length) sums[0] = sums[0][0].toUpperCase() + sums[0].slice(1);
+        return `
+            <section class="sale-banner" aria-label="No longer on the shelf">
+                <p class="sale-eyebrow">No longer on the shelf</p>
+                <p class="sale-line">${esc(saleLine(r))}</p>
+                ${sums.length ? `<p class="sale-sums">${sums.join(" · ")}</p>` : ""}
+            </section>`;
+    }
+
+    // A sold release's CeX prices from the daily snapshots nearest the day it went (Shelf.nearestPoint), and what
+    // that says about the price you got. The section goes when there's no snapshot near enough.
+    async function cexAroundSale(r, d) {
+        const box = d.$("[data-cex]");
+        try {
+            const [h] = await api("GET", `/api/cex/history?sku=${encodeURIComponent(r.cexSku)}`);
+            const near = h && Shelf.nearestPoint(h.points, r.soldOn);
+            if (!d.root.isConnected) return;
+            if (!near) return box.closest(".release-cex").remove();
+            const { point: p, days } = near;
+            const when = days === 0 ? "on the day" : `on ${day(p.date)}, ${Math.abs(days)} ${Math.abs(days) === 1 ? "day" : "days"} ${days < 0 ? "before" : "after"}`;
+            const offer = r.payout === "Voucher" ? p.exchange : p.cash;
+            const diff = r.soldFor != null && r.soldVia === "Cex" ? r.soldFor - offer : null;
+            box.innerHTML = `
+                <div class="cex-entry">
+                    <a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link" title="${esc(h.boxName)}">${esc(h.boxName ?? r.cexSku)}</a>
+                    <dl>
+                        <div><dt>Sells for</dt><dd>${money(p.sell)}</dd></div>
+                        <div class="is-cash"><dt>Cash</dt><dd>${money(p.cash)}</dd></div>
+                        <div class="is-voucher"><dt>Voucher</dt><dd>${money(p.exchange)}</dd></div>
+                    </dl>
+                </div>
+                <p class="faint">CeX's prices ${esc(when)}${diff == null ? "" : `: you got ${Math.abs(diff) < 0.005 ? `exactly its ${r.payout === "Voucher" ? "voucher" : "cash"} price` : `${signed(diff)} ${diff > 0 ? "over" : "under"} its ${r.payout === "Voucher" ? "voucher" : "cash"} price`}`}.</p>`;
+        } catch {
+            if (d.root.isConnected) box.closest(".release-cex")?.remove();
         }
     }
 
@@ -277,9 +349,11 @@
 
     function edit(r, presetTitleIds, ctx) {
         const isNew = !r;
-        r = r ?? { name: "", format: "BluRay", edition: "Standard", pricePaid: null, purchasedFrom: "Other", notes: "", cexUrl: "", titleIds: presetTitleIds };
+        r = r ?? { name: "", format: "BluRay", edition: "Standard", pricePaid: null, purchasedFrom: "Other", boughtOn: null, notes: "", cexUrl: "", titleIds: presetTitleIds, soldVia: null };
+        const wasSold = isSold(r);
         const v = (x) => (x == null ? "" : esc(x));
         const options = (map, current) => Object.entries(map).map(([k, l]) => `<option value="${k}"${k === current ? " selected" : ""}>${esc(l)}</option>`).join("");
+        const payout = r.payout ?? "Cash";
         const d = dialog(
             isNew ? "Add a release" : `Edit ${esc(r.name)}`,
             `
@@ -287,16 +361,37 @@
             <form class="release-form stack">
                 <div><label class="label" for="rel-name">Name</label>
                     <input id="rel-name" name="name" maxlength="300" class="input" value="${v(r.name)}" placeholder="Leave empty to use CeX's name"></div>
-                <div class="row row-4">
+                <div class="row row-5">
                     <div><label class="label" for="rel-format">Format</label><select id="rel-format" name="format" class="input">${options(FORMATS, r.format)}</select></div>
                     <div><label class="label" for="rel-edition">Edition</label><select id="rel-edition" name="edition" class="input">${options(EDITIONS, r.edition)}</select></div>
                     <div><label class="label" for="rel-place">Bought from</label><select id="rel-place" name="purchasedFrom" class="input">${options(PLACES, r.purchasedFrom)}</select></div>
                     <div><label class="label" for="rel-price">Price paid (£)</label><input id="rel-price" name="pricePaid" type="number" min="0" step="0.01" class="input" value="${v(r.pricePaid)}"></div>
+                    <div><label class="label" for="rel-bought">Bought on</label><input id="rel-bought" name="boughtOn" data-date class="input" value="${v(r.boughtOn)}" placeholder="If you know"></div>
                 </div>
                 <div><label class="label" for="rel-cex">CeX link <span class="faint">(for its CeX value: it doesn't have to be where you bought it)</span></label>
                     <input id="rel-cex" name="cexUrl" class="input code" value="${v(r.cexUrl)}" placeholder="https://uk.webuy.com/product-detail?id=…"></div>
                 <div><span class="label">Titles on it</span><div data-titles></div></div>
                 <div><label class="label" for="rel-notes">Notes</label><textarea id="rel-notes" name="notes" rows="2" maxlength="2000" class="input">${v(r.notes)}</textarea></div>
+                <fieldset class="sale-fields${wasSold ? " is-open" : ""}">
+                    <legend class="sr-only">Traded in or sold</legend>
+                    <label class="check sale-toggle"><input type="checkbox" name="sold"${wasSold ? " checked" : ""}> Traded in or sold <span class="faint">it stays here as history, off the shelf</span></label>
+                    <div class="sale-body${wasSold ? "" : " hidden"}" data-sale>
+                        <div class="row row-3">
+                            <div><label class="label" for="rel-via">Where</label><select id="rel-via" name="soldVia" class="input">${options(CHANNELS, r.soldVia ?? "Cex")}</select></div>
+                            <div><label class="label" for="rel-sold-on">Date</label><input id="rel-sold-on" name="soldOn" data-date class="input" value="${v(r.soldOn ?? todayIso())}"></div>
+                            <div><label class="label" for="rel-sold-for">Price I got (£)</label><input id="rel-sold-for" name="soldFor" type="number" min="0" step="0.01" class="input" value="${v(r.soldFor)}" placeholder="Optional"></div>
+                        </div>
+                        <div class="sale-payout" data-payout-row>
+                            <span class="label" id="rel-payout-label">CeX paid in</span>
+                            <div class="segmented" role="group" aria-labelledby="rel-payout-label">
+                                <button type="button" data-payout="Cash" aria-pressed="${payout === "Cash"}">Cash</button>
+                                <button type="button" data-payout="Voucher" aria-pressed="${payout === "Voucher"}">Voucher</button>
+                            </div>
+                            <input type="hidden" name="payout" value="${payout}">
+                        </div>
+                        <div class="sale-hint hidden" data-cex-hint aria-live="polite"></div>
+                    </div>
+                </fieldset>
                 <div class="actions">
                     <button type="button" data-cancel class="btn">Cancel</button>
                     <button type="submit" class="btn btn-primary">${isNew ? "Add release" : "Save changes"}</button>
@@ -307,27 +402,119 @@
         d.error("");
         const picker = titlePicker(d.$("[data-titles]"), r.titleIds, ctx.titles());
         const form = d.$("form");
+        form.querySelectorAll("[data-date]").forEach(DatePicker.attach);
+
+        // ---------- traded in or sold ----------
+        const saleBox = d.$("[data-sale]");
+        const setPayout = (value) => {
+            form.payout.value = value;
+            d.$$("[data-payout]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.payout === value)));
+        };
+        d.$$("[data-payout]").forEach((b) => (b.onclick = () => setPayout(b.dataset.payout)));
+        // "CeX offers £2.00 cash · £3.00 voucher today", with a click to use either (never filled in by itself)
+        const hint = d.$("[data-cex-hint]");
+        const offers = new Map(); // sku → CeX's prices, or null when it had none
+        async function showHint() {
+            const sku = form.sold.checked && form.soldVia.value === "Cex" ? skuOf(form.cexUrl.value) : null;
+            if (!sku) {
+                hint.classList.add("hidden");
+                return;
+            }
+            if (!offers.has(sku)) {
+                hint.classList.remove("hidden");
+                hint.innerHTML = `<p class="field-hint pulse">Checking what CeX offers…</p>`;
+                offers.set(sku, await api("GET", `/api/cex/${encodeURIComponent(sku)}`).catch(() => null));
+            }
+            const c = offers.get(sku);
+            // the link or channel may have changed while CeX answered
+            if (!c || skuOf(form.cexUrl.value) !== sku || form.soldVia.value !== "Cex" || !form.sold.checked) {
+                if (!c) hint.classList.add("hidden");
+                return;
+            }
+            hint.classList.remove("hidden");
+            hint.innerHTML = `
+                <p class="field-hint">CeX offers <strong>${money(c.cashPrice)}</strong> cash · <strong>${money(c.exchangePrice)}</strong> voucher today</p>
+                <div class="sale-hint-use">
+                    <button type="button" class="btn btn-small" data-use="Cash">Use ${money(c.cashPrice)} cash</button>
+                    <button type="button" class="btn btn-small" data-use="Voucher">Use ${money(c.exchangePrice)} voucher</button>
+                </div>`;
+            hint.querySelectorAll("[data-use]").forEach((b) => {
+                b.onclick = () => {
+                    form.soldFor.value = Number(b.dataset.use === "Voucher" ? c.exchangePrice : c.cashPrice).toFixed(2);
+                    setPayout(b.dataset.use);
+                };
+            });
+        }
+        const showChannel = () => {
+            d.$("[data-payout-row]").classList.toggle("hidden", form.soldVia.value !== "Cex");
+            showHint();
+        };
+        form.soldVia.addEventListener("change", showChannel);
+        form.cexUrl.addEventListener("change", showHint);
+        form.sold.addEventListener("change", () => {
+            const on = form.sold.checked;
+            saleBox.classList.toggle("hidden", !on);
+            form.querySelector(".sale-fields").classList.toggle("is-open", on);
+            if (!on) {
+                // unticked: the sale goes, and ticking again starts afresh (today, no price)
+                form.soldVia.value = "Cex";
+                form.soldVia.dispatchEvent(new Event("change"));
+                form.soldOn.value = todayText();
+                form.soldFor.value = "";
+                setPayout("Cash");
+            } else {
+                if (!form.soldOn.value.trim()) form.soldOn.value = todayText();
+                d.$("#rel-via")?.focus();
+            }
+            showChannel();
+        });
+        showChannel();
+
         const snapshot = () => JSON.stringify([[...new FormData(form)], picker.get()]);
         const initial = snapshot();
         d.guard(() => snapshot() !== initial);
         d.$("[data-cancel]").onclick = () => d.requestClose();
         form.onsubmit = (e) => {
             e.preventDefault();
+            const boughtOn = DatePicker.iso(form.boughtOn);
+            const sold = form.sold.checked;
+            const soldOn = sold ? DatePicker.iso(form.soldOn) : null;
+            const soldFor = sold && form.soldFor.value !== "" ? Number(form.soldFor.value) : null;
+            const problem =
+                boughtOn === undefined ? "The date you bought it isn't a date (dd/mm/yyyy)."
+                : boughtOn && boughtOn > todayIso() ? "The date you bought it can't be in the future."
+                : sold && soldOn === undefined ? "The date it went isn't a date (dd/mm/yyyy)."
+                : sold && !soldOn ? "When did it go? A date is needed."
+                : sold && soldOn > todayIso() ? "The date it went can't be in the future."
+                : sold && boughtOn && soldOn < boughtOn ? "It can't have gone before you bought it."
+                : soldFor != null && soldFor < 0 ? "The price you got can't be negative."
+                : null;
+            if (problem) {
+                d.error(problem);
+                return;
+            }
             const body = {
                 name: form.name.value.trim(),
                 format: form.format.value,
                 edition: form.edition.value,
                 pricePaid: form.pricePaid.value === "" ? null : Number(form.pricePaid.value),
                 purchasedFrom: form.purchasedFrom.value,
+                boughtOn,
                 cexUrl: form.cexUrl.value.trim() || null,
                 notes: form.notes.value,
                 titleIds: picker.get(),
+                // unticked: all of it goes (the server clears the rest without a channel too)
+                soldVia: sold ? form.soldVia.value : null,
+                soldOn,
+                soldFor,
+                payout: sold && form.soldVia.value === "Cex" ? form.payout.value : null,
             };
             busy(d, form.querySelector("button[type=submit]"), async () => {
                 const saved = isNew ? await api("POST", "/api/releases", body) : await api("PUT", `/api/releases/${r.id}`, body);
                 d.close();
                 const fresh = await ctx.onChanged(saved);
-                Auth.showSuccess(isNew ? `Added ${saved.name}` : `Saved ${saved.name}`);
+                const verb = !isSold(saved) ? (wasSold ? `Put ${saved.name} back on the shelf` : null) : !wasSold ? `Marked ${saved.name} as ${saved.soldVia === "Cex" ? "traded in" : "sold"}` : null;
+                Auth.showSuccess(verb ?? (isNew ? `Added ${saved.name}` : `Saved ${saved.name}`));
                 if (fresh) open(fresh, ctx);
             });
         };

@@ -1,20 +1,25 @@
-// Physical releases page: every disc (or box set) on the shelf and the titles on it.
-// Public read; editors add, edit and delete releases. Needs auth.js and shelf.js.
+// Physical releases page: every disc (or box set) on the shelf and the titles on it, and (one chip away) the
+// ones traded in or sold, kept as history. Public read; editors add, edit and delete releases. Needs auth.js
+// and shelf.js.
 //   /releases?release=12          opens that release
+//   /releases?status=sold&via=Cex  what went, and where (status: shelf, the default, all or sold)
 //   /releases?new=1&title=34      opens "Add a release" with that title already picked (editors)
 
 (function () {
     const { api, esc } = Auth;
-    const { label, FORMATS, EDITIONS, PLACES, money, renderTable, viewToggle } = Shelf;
+    const { label, FORMATS, EDITIONS, PLACES, CHANNELS, money, renderTable, viewToggle, isSold, saleBadge, saleNet, signed, day } = Shelf;
 
     let releases = [];
     let titles = new Map(); // id → title
-    const filter = { q: "", format: "all", edition: "all", place: "all", sort: "name" };
+    // status: on the shelf (the default), all, or traded in / sold; via: where the sold ones went
+    const filter = { q: "", status: "shelf", via: "all", format: "all", edition: "all", place: "all", sort: "name" };
+    // the sorts about sales: picking one while the page shows the shelf switches to what went
+    const SALE_SORTS = ["sold-recent", "sale-best", "sale-worst"];
     const DEFAULTS = { ...filter };
     let tableSort = { key: "name", dir: "asc" };
     let shown = [];
 
-    // Search, filters, sort and grid/table live in the URL too (?q=&format=&edition=&place=&sort=&view=),
+    // Search, filters, sort and grid/table live in the URL too (?q=&status=&via=&format=&edition=&place=&sort=&view=),
     // so Back, a refresh or a shared link land on the same view.
     (function readUrl() {
         const p = new URLSearchParams(location.search);
@@ -25,6 +30,8 @@
             sort.value = filter.sort;
             sort.dispatchEvent(new Event("change")); // the themed dropdown (select.js) follows "change"
         } else filter.sort = DEFAULTS.sort;
+        if (!["shelf", "all", "sold"].includes(filter.status)) filter.status = DEFAULTS.status;
+        if (filter.via !== "all" && !(filter.via in CHANNELS)) filter.via = DEFAULTS.via;
         if (["grid", "table"].includes(p.get("view")))
             try {
                 localStorage.setItem("view:releases", p.get("view"));
@@ -65,21 +72,25 @@
         titles = new Map(ts.map((t) => [t.id, Lists.normalise(t)])); // both lists: a disc can hold one you haven't seen
         TitleEditor.refreshReleases((id) => titles.get(id));
         for (const r of releases)
-            r._search = [r.name, r.cexBoxName, r.notes, label(r), PLACES[r.purchasedFrom], ...titlesOf(r).map((t) => t.name)].filter(Boolean).join(" ").toLowerCase();
+            r._search = [r.name, r.cexBoxName, r.notes, label(r), PLACES[r.purchasedFrom], ...titlesOf(r).map((t) => t.name), ...(isSold(r) ? [saleBadge(r), CHANNELS[r.soldVia], "sold traded"] : [])]
+                .filter(Boolean).join(" ").toLowerCase();
         hero();
         filters();
         show();
     }
 
+    // what's on the shelf now; once anything has gone, how many and what came back
     function hero() {
-        const covered = new Set(releases.flatMap((r) => r.titleIds)).size;
-        const paid = releases.reduce((s, r) => s + (r.pricePaid ?? 0), 0);
-        const uhd = releases.filter((r) => r.format === "UltraHdBluRay").length;
+        const shelf = releases.filter((r) => !isSold(r)), gone = releases.filter(isSold);
+        const covered = new Set(shelf.flatMap((r) => r.titleIds)).size;
+        const paid = shelf.reduce((s, r) => s + (r.pricePaid ?? 0), 0);
+        const uhd = shelf.filter((r) => r.format === "UltraHdBluRay").length;
+        const back = gone.reduce((s, r) => s + (r.soldFor ?? 0), 0);
         document.getElementById("stats").innerHTML = [
-            [releases.length, releases.length === 1 ? "release" : "releases"],
+            [shelf.length, "on the shelf"],
             [covered, covered === 1 ? "title" : "titles"],
             [`£${Math.round(paid)}`, "paid"],
-            [uhd, "in 4K"],
+            ...(gone.length ? [[gone.length, "traded or sold"], [`£${Math.round(back)}`, "back"]] : [[uhd, "in 4K"]]),
         ]
             .map(([v, l]) => `<div class="stat"><dt>${esc(l)}</dt><dd>${esc(v)}</dd></div>`)
             .join("");
@@ -87,8 +98,13 @@
 
     // ---------- filters, sorting ----------
 
+    // on the shelf, everything, or what went (and where)
+    const inStatus = (r) => (filter.status === "all" ? true : filter.status === "sold" ? isSold(r) : !isSold(r));
+    const inVia = (r) => filter.status === "shelf" || filter.via === "all" || r.soldVia === filter.via;
+
     function filters() {
-        const chips = (id, key, options) => {
+        // after: the status and channel chips change the other groups' counts, so they redraw them all
+        const chips = (id, key, options, { after } = {}) => {
             const el = document.getElementById(id);
             el.innerHTML = options
                 .map(([v, l]) => `<button type="button" class="chip" data-v="${v}" aria-pressed="${filter[key] === v}">${esc(l)}</button>`)
@@ -97,11 +113,29 @@
                 b.onclick = () => {
                     filter[key] = b.dataset.v;
                     el.querySelectorAll("[data-v]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+                    after?.();
                     show();
                 };
             });
         };
-        const count = (pred) => releases.filter(pred).length;
+        const gone = releases.filter(isSold);
+        const statusEl = document.getElementById("statusFilters");
+        // nothing has gone yet: no point offering it
+        statusEl.classList.toggle("hidden", !gone.length);
+        if (!gone.length) filter.status = "shelf";
+        chips("statusFilters", "status", [
+            ["shelf", `On the shelf (${releases.length - gone.length})`],
+            ["sold", `Traded in or sold (${gone.length})`],
+            ["all", `All (${releases.length})`],
+        ], { after: filters });
+        // where they went: only when the sold ones are showing, and they went to more than one place
+        const vias = Object.keys(CHANNELS).filter((k) => gone.some((r) => r.soldVia === k));
+        const showVia = filter.status !== "shelf" && vias.length > 1;
+        document.getElementById("viaFilters").classList.toggle("hidden", !showVia);
+        if (!showVia) filter.via = "all";
+        chips("viaFilters", "via", [["all", "Anywhere"], ...vias.map((k) => [k, `${k === "FacebookMarketplace" ? "FB Marketplace" : CHANNELS[k]} (${gone.filter((r) => r.soldVia === k).length})`])], { after: filters });
+        // the other groups count within the status (and channel) chosen
+        const count = (pred) => releases.filter((r) => inStatus(r) && inVia(r) && pred(r)).length;
         chips("formatFilters", "format", [["all", "All formats"], ...Object.entries(FORMATS).filter(([k]) => count((r) => r.format === k)).map(([k, l]) => [k, `${l} (${count((r) => r.format === k)})`])]);
         chips("editionFilters", "edition", [["all", "All editions"], ...Object.entries(EDITIONS).filter(([k]) => count((r) => r.edition === k)).map(([k, l]) => [k, `${l} (${count((r) => r.edition === k)})`])]);
         chips("placeFilters", "place", [["all", "All shops"], ...Object.entries(PLACES).filter(([k]) => count((r) => r.purchasedFrom === k)).map(([k, l]) => [k, `${l} (${count((r) => r.purchasedFrom === k)})`])]);
@@ -113,6 +147,10 @@
         "price-asc": (a, b) => (a.pricePaid ?? Infinity) - (b.pricePaid ?? Infinity),
         titles: (a, b) => b.titleIds.length - a.titleIds.length || a.name.localeCompare(b.name),
         newest: (a, b) => b.createdAt.localeCompare(a.createdAt),
+        // the sales: releases without a sale date (or both prices) go last
+        "sold-recent": (a, b) => (b.soldOn ?? "").localeCompare(a.soldOn ?? "") || a.name.localeCompare(b.name),
+        "sale-best": (a, b) => (saleNet(b) ?? -Infinity) - (saleNet(a) ?? -Infinity) || a.name.localeCompare(b.name),
+        "sale-worst": (a, b) => (saleNet(a) ?? Infinity) - (saleNet(b) ?? Infinity) || a.name.localeCompare(b.name),
     };
 
     document.getElementById("releaseSearch").addEventListener("input", (e) => {
@@ -121,6 +159,11 @@
     });
     sortSelect().addEventListener("change", (e) => {
         filter.sort = e.target.value;
+        // sorting by sales while the shelf shows: show what went
+        if (SALE_SORTS.includes(filter.sort) && filter.status === "shelf" && releases.some(isSold)) {
+            filter.status = "sold";
+            filters();
+        }
         show();
     });
 
@@ -208,6 +251,11 @@
         { key: "count", label: "No.", value: (r) => r.titleIds.length, num: true },
         { key: "paid", label: "Paid", value: (r) => r.pricePaid, html: (r) => money(r.pricePaid), num: true },
         { key: "place", label: "Bought from", value: (r) => PLACES[r.purchasedFrom] },
+        { key: "bought", label: "Bought on", value: (r) => r.boughtOn ?? "", html: (r) => esc(day(r.boughtOn)) },
+        { key: "status", label: "Status", value: (r) => (isSold(r) ? saleBadge(r) : "On the shelf") },
+        { key: "soldOn", label: "Sold on", value: (r) => r.soldOn ?? "", html: (r) => esc(day(r.soldOn)) },
+        { key: "got", label: "Got back", value: (r) => r.soldFor, html: (r) => money(r.soldFor), num: true },
+        { key: "net", label: "+/−", value: (r) => saleNet(r), html: (r) => (saleNet(r) == null ? "" : `<span class="${saleNet(r) >= 0 ? "is-up" : "is-down"}">${signed(saleNet(r))}</span>`), num: true },
         { key: "cex", label: "CeX product", wrap: true, value: (r) => r.cexBoxName ?? (r.cexSku ? r.cexSku : ""), html: (r) => (r.cexUrl ? `<a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link" onclick="event.stopPropagation()">${esc(r.cexBoxName ?? r.cexSku)}</a>` : "") },
         { key: "notes", label: "Notes", value: (r) => r.notes ?? "", wrap: true },
         { key: "added", label: "Added", value: (r) => r.createdAt, html: (r) => esc(r.createdAt.slice(0, 10).split("-").reverse().join("/")) },
@@ -215,16 +263,21 @@
 
     function show() {
         if (releases.length) writeUrl();
-        const list = releases
+        const pool = releases.filter((r) => inStatus(r) && inVia(r));
+        const list = pool
             .filter((r) => (filter.format === "all" || r.format === filter.format) && (filter.edition === "all" || r.edition === filter.edition) && (filter.place === "all" || r.purchasedFrom === filter.place) && (!filter.q || r._search.includes(filter.q)))
             .sort(sorters[filter.sort]);
-        document.getElementById("releaseCount").textContent = list.length === releases.length ? "" : `${list.length} of ${releases.length}`;
+        document.getElementById("releaseCount").textContent = list.length === pool.length ? "" : `${list.length} of ${pool.length}`;
         const grid = document.getElementById("releasesGrid");
         shown = list;
         grid.classList.toggle("is-table", view.get() === "table" && list.length > 0);
         if (!list.length) {
             grid.innerHTML = releases.length
-                ? `<div class="empty"><h2>Nothing matches</h2><p class="muted">Try a shorter search or another format.</p></div>`
+                ? pool.length || filter.status === "all"
+                    ? `<div class="empty"><h2>Nothing matches</h2><p class="muted">Try a shorter search or another format.</p></div>`
+                    : filter.status === "sold"
+                      ? `<div class="empty"><h2>Nothing traded in or sold</h2><p class="muted">Tick “Traded in or sold” on a release when it goes, and it shows up here.</p></div>`
+                      : `<div class="empty"><h2>The shelf is empty</h2><p class="muted">Everything here has been traded in or sold.</p></div>`
                 : `<div class="empty"><h2>No releases yet</h2><p class="muted">Sign in and add the discs on your shelf.</p></div>`;
             return;
         }
@@ -245,9 +298,11 @@
         grid.innerHTML = list
             .map((r, i) => {
                 const ts = titlesOf(r);
+                const sold = isSold(r);
+                const net = saleNet(r);
                 return `
-                <button type="button" class="card release-card" data-i="${i}">
-                    <div class="card-poster release-art${r.imageUrl ? " has-photo" : ""}">${art(r)}</div>
+                <button type="button" class="card release-card${sold ? " is-sold" : ""}" data-i="${i}">
+                    <div class="card-poster release-art${r.imageUrl ? " has-photo" : ""}${sold ? " is-sold" : ""}">${sold ? `<span class="sale-badge">${esc(saleBadge(r))}</span>` : ""}${art(r)}</div>
                     <div class="card-body">
                         <h3 class="card-title">${esc(r.name)}</h3>
                         <div class="tags">
@@ -256,7 +311,10 @@
                         </div>
                         <dl class="facts">
                             ${r.pricePaid != null ? `<dt>Paid</dt><dd>${money(r.pricePaid)}</dd>` : ""}
-                            ${r.purchasedFrom !== "Other" ? `<dt>From</dt><dd>${esc(PLACES[r.purchasedFrom])}</dd>` : ""}
+                            ${sold
+                                ? `${r.soldFor != null ? `<dt>Got</dt><dd class="sale-money">${money(r.soldFor)}${net != null ? ` <span class="${net >= 0 ? "is-up" : "is-down"}">${signed(net)}</span>` : ""}</dd>` : ""}
+                                   <dt>${r.soldVia === "Cex" ? "Traded" : "Sold"}</dt><dd>${esc(day(r.soldOn))}</dd>`
+                                : r.purchasedFrom !== "Other" ? `<dt>From</dt><dd>${esc(PLACES[r.purchasedFrom])}</dd>` : ""}
                             ${ts.length > 1 ? `<dt class="sr-only">Titles</dt><dd class="wide">${esc(ts.map((t) => t.name).join(", "))}</dd>` : ""}
                         </dl>
                     </div>

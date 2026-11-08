@@ -4688,6 +4688,170 @@ a.tag-own:focus-visible {
     justify-content: flex-start;
 }
 
+/* ---------- traded in or sold (js/shelf.js saleLine / saleBadge) ---------- */
+
+/* a disc that has gone: its picture faded, with a badge on the corner */
+.release-art.is-sold > img,
+.release-art.is-sold > .release-collage,
+.release-art.is-sold > .no-poster {
+    filter: grayscale(0.85);
+    opacity: 0.5;
+}
+
+.sale-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    max-width: calc(100% - 16px);
+    padding: 2px 9px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.release-card.is-sold .card-title {
+    color: var(--ink-2);
+}
+
+/* the release popup: where it went, and paid against got back */
+.sale-banner {
+    margin: 0 0 14px;
+    padding: 10px 14px 11px;
+    border: 1px solid var(--line-strong);
+    border-left: 4px solid var(--ink-3);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--ink) 6%, var(--surface));
+}
+
+.sale-banner p {
+    margin: 0;
+}
+
+.sale-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.sale-line {
+    margin-top: 2px !important;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.sale-sums {
+    margin-top: 4px !important;
+    font-size: 13px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.sale-sums .is-up,
+.sale-money .is-up,
+.data-table .is-up {
+    color: var(--ok);
+    font-weight: 700;
+}
+
+.sale-sums .is-down,
+.sale-money .is-down,
+.data-table .is-down {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+.release-cex .faint {
+    margin: 8px 0 0;
+    font-size: 13px;
+}
+
+/* the release editor's "Traded in or sold" box */
+.sale-fields {
+    min-width: 0;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+}
+
+.sale-fields.is-open {
+    border-color: var(--line-strong);
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.sale-toggle {
+    flex-wrap: wrap;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.sale-toggle .faint {
+    font-weight: 400;
+    font-size: 13px;
+}
+
+.sale-body {
+    margin-top: 12px;
+}
+
+.sale-payout {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-top: 12px;
+}
+
+.sale-payout .label {
+    margin: 0;
+}
+
+.sale-payout .segmented button {
+    min-height: 34px;
+}
+
+.sale-hint {
+    margin-top: 10px;
+}
+
+.sale-hint .field-hint {
+    margin: 0;
+}
+
+.sale-hint-use {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.sale-fields .hidden {
+    display: none !important;
+}
+
+/* phones: the box gives its side padding back to the fields, so a date fits as it does above */
+@media (max-width: 640px) {
+    .sale-fields,
+    .sale-fields.is-open {
+        padding: 14px 0 0;
+        border-width: 1px 0 0;
+        border-radius: 0;
+        background: none;
+    }
+}
+
 .release-titles {
     margin-top: 22px;
     padding-top: 16px;
@@ -4755,6 +4919,11 @@ a.tag-own:focus-visible {
     color: var(--ink-3);
 }
 
+/* the title popup's discs that were traded in or sold: there as history, quieter than the shelf */
+.stub-releases.is-gone .link {
+    color: var(--ink-2);
+}
+
 .stub-share {
     font-size: 12px;
     color: var(--ink-3);
@@ -4769,6 +4938,10 @@ a.tag-own:focus-visible {
 .editor-releases p {
     margin: 0 0 8px;
     font-size: 13px;
+}
+
+.editor-releases .is-gone .link {
+    color: var(--ink-2);
 }
 
 @media (max-width: 640px) {

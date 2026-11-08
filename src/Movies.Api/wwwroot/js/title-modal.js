@@ -232,12 +232,14 @@
         const paid = (share || 0) > 0;
         const formats = row.releases.length > 0;
         const cex = row.releases.some((r) => r.cexSku);
+        // discs traded in or sold (Lists.normalise keeps them apart): history, after what's on the shelf
+        const gone = row.soldReleases ?? [];
         return `
         <aside class="stub" aria-label="${W ? "On your watchlist" : "Verdict and value"}">
             ${W ? waitingHtml(row) : ratingHtml(row, true) || `<p class="stub-unrated">Not rated yet</p>`}
             ${crowdHtml(row)}
             ${facts.length ? `<dl class="stub-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>` : ""}
-            ${paid || formats || cex ? `
+            ${paid || formats || cex || gone.length ? `
             <section class="stub-copy" aria-label="Your copy">
                 ${paid ? `<p class="stub-paid">You paid <span class="price-paid">${money(share)}</span>${row.releases.some((r) => r.titleCount > 1 && r.pricePaid != null) ? ` <span class="stub-share">(its share of a set)</span>` : ""}</p>` : ""}
                 ${formats ? `<ul class="stub-releases">${row.releases
@@ -245,6 +247,15 @@
                     <li>
                         <a href="/releases?release=${r.id}" class="link" data-release-link="${r.id}">${esc(r.name)}</a>
                         <span class="stub-release-meta">${esc(Shelf.label(r))}${r.purchasedFrom !== "Other" ? ` · ${esc(Shelf.PLACES[r.purchasedFrom])}` : ""}${r.titleCount > 1 ? ` · ${r.titleCount} titles` : ""}${r.pricePaid != null ? ` · ${money(r.pricePaid)}` : ""}</span>
+                    </li>`)
+                    .join("")}</ul>` : ""}
+                ${gone.length ? `
+                <h3 class="stub-gone-head">No longer on the shelf</h3>
+                <ul class="stub-releases is-gone">${gone
+                    .map((r) => `
+                    <li>
+                        <a href="/releases?release=${r.id}" class="link" data-release-link="${r.id}">${esc(r.name)}</a>
+                        <span class="stub-release-meta">${esc(Shelf.saleBadge(r))}${r.soldOn ? ` · ${esc(Shelf.day(r.soldOn))}` : ""}${r.soldFor != null ? ` · ${esc(Shelf.salePrice(r))}` : ""}</span>
                     </li>`)
                     .join("")}</ul>` : ""}
                 ${cex ? `<h3>At CeX today</h3><div id="cexPricing" class="stub-cex"><p class="muted pulse">Checking prices…</p></div>` : ""}

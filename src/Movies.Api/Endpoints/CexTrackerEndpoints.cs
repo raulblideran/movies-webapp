@@ -48,9 +48,12 @@ public static class CexTrackerEndpoints
         }).RequireAuthorization(Policies.SignedIn).RequireRateLimiting("cex");
 
         // Daily price history of the collection's own CeX products (see CexHistoryService), oldest first.
-        app.MapGet("/api/cex/history", async (MoviesDbContext db) =>
+        // ?sku= narrows it to one product (the release popup, for the prices around a sale).
+        app.MapGet("/api/cex/history", async (string? sku, MoviesDbContext db) =>
         {
-            var rows = await db.CexPriceSnapshots.AsNoTracking().OrderBy(s => s.Date).ToListAsync();
+            var q = db.CexPriceSnapshots.AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(sku)) q = q.Where(s => s.Sku == sku);
+            var rows = await q.OrderBy(s => s.Date).ToListAsync();
             return rows.GroupBy(s => s.Sku).Select(g => new
             {
                 Sku = g.Key,

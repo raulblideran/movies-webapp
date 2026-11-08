@@ -8,8 +8,18 @@
         watchlist: { page: "/watchlist", name: "Watchlist", newUrl: "/watchlist/new" },
     };
 
-    // The API says "Watched" / "Watchlist"; the pages use the lowercase keys above.
-    const normalise = (row) => ({ ...row, list: row.list === "Watchlist" ? "watchlist" : "watched" });
+    // The API says "Watched" / "Watchlist"; the pages use the lowercase keys above. The title's releases are
+    // split: .releases is what's on the shelf now (every page reads it that way: filters, tags, what you paid,
+    // CeX prices), .soldReleases the discs traded in or sold, kept as history.
+    const normalise = (row) => {
+        const all = row.soldReleases ? [...row.releases, ...row.soldReleases] : (row.releases ?? []);
+        return {
+            ...row,
+            list: row.list === "Watchlist" || row.list === "watchlist" ? "watchlist" : "watched",
+            releases: all.filter((r) => !r.soldVia),
+            soldReleases: all.filter((r) => r.soldVia),
+        };
+    };
 
     // Every title, on both lists.
     async function loadAll() {

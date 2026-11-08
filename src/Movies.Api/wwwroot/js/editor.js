@@ -147,15 +147,17 @@
         return [...map.values()].sort((a, b) => a.localeCompare(b));
     }
 
-    // Copies on the shelf are releases, edited on the releases page; the title form lists them.
+    // Copies on the shelf are releases, edited on the releases page; the title form lists them, and after
+    // them the ones traded in or sold (row.soldReleases, from Lists.normalise).
     function releasesInner(row, isNew) {
         const label = window.Shelf?.label ?? ((r) => r.format);
-        const items = row.releases
-            .map((r) => `<li><a href="/releases?release=${r.id}" class="link" data-release-link="${r.id}">${esc(r.name)}</a> <span class="faint">${esc(label(r))}${r.pricePaid != null ? ` · £${Number(r.pricePaid).toFixed(2)}` : ""}</span></li>`)
-            .join("");
+        const item = (r, meta) => `<li><a href="/releases?release=${r.id}" class="link" data-release-link="${r.id}">${esc(r.name)}</a> <span class="faint">${esc(meta)}</span></li>`;
+        const items = row.releases.map((r) => item(r, `${label(r)}${r.pricePaid != null ? ` · £${Number(r.pricePaid).toFixed(2)}` : ""}`)).join("");
+        const gone = (row.soldReleases ?? []).map((r) => item(r, `${label(r)} · ${window.Shelf?.saleBadge(r) ?? "Sold"}`)).join("");
         return `
                 <span class="label">On the shelf</span>
-                ${items ? `<ul>${items}</ul>` : `<p class="faint">Not on any release.</p>`}
+                ${items ? `<ul>${items}</ul>` : `<p class="faint">Not on any release${gone ? " now" : ""}.</p>`}
+                ${gone ? `<span class="label">No longer on the shelf</span><ul class="is-gone">${gone}</ul>` : ""}
                 ${isNew
                     ? `<p class="faint">Save the title first, then add the discs it's on from the releases page.</p>`
                     : `<a href="/releases?new=1&title=${row.id}" class="btn btn-small" data-add-release>Add a release with this title</a>`}`;
@@ -604,8 +606,8 @@
         });
         const editor = {
             id: row.id,
-            showReleases(releases) {
-                row = { ...row, releases };
+            showReleases(releases, soldReleases = []) {
+                row = { ...row, releases, soldReleases };
                 releasesBox.innerHTML = releasesInner(row, isNew);
             },
             isOpen: () => container.isConnected,
@@ -690,7 +692,7 @@
                 continue;
             }
             const fresh = find(ed.id);
-            if (fresh) ed.showReleases(fresh.releases);
+            if (fresh) ed.showReleases(fresh.releases, fresh.soldReleases);
         }
     }
 

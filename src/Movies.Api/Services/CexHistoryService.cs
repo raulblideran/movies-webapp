@@ -8,9 +8,12 @@ public class CexHistoryService(MoviesDbContext db, CexClient cex, ILogger<CexHis
 {
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
 
-    /// <summary>Distinct CeX SKUs of the releases on the shelf.</summary>
+    /// <summary>
+    /// Distinct CeX SKUs of the releases on the shelf. Traded in or sold ones aren't owned any more, so their
+    /// prices stop being recorded (the snapshots from before the sale stay), unless another copy is still owned.
+    /// </summary>
     public async Task<List<string>> OwnedSkusAsync(CancellationToken ct = default) =>
-        await db.Releases.Where(r => r.CexSku != null).Select(r => r.CexSku!).Distinct().ToListAsync(ct);
+        await db.Releases.Where(r => r.CexSku != null && r.SoldVia == null).Select(r => r.CexSku!).Distinct().ToListAsync(ct);
 
     /// <summary>
     /// Snapshots today's prices for owned SKUs that don't have one yet, so a run that CeX cut short

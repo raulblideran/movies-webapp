@@ -1,7 +1,8 @@
 // Stats page, Releases tab: every release on the shelf, what it cost and where it came from, and what the ones
 // with a CeX link would fetch at CeX, wherever they were bought. Current prices and the value-over-time line come
-// from the server's daily price snapshots (/api/cex/history). Built from the blocks js/stats.js shares as
-// window.StatsKit.
+// from the server's daily price snapshots (/api/cex/history). Then the discs traded in or sold: where they went,
+// what came back, whether CeX paid its own price on the day, and how long they were kept. Built from the blocks
+// js/stats.js shares as window.StatsKit.
 
 (function () {
     const K = window.StatsKit;
@@ -14,7 +15,19 @@
         cash: { name: "Cash", color: slot(1) },
         voucher: { name: "Voucher", color: slot(2) },
         sell: { name: "CeX sells for", color: slot(3) },
+        back: { name: "Got back", color: slot(4) },
     };
+    // where the sold ones went: CeX and eBay keep the colours they have as shops
+    const CHANNEL_COLOR = { Cex: slot(0), Ebay: slot(2), FacebookMarketplace: slot(5), Other: OTHER };
+    const DAY = 864e5;
+    const dayNo = (iso) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / DAY;
+    // a length of time in days, as "1 year 4 months", "5 months", "12 days"
+    function keptText(days) {
+        if (days == null) return "–";
+        if (days < 31) return plural(Math.round(days), "day");
+        const months = Math.round(days / 30.44), y = Math.floor(months / 12), m = months % 12;
+        return [y ? plural(y, "year") : "", m ? plural(m, "month") : ""].filter(Boolean).join(" ");
+    }
     const signed = (n) => (n == null ? "–" : `${n < 0 ? "−" : "+"}${gbp(Math.abs(n))}`);
     const day = (iso) => {
         const [y, m, d] = iso.split("-").map(Number);
@@ -33,8 +46,9 @@
     let hero = [];
     const PLACES = Shelf.PLACES;
 
-    // One row per release (a box set once, however many titles it holds). Every release with a CeX link that
-    // CeX has prices for counts towards the trade values, wherever it was bought; two copies count twice.
+    // One row per release (a box set once, however many titles it holds). Every release on the shelf with a CeX
+    // link that CeX has prices for counts towards the trade values, wherever it was bought; two copies count
+    // twice. Traded in or sold ones (.sold) carry the sale, and CeX's prices nearest the day it went (.offer).
     function build() {
         const bySku = new Map(history.map((h) => [h.sku, h]));
         const titles = new Map(K.titles().map((t) => [t.id, t]));
@@ -44,6 +58,8 @@
             const h = r.cexSku ? bySku.get(r.cexSku) : null;
             const points = h?.points ?? [];
             const last = points[points.length - 1], first = points[0];
+            const sold = !!r.soldVia;
+            const near = sold ? Shelf.nearestPoint(points, r.soldOn) : null;
             return {
                 id: r.id,
                 // copies of the same title read "A Silent Voice (DVD)", "A Silent Voice (Blu-ray)"
@@ -63,6 +79,17 @@
                 latest: last ?? null,
                 first: first ?? null,
                 cashChange: last && first && last !== first ? last.cash - first.cash : null,
+                // traded in or sold
+                sold,
+                channel: r.soldVia,
+                soldOn: r.soldOn,
+                got: r.soldFor,
+                payout: r.payout,
+                net: Shelf.saleNet(r),
+                back: r.soldFor != null && r.pricePaid > 0 ? r.soldFor / r.pricePaid : null,
+                keptDays: r.boughtOn && r.soldOn ? dayNo(r.soldOn) - dayNo(r.boughtOn) : null,
+                // CeX's offer then: voucher for a voucher trade-in, otherwise cash
+                offer: near ? { ...near, value: r.payout === "Voucher" ? near.point.exchange : near.point.cash } : null,
             };
         });
     }
@@ -85,11 +112,13 @@
     function render() {
         K.beginTab("releases");
         const root = document.getElementById("releasesRoot");
-        const A = build();
-        if (!A.length) {
+        const ALL = build();
+        if (!ALL.length) {
             root.innerHTML = `<div class="empty"><h2>No releases yet</h2><p class="muted">Add the discs on your shelf on the releases page and they show up here.</p></div>`;
             return;
         }
+        // everything above "Traded in and sold" is what's on the shelf now
+        const A = ALL.filter((i) => !i.sold), S = ALL.filter((i) => i.sold);
         const I = A.filter((i) => i.latest); // the ones CeX has prices for
         const linked = A.filter((i) => i.linked);
         const waiting = linked.length - I.length;
@@ -107,11 +136,12 @@
         const firstDate = valued ? I.map((i) => i.first.date).sort()[0] : null;
         const margins = I.filter((i) => i.latest.sell > 0).map((i) => (i.latest.sell - i.latest.cash) / i.latest.sell);
 
-        hero = [[fmt(A.length), "releases"], [gbp(paidAll, 0), "paid"], [gbp(cash, 0), "cash"], [gbp(voucher, 0), "voucher"]];
+        hero = [[fmt(A.length), "on the shelf"], [gbp(paidAll, 0), "paid"], [gbp(cash, 0), "cash"], [gbp(voucher, 0), "voucher"]];
+        if (S.length) hero.push([gbp(sum(S.map((i) => i.got ?? 0)), 0), "back"]);
         K.setHero(hero);
 
         const tiles = [
-            ["Releases", fmt(A.length), `${plural(titleCount, "title")} on them`],
+            ["On the shelf", fmt(A.length), `${plural(titleCount, "title")} on them${S.length ? ` · ${fmt(S.length)} more gone` : ""}`],
             ["Paid for them all", gbp(paidAll), `${plural(A.filter((i) => i.priced).length, "release")} with a price`],
             ["Bought at CeX", fmt(atCex.length), `${gbp(sum(atCex.map((i) => i.paid)))} paid`],
             ["Bought elsewhere", fmt(elsewhere.length), `${gbp(sum(elsewhere.map((i) => i.paid)))} paid`],
@@ -134,17 +164,22 @@
 
         root.innerHTML = [
             K.kpiTiles(tiles),
-            shopSection(A),
-            formatSection(A),
-            valueSection(A),
-            concentrationSection(A, I),
-            valued ? timeSection(I, totalsByDay(I), paidValued) : "",
-            valued ? priceSection(priced) : "",
-            valued ? sellSection(I, priced, { cash, voucher, sell, paidCex: paidValued }) : section("c-sell", "CeX trade values", linked.length
-                ? `The server checks CeX for the ${plural(linked.length, "release")} with a CeX link a couple of minutes after it starts, then every day. Come back shortly.`
-                : "Add CeX links to releases (wherever you bought them) to see what CeX would pay for them.", []),
-            valued ? worthSection(I) : "",
-            tableSection(A),
+            ...(A.length
+                ? [
+                      shopSection(A),
+                      formatSection(A),
+                      valueSection(A),
+                      concentrationSection(A, I),
+                      valued ? timeSection(I, totalsByDay(I), paidValued) : "",
+                      valued ? priceSection(priced) : "",
+                      valued ? sellSection(I, priced, { cash, voucher, sell, paidCex: paidValued }) : section("c-sell", "CeX trade values", linked.length
+                          ? `The server checks CeX for the ${plural(linked.length, "release")} on the shelf with a CeX link a couple of minutes after it starts, then every day. Come back shortly.`
+                          : "Add CeX links to releases (wherever you bought them) to see what CeX would pay for them.", []),
+                      valued ? worthSection(I) : "",
+                      tableSection(A),
+                  ]
+                : [section("c-shelf", "On the shelf", "Nothing: every release has been traded in or sold.", [])]),
+            soldSection(S, ALL),
         ].join("");
         K.redraw();
     }
@@ -159,7 +194,7 @@
         const counts = shops.map((s) => ({ label: s.label, value: s.n, color: s.color }));
         const worth = shops.filter((s) => s.valued).sort((a, b) => b.cash - a.cash)
             .map((s) => ({ label: s.label, value: s.cash, valueLabel: `${gbp(s.cash, 0)} cash · ${gbp(s.paidValued, 0)} paid`, color: s.color, tip: `${plural(s.valued, "release")} with a CeX price: paid ${gbp(s.paidValued)}, cash ${gbp(s.cash)}, voucher ${gbp(s.voucher)}`, full: s.label }));
-        return section("c-shops", "Where they came from", "", [
+        return section("c-shops", "Where they came from", "The releases on the shelf now, by the shop they came from.", [
             card("Releases by shop", "", (el) => donut(el, { items: counts, centerLabel: "releases", label: "Releases by shop" }), {
                 head: ["Shop", "Releases", "Paid"],
                 rows: shops.map((s) => [s.label, s.n, gbp(s.paid)]),
@@ -194,7 +229,7 @@
         const maxPaid = Math.max(10, ...strip.map((p) => p.x));
         const ticks = [0, 2, 5, 10, 20, 50, 100, 200].filter((v) => v <= maxPaid * 1.2);
 
-        return section("c-formats", "Formats and editions", "Counted per release: a box set is one release however many titles it holds.", [
+        return section("c-formats", "Formats and editions", "On the shelf now, counted per release: a box set is one release however many titles it holds.", [
             card("Format × edition", "How many releases of each kind", (el) =>
                 heatmap(el, {
                     rows: F.map((k) => Shelf.FORMATS[k]),
@@ -273,7 +308,7 @@
             genres.set(g.toLowerCase(), { name: genres.get(g.toLowerCase())?.name ?? g, n: (genres.get(g.toLowerCase())?.n ?? 0) + 1 });
         const topGenres = [...genres.values()].sort((a, b) => b.n - a.n).slice(0, 12).map((g) => ({ label: g.name, value: g.n }));
 
-        return section("c-value", "Box sets and value", "", [
+        return section("c-value", "Box sets and value", "The releases on the shelf now.", [
             card("Titles per release", "Box sets and collections hold more than one", (el) => columns(el, { items: sizes, label: "Releases by number of titles" }), {
                 head: ["Titles", "Releases"],
                 rows: sizes.map((s) => [s.label, s.value]),
@@ -325,7 +360,7 @@
             return { label: b === Infinity ? `${a}%+` : `${a}–${b}%`, value: n, tip: plural(n, "release") };
         });
 
-        return section("c-concentration", "Where the money sits", note ? `${note}.` : "", [
+        return section("c-concentration", "Where the money sits", `On the shelf now${note ? `: ${note[0].toLowerCase()}${note.slice(1)}` : ""}.`, [
             card("Concentration", "Running share of the total, most expensive releases first", guard(paid.n, (el) => lines(el, { points: pts, series, valueFmt: (v) => `${fmt(v)}%`, label: "Cumulative share of spend and value" })), {
                 size: "is-wide",
                 extra: legend(series),
@@ -374,8 +409,8 @@
         const single = days.length < 2;
 
         return section("c-time", "Value over time", single
-            ? `Price tracking started on ${day(days[0].date)}. The server records every item's CeX prices once a day, so this line grows a point a day.`
-            : `${plural(days.length, "day")} of daily CeX prices. An item CeX didn't answer for on a day keeps its last known price.`, [
+            ? `What's on the shelf now. Price tracking started on ${day(days[0].date)}. The server records every item's CeX prices once a day, so this line grows a point a day.`
+            : `What's on the shelf now, over ${plural(days.length, "day")} of daily CeX prices. An item CeX didn't answer for on a day keeps its last known price.`, [
             card("What it's all worth, day by day", "Totals across every release with a CeX link · the axis starts near the lowest value so changes show", (el) => lines(el, { points: pts, series, yMin: floorTo(Math.min(...series.flatMap((s) => s.values)) * 0.85), valueFmt: (v) => gbp(v, 0), label: "Collection value over time" }), {
                 size: "is-wide",
                 extra: legend(series),
@@ -424,7 +459,7 @@
         };
         priceDraw = draw;
         const chips = `<div class="chips price-sort" role="group" aria-label="Order by">${PRICE_SORTS.map(([k, l]) => `<button type="button" class="chip" data-price-sort="${k}" aria-pressed="${priceSort === k}">${l}</button>`).join("")}</div>`;
-        return section("c-price", "Paid vs CeX's price", "What each release cost you, against what CeX sells it for today: their shop price, so what buying it again would cost.", [
+        return section("c-price", "Paid vs CeX's price", "What each release on the shelf cost you, against what CeX sells it for today: their shop price, so what buying it again would cost.", [
             card("Release by release", `${plural(up, "release")} would cost more at CeX now than you paid, ${fmt(down)} less · square-root scale, so the cheap ones don't bunch up`, draw, {
                 size: "is-wide",
                 extra: `<div class="price-controls">${legend([M.paid, M.sell])}${chips}</div>`,
@@ -470,7 +505,7 @@
         const scatterPts = priced.map((i) => ({ x: i.paid, y: i.latest.cash, label: i.name, tipV: `paid ${gbp(i.paid)} · cash ${gbp(i.latest.cash)}` }));
         const tickVals = [0, 2, 5, 10, 20, 50, 100, 200].filter((v) => v <= top);
 
-        return section("c-sell", "If you sold today", "Cash and voucher are what CeX would pay you; “CeX sells for” is their shop price.", [
+        return section("c-sell", "If you sold today", "Everything on the shelf with a CeX price. Cash and voucher are what CeX would pay you; “CeX sells for” is their shop price.", [
             card("Paid vs what CeX would give", "", (el) => hbars(el, { items: compare, label: "Paid, cash, voucher and CeX's price" }), {
                 head: ["", "Total"],
                 rows: compare.map((c) => [c.label, c.valueLabel]),
@@ -515,7 +550,7 @@
             return { label: c.c, value: mean(ms), valueLabel: `${pct(mean(ms))}  (${c.items.length})`, full: `${c.c} · ${plural(c.items.length, "item")}` };
         }).sort((a, b) => b.value - a.value);
 
-        return section("c-worth", "What's worth what", "", [
+        return section("c-worth", "What's worth what", "The releases on the shelf now, at CeX's prices today.", [
             card("Most valuable", "Cash price, with the voucher price alongside", (el) => hbars(el, { items: top, label: "Most valuable items" }), {
                 head: ["Item", "Cash", "Voucher", "CeX sells for"],
                 rows: [...I].sort((a, b) => b.latest.cash - a.latest.cash).slice(0, 10).map((i) => [i.name, gbp(i.latest.cash), gbp(i.latest.exchange), gbp(i.latest.sell)]),
@@ -546,7 +581,7 @@
             .join("");
         return `
             <section class="viz-section" aria-labelledby="c-all">
-                <div class="viz-section-head"><h2 id="c-all">Every release</h2><p>Sorted by cash value; releases without a CeX price come last. “Change” is the cash price since tracking began.</p></div>
+                <div class="viz-section-head"><h2 id="c-all">Every release on the shelf</h2><p>Sorted by cash value; releases without a CeX price come last. “Change” is the cash price since tracking began.</p></div>
                 <article class="viz-card">
                     <div class="viz-table-wrap cex-table-wrap">
                         <table class="viz-table cex-table">
@@ -556,6 +591,153 @@
                     </div>
                 </article>
             </section>`;
+    }
+
+    // ---------- traded in and sold ----------
+
+    function soldSection(S, ALL) {
+        const wrap = (intro, body = "") => `
+            <section class="viz-section sold-section" aria-labelledby="c-sold">
+                <div class="viz-section-head"><h2 id="c-sold">Traded in and sold</h2><p>${intro}</p></div>
+                ${body}
+            </section>`;
+        if (!S.length)
+            return wrap("Nothing traded in or sold yet. When a disc goes, tick “Traded in or sold” on it (on the releases page): it leaves the shelf, and shows up here with where it went and what you got back.");
+
+        const tradeIns = S.filter((i) => i.channel === "Cex");
+        const got = S.filter((i) => i.got != null);
+        const back = sum(got.map((i) => i.got));
+        const both = S.filter((i) => i.got != null && i.priced && i.paid > 0);
+        const paidBoth = sum(both.map((i) => i.paid));
+        const paidEver = sum(ALL.map((i) => i.paid));
+        const kept = S.filter((i) => i.keptDays != null);
+        const tiles = [
+            ["Gone from the shelf", fmt(S.length), [tradeIns.length ? `${fmt(tradeIns.length)} traded in at CeX` : "", S.length > tradeIns.length ? `${fmt(S.length - tradeIns.length)} sold` : ""].filter(Boolean).join(" · ")],
+            ["Money back", gbp(back), got.length === S.length ? (S.length === 1 ? "from the one disc" : `from all ${fmt(S.length)} discs`) : `from ${plural(got.length, "disc")} with a price`],
+            ["Cost recovered", pct(paidBoth ? (sum(both.map((i) => i.got)) / paidBoth) * 100 : null), both.length ? `of the ${gbp(paidBoth)} those cost` : "needs what you paid and got"],
+            ["Net spend", gbp(paidEver - back), `${gbp(paidEver)} paid for every release, less what came back`],
+            ["Average per disc", gbp(mean(got.map((i) => i.got))), got.length ? `median ${gbp(median(got.map((i) => i.got)))}` : ""],
+        ];
+        if (kept.length) tiles.push(["Kept on average", keptText(mean(kept.map((i) => i.keptDays))), `${plural(kept.length, "disc")} with a purchase date`]);
+
+        // where they went
+        const chans = Object.keys(Shelf.CHANNELS)
+            .map((k) => {
+                const rs = S.filter((i) => i.channel === k);
+                const rates = rs.filter((i) => i.back != null).map((i) => i.back * 100);
+                return { k, label: Shelf.CHANNELS[k], color: CHANNEL_COLOR[k], n: rs.length, back: sum(rs.map((i) => i.got ?? 0)), rate: mean(rates) };
+            })
+            .filter((c) => c.n);
+
+        // paid against got back, and the difference
+        const pairs = S.filter((i) => i.priced && i.got != null).map((i) => ({ name: i.name, paid: i.paid, got: i.got, net: i.got - i.paid }));
+        const top = Math.max(5, Math.ceil(Math.max(0, ...pairs.flatMap((p) => [p.paid, p.got])) / 10) * 10);
+        const ahead = pairs.filter((p) => p.net >= 0).length;
+        const byNet = [...pairs].sort((a, b) => b.net - a.net || a.name.localeCompare(b.name));
+        // the best and the worst: all of them when they fit, otherwise the 8 at each end
+        const deals = (byNet.length > 16 ? [...byNet.slice(0, 8), ...byNet.slice(-8)] : byNet)
+            .map((p) => ({ label: p.name, value: p.net, valueLabel: signed(p.net), tip: `paid ${gbp(p.paid)} · got back ${gbp(p.got)}`, full: p.name }));
+
+        // money back, month by month
+        const monthOf = (iso) => +iso.slice(0, 4) * 12 + +iso.slice(5, 7) - 1;
+        const dated = S.filter((i) => i.soldOn);
+        const ks = dated.map((i) => monthOf(i.soldOn));
+        const months = ks.length ? Array.from({ length: Math.max(...ks) - Math.min(...ks) + 1 }, (_, n) => Math.min(...ks) + n) : [];
+        const monthly = months.map((k) => {
+            const rs = dated.filter((i) => monthOf(i.soldOn) === k);
+            const v = sum(rs.map((i) => i.got ?? 0));
+            return { label: `${MONTHS[k % 12]} ${Math.floor(k / 12)}`, value: v, tip: `${gbp(v)} from ${plural(rs.length, "disc")}` };
+        });
+
+        // what came back as a share of what it cost
+        const rated = S.filter((i) => i.back != null);
+        const bands = [[0, 25], [25, 50], [50, 75], [75, 100], [100, Infinity]].map(([a, b]) => {
+            const n = rated.filter((i) => i.back * 100 >= a && i.back * 100 < b).length;
+            return { label: b === Infinity ? "100%+" : `${a}–${b}%`, value: n, tip: plural(n, "disc") };
+        });
+
+        // CeX trade-ins against CeX's own offer around the day (Shelf.nearestPoint)
+        const checked = tradeIns.filter((i) => i.offer && i.got != null).map((i) => ({ i, diff: i.got - i.offer.value }));
+        const off = checked.filter((c) => Math.abs(c.diff) >= 0.005).sort((a, b) => b.diff - a.diff);
+        const offerWhen = (o) => (o.days === 0 ? "that day" : `${Math.abs(o.days)} ${Math.abs(o.days) === 1 ? "day" : "days"} ${o.days < 0 ? "before" : "after"}`);
+        const fairNote = !tradeIns.length ? "No CeX trade-ins yet."
+            : !checked.length ? "None of the trade-ins has a daily CeX price within a week of the day (or a price you got)."
+            : off.length ? `${plural(checked.length - off.length, "trade-in")} matched CeX's price exactly.`
+            : `All ${plural(checked.length, "trade-in")} matched CeX's price on the day.`;
+
+        // how long they were kept
+        const keptBands = [[0, 182, "Under 6 months"], [182, 365, "6–12 months"], [365, 730, "1–2 years"], [730, 1826, "2–5 years"], [1826, Infinity, "5 years+"]].map(([a, b, label]) => {
+            const n = kept.filter((i) => i.keptDays >= a && i.keptDays < b).length;
+            return { label, value: n, tip: plural(n, "disc") };
+        });
+
+        const cards = [
+            card("Where they went", "Discs by where they were traded in or sold", (el) => donut(el, { items: chans.map((c) => ({ label: c.label, value: c.n, color: c.color })), centerLabel: S.length === 1 ? "disc" : "discs", label: "Discs by where they went" }), {
+                head: ["Where", "Discs", "Money back", "Average return"],
+                rows: chans.map((c) => [c.label, c.n, gbp(c.back), pct(c.rate)]),
+                note: chans.map((c) => `${c.label} ${gbp(c.back)}${c.rate != null ? ` (${pct(c.rate)} of cost)` : ""}`).join(" · "),
+            }),
+            card("Money back by month", "What came back in each month", guard(monthly.length, (el) => columns(el, { items: monthly, valueFmt: (v) => gbp(v, 0), labelEvery: Math.max(1, Math.ceil(monthly.length / 8)), label: "Money back from sales, month by month" })), {
+                head: ["Month", "Money back"],
+                rows: monthly.map((m) => [m.label, gbp(m.value)]),
+            }),
+            card("Paid vs got back", `${plural(ahead, "disc")} made back what it cost or more, ${fmt(pairs.length - ahead)} didn't · square-root scale`, guard(pairs.length, (el) =>
+                dumbbell(el, {
+                    items: byNet.map((p) => ({ label: p.name, a: p.paid, b: p.got, valueLabel: signed(p.net), full: p.name, tip: `paid ${gbp(p.paid)} · got back ${gbp(p.got)} · ${signed(p.net)}` })),
+                    series: [M.paid, M.back],
+                    xTicks: [0, 1, 2, 5, 10, 20, 50, 100, 200].filter((v) => v <= top),
+                    xFmt: (v) => `£${v}`,
+                    sqrt: true,
+                    label: "What you paid for each disc that went, against what you got back",
+                }), "Needs both the price paid and the price you got."), {
+                size: "is-wide",
+                extra: legend([M.paid, M.back]),
+                head: ["Disc", "Paid", "Got back", "Difference"],
+                rows: byNet.map((p) => [p.name, gbp(p.paid), gbp(p.got), signed(p.net)]),
+            }),
+            card("Best and worst deals", "Got back minus what you paid, best first", guard(deals.length, (el) => divbars(el, { items: deals, label: "Best and worst sales" }), "Needs both the price paid and the price you got."), {
+                head: ["Disc", "Got − paid", "Detail"],
+                rows: deals.map((d) => [d.label, d.valueLabel, d.tip]),
+            }),
+            card("How much came back", "Discs by what you got as a share of what you paid", guard(rated.length, (el) => columns(el, { items: bands, yMax: Math.max(4, ...bands.map((b) => b.value)), label: "Discs by share of the price recovered" })), {
+                head: ["Back", "Discs"],
+                rows: bands.map((b) => [b.label, b.value]),
+                note: rated.length ? `Median ${pct(median(rated.map((i) => i.back * 100)))} of the price back.` : "",
+            }),
+            card("Did CeX pay its price?", "What you got, against CeX's own cash (or voucher) price nearest the day", guard(off.length, (el) =>
+                divbars(el, { items: off.map((c) => ({ label: c.i.name, value: c.diff, valueLabel: signed(c.diff), tip: `got ${gbp(c.i.got)} · CeX's ${c.i.payout === "Voucher" ? "voucher" : "cash"} price ${gbp(c.i.offer.value)} (${offerWhen(c.i.offer)})`, full: c.i.name })), label: "Trade-ins against CeX's price on the day" }), fairNote), {
+                head: ["Disc", "Traded in", "Got", "CeX's price", "Difference", "Prices from"],
+                rows: checked.map((c) => [c.i.name, Shelf.day(c.i.soldOn), `${gbp(c.i.got)} ${c.i.payout === "Voucher" ? "voucher" : "cash"}`, gbp(c.i.offer.value), signed(c.diff), offerWhen(c.i.offer)]),
+                note: off.length ? fairNote : "",
+            }),
+            kept.length
+                ? card("How long you kept them", "From the day you bought it to the day it went (discs with a purchase date)", (el) => columns(el, { items: keptBands, yMax: Math.max(4, ...keptBands.map((b) => b.value)), label: "Discs by how long they were kept" }), {
+                      head: ["Kept", "Discs"],
+                      rows: keptBands.map((b) => [b.label, b.value]),
+                      note: `Median ${keptText(median(kept.map((i) => i.keptDays)))}.`,
+                  })
+                : "",
+        ];
+
+        const rows = [...S].sort((a, b) => (b.soldOn ?? "").localeCompare(a.soldOn ?? "") || a.name.localeCompare(b.name));
+        const money = (v) => (v == null ? "–" : gbp(v));
+        const table = `
+            <article class="viz-card is-wide">
+                <header class="viz-head"><h3>Every disc that went</h3><p class="viz-sub">Most recent first. “CeX's price” is its cash (or voucher) price nearest the day.</p></header>
+                <div class="viz-table-wrap cex-table-wrap">
+                    <table class="viz-table cex-table">
+                        <thead><tr><th scope="col">Release</th><th scope="col">Where</th><th scope="col">When</th><th scope="col">Paid</th><th scope="col">Got back</th><th scope="col">Got − paid</th><th scope="col">CeX's price</th><th scope="col">Kept</th></tr></thead>
+                        <tbody>${rows
+                            .map((i) => `<tr><th scope="row">${esc(i.name)}<span class="cex-table-titles">${esc(i.titles.map((t) => t.name).join(", "))}</span></th><td>${esc(Shelf.CHANNELS[i.channel] ?? i.channel)}${i.channel === "Cex" && i.payout ? ` <span class="faint">(${i.payout === "Voucher" ? "voucher" : "cash"})</span>` : ""}</td><td>${esc(Shelf.day(i.soldOn))}</td><td>${i.priced ? gbp(i.paid) : "–"}</td><td>${money(i.got)}</td><td class="${i.net == null ? "" : i.net >= 0 ? "is-up" : "is-down"}">${signed(i.net)}</td><td>${i.offer ? gbp(i.offer.value) : "–"}</td><td>${i.keptDays == null ? "–" : esc(keptText(i.keptDays))}</td></tr>`)
+                            .join("")}</tbody>
+                    </table>
+                </div>
+            </article>`;
+
+        return wrap(
+            `${plural(S.length, "disc")} no longer on the shelf, kept here as history. Paid is what each cost; got back is what came back for it.`,
+            `${K.kpiTiles(tiles)}<div class="viz-grid">${cards.join("")}${table}</div>`,
+        );
     }
 
     K.addTab("releases", {

@@ -96,7 +96,7 @@
     async function deleteTitle(row) {
         const sure = await Auth.confirm({
             title: `Delete ${row.name}?`,
-            message: `It comes off your ${row.list === "watchlist" ? "watchlist" : "Watchlog"} for good${row.releases.length ? ", and off the discs it's on (the discs stay)" : ""}. This can't be undone.`,
+            message: `It comes off your ${row.list === "watchlist" ? "watchlist" : "Watchlog"} for good${row.releases.length || row.soldReleases?.length ? ", and off the discs it's on (the discs stay)" : ""}. This can't be undone.`,
             confirmLabel: "Delete",
             danger: true,
         });
