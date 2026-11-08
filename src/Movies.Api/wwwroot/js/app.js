@@ -572,6 +572,10 @@ const watchlistColumns = [
     { key: "name", label: "Name", value: (r) => r.name },
     { key: "type", label: "Type", value: (r) => r.type },
     { key: "year", label: "Year", value: (r) => r.releaseYear, num: true },
+    { key: "out", label: "Release (UK)", value: (r) => Lists.releaseOf(r)?.date ?? null, html: (r) => {
+        const rel = Lists.releaseOf(r);
+        return rel ? `${escapeHtml(Lists.dateText(rel.date))}${rel.uk ? "" : ` <span class="faint">(not UK)</span>`}` : `<span class="faint">TBA</span>`;
+    } },
     { key: "runtime", label: "Runtime", value: (r) => r.runtime, html: (r) => escapeHtml(TitleModal.runtimeText(r).replace(" episodes", "/ep")), num: true },
     { key: "added", label: "Added", value: (r) => r.watchlistAddedOn, html: (r) => escapeHtml(formatDate(r.watchlistAddedOn)) },
     { key: "genres", label: "Genres", value: (r) => r.genres.join(", "), wrap: true },
@@ -595,6 +599,17 @@ const titleColumns = [
     { key: "rewatch", label: "Rewatch", value: (r) => r.rewatchPotential, num: true },
 ];
 const view = Shelf.viewToggle(document.getElementById("viewToggle"), IS_WATCHLIST ? "watchlist" : "titles", () => filterCards());
+
+// The watchlist's release line: "UK release 23 Dec 2026 · in 6 weeks". Without a UK date, TMDB's own date
+// (usually the US one), flagged as such; with no date at all, "Release date not announced".
+function releaseLine(row) {
+    const r = Lists.releaseOf(row);
+    if (!r) return `<p class="card-when is-tba">Release date not announced</p>`;
+    const future = !Lists.isReleased(row);
+    const label = r.uk ? "UK release" : future ? "Out" : row.type === "Series" ? "First aired" : "Released";
+    return `<p class="card-when${future ? " is-upcoming" : ""}">${label} <time datetime="${r.date}">${Lists.dateText(r.date)}</time>${
+        future ? ` · ${Lists.untilText(r.date)}${r.uk ? "" : ` <span class="faint">· no UK date yet</span>`}` : ""}</p>`;
+}
 
 function displayCards(data) {
     const grid = document.getElementById("cardsGrid");
@@ -642,6 +657,7 @@ function displayCards(data) {
             <div class="card-poster">${poster}${ratingHtml(row)}</div>
             <div class="card-body">
                 <h3 class="card-title">${escapeHtml(row.name)}${row.releaseYear ? ` <span class="card-year">${row.releaseYear}</span>` : ""}</h3>
+                ${IS_WATCHLIST ? releaseLine(row) : ""}
                 <div class="tags">${tagsHtml(row)}</div>
                 ${WatchDialog.pipsHtml(row)}
                 <dl class="facts">${factsHtml(row, { skip: ["Genre", "Price (£)"] })}</dl>

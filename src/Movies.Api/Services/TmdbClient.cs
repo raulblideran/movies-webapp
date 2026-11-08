@@ -82,7 +82,20 @@ public record TmdbDetailsResponse(
     [property: JsonPropertyName("created_by")] List<TmdbPerson>? CreatedBy = null,
     [property: JsonPropertyName("vote_average")] double? VoteAverage = null,
     [property: JsonPropertyName("vote_count")] int? VoteCount = null,
-    [property: JsonPropertyName("production_countries")] List<TmdbCountry>? ProductionCountries = null);
+    [property: JsonPropertyName("production_countries")] List<TmdbCountry>? ProductionCountries = null,
+    [property: JsonPropertyName("release_dates")] TmdbReleaseDates? ReleaseDates = null);
+
+/// <summary>A film's release dates by country (append_to_response=release_dates).</summary>
+public record TmdbReleaseDates([property: JsonPropertyName("results")] List<TmdbCountryReleases>? Results);
+
+public record TmdbCountryReleases(
+    [property: JsonPropertyName("iso_3166_1")] string? Country,
+    [property: JsonPropertyName("release_dates")] List<TmdbReleaseDate>? Dates);
+
+/// <summary>type: 1 premiere, 2 limited cinema run, 3 cinemas, 4 digital, 5 physical, 6 TV.</summary>
+public record TmdbReleaseDate(
+    [property: JsonPropertyName("release_date")] string? Date,
+    [property: JsonPropertyName("type")] int Type);
 
 public record TmdbCountry([property: JsonPropertyName("iso_3166_1")] string? Code);
 
@@ -134,7 +147,8 @@ public record TmdbDetails(
     int? VoteCount = null,
     string? OriginalLanguage = null,
     List<string>? Countries = null,
-    DateOnly? ReleaseDate = null)
+    DateOnly? ReleaseDate = null,
+    DateOnly? UkReleaseDate = null)
 {
     /// <summary>How many of the cast are kept: the top-billed (a series: the most episodes).</summary>
     public const int CastKept = 10;
@@ -179,7 +193,24 @@ public record TmdbDetails(
             Countries: (d.OriginCountry is { Count: > 0 } origin ? origin : (d.ProductionCountries ?? []).Select(c => c.Code ?? ""))
                 .Where(c => c.Length == 2).Distinct().ToList(),
             ReleaseDate: DateOnly.TryParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var released) ? released : null);
+                System.Globalization.DateTimeStyles.None, out var released) ? released : null,
+            UkReleaseDate: tv ? null : UkDate(d.ReleaseDates));
+    }
+
+    /// <summary>
+    /// The UK release: the first date in cinemas, else of a limited run, else digital, else on disc or TV.
+    /// Premieres and festival screenings don't count. Null when TMDB has no UK date.
+    /// </summary>
+    public static DateOnly? UkDate(TmdbReleaseDates? dates)
+    {
+        var uk = (dates?.Results ?? []).Where(c => c.Country == "GB").SelectMany(c => c.Dates ?? [])
+            .Select(r => (r.Type, Date: r.Date is { Length: >= 10 } s && DateOnly.TryParseExact(s[..10], "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day) ? day : (DateOnly?)null))
+            .Where(r => r.Date is not null)
+            .ToList();
+        foreach (var type in new[] { 3, 2, 4, 5, 6 })
+            if (uk.Where(r => r.Type == type).Min(r => r.Date) is { } first) return first;
+        return null;
     }
 
     /// <summary>A YouTube trailer: official first, then English, then the newest. A teaser if there's no trailer.</summary>
@@ -292,7 +323,7 @@ public class TmdbClient(HttpClient http, Microsoft.Extensions.Options.IOptions<T
         if (!Enabled || mediaType is not ("movie" or "tv")) return null;
         try
         {
-            var extra = mediaType == "tv" ? "videos,aggregate_credits" : "videos,credits";
+            var extra = mediaType == "tv" ? "videos,aggregate_credits" : "videos,credits,release_dates";
             var url = $"3/{mediaType}/{id}?api_key={Uri.EscapeDataString(options.Value.ApiKey!)}&append_to_response={extra}";
             using var resp = await http.GetAsync(url, ct);
             if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;

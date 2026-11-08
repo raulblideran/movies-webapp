@@ -28,14 +28,40 @@
         return (await resp.json()).map(normalise);
     }
 
-    // Out already? TMDB's release date (a series: its first air date) is today or earlier. Without a date
-    // the release year decides; with neither there's no telling, so it counts as out. Used by the
-    // watchlist's "Out yet?" filter and by Pick for me.
     const todayIso = () => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     };
-    const isReleased = (row) => (row.releaseDate ? row.releaseDate <= todayIso() : !row.releaseYear || row.releaseYear <= new Date().getFullYear());
+
+    // When it's out (or was): the UK release when TMDB has one, else TMDB's own date (a series: its first air date).
+    // { date: "2026-12-23", uk: true }, or null when there's no date at all.
+    const releaseOf = (row) =>
+        row.ukReleaseDate ? { date: row.ukReleaseDate, uk: true } : row.releaseDate ? { date: row.releaseDate, uk: false } : null;
+
+    // Out already? Its release date (above) is today or earlier. Without a date, only a past release year says
+    // it's out: no date and no year means it hasn't been announced, so it isn't. Used by the watchlist's
+    // "Out yet?" filter and by Pick for me.
+    const isReleased = (row) => {
+        const r = releaseOf(row);
+        return r ? r.date <= todayIso() : !!row.releaseYear && row.releaseYear < new Date().getFullYear();
+    };
+
+    // "23 Dec 2026"
+    const shortDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const dateText = (iso) => {
+        const [y, m, d] = iso.split("-").map(Number);
+        return shortDate.format(new Date(y, m - 1, d));
+    };
+    // "in 3 weeks", "in 5 months", "next year"
+    function untilText(iso) {
+        const [y, m, d] = iso.split("-").map(Number);
+        const days = Math.round((Date.UTC(y, m - 1, d) - Date.now()) / 864e5);
+        if (days <= 1) return days <= 0 ? "out now" : "tomorrow";
+        if (days < 14) return `in ${days} days`;
+        if (days < 60) return `in ${Math.round(days / 7)} weeks`;
+        if (days < 540) return `in ${Math.round(days / 30.44)} months`;
+        return `in ${Math.round(days / 365.25)} years`;
+    }
 
     // The same film or series (by TMDB id) among rows, other than row itself.
     const sameTmdb = (row, rows) =>
@@ -48,6 +74,9 @@
         loadAll,
         sameTmdb,
         isReleased,
+        releaseOf,
+        dateText,
+        untilText,
         editUrl: (id) => `/titles/${id}/edit`,
         // where a title opens: its list's page, with its popup open
         link: (row) => `${LISTS[row.list].page}?title=${row.id}`,

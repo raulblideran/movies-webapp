@@ -1133,6 +1133,22 @@ textarea.code {
     color: var(--ink-3);
 }
 
+/* the watchlist's release line (js/app.js releaseLine) */
+.card-when {
+    margin: -2px 0 8px;
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.card-when.is-upcoming {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.card-when.is-upcoming .faint {
+    font-weight: 400;
+}
+
 /* Rating: a ticket stub with notched sides */
 .rating {
     display: inline-block;
@@ -4613,10 +4629,6 @@ a.tag-own:focus-visible {
 }
 
 /* ---------- physical releases (releases.html, js/releases.js) ---------- */
-
-.release-filters {
-    gap: 10px 22px;
-}
 
 .release-sort .input {
     width: auto;

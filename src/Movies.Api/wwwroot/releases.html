@@ -86,16 +86,39 @@
                             <option value="sale-worst">Worst sale (got back − paid)</option>
                         </select>
                     </label>
+                    <button type="button" id="filterToggle" class="btn" aria-expanded="false" aria-controls="filtersSection">
+                        Filters <span id="filterCount"></span>
+                        <span class="caret" aria-hidden="true">▼</span>
+                    </button>
+                    <button type="button" id="clearFilters" class="btn hidden">Clear filters</button>
                     <div id="viewToggle"></div>
                     <div id="adminControls"></div>
                 </div>
-                <div class="toolbar-row release-filters">
-                    <div class="chips hidden" id="statusFilters" role="group" aria-label="On the shelf, or traded in or sold"></div>
-                    <div class="chips hidden" id="viaFilters" role="group" aria-label="Where it went"></div>
-                    <div class="chips hidden" id="titleFilters" role="group" aria-label="Titles linked"></div>
-                    <div class="chips" id="formatFilters" role="group" aria-label="Format"></div>
-                    <div class="chips" id="editionFilters" role="group" aria-label="Edition"></div>
-                    <div class="chips" id="placeFilters" role="group" aria-label="Bought from"></div>
+                <div id="filtersSection" class="filters hidden">
+                    <div class="filter-group hidden">
+                        <h3>On the shelf?</h3>
+                        <div class="chips" id="statusFilters" role="group" aria-label="On the shelf, or traded in or sold"></div>
+                    </div>
+                    <div class="filter-group hidden">
+                        <h3>Where it went</h3>
+                        <div class="chips" id="viaFilters" role="group" aria-label="Where it went"></div>
+                    </div>
+                    <div class="filter-group hidden">
+                        <h3>Titles</h3>
+                        <div class="chips" id="titleFilters" role="group" aria-label="Titles linked"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Format</h3>
+                        <div class="chips" id="formatFilters" role="group" aria-label="Format"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Edition</h3>
+                        <div class="chips" id="editionFilters" role="group" aria-label="Edition"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h3>Bought from</h3>
+                        <div class="chips" id="placeFilters" role="group" aria-label="Bought from"></div>
+                    </div>
                 </div>
             </div>
 

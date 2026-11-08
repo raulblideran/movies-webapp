@@ -10,7 +10,6 @@
     const toggle = document.getElementById("comingSoonToggle");
     const esc = (v) => App.escapeHtml(v);
     const KEY = "comingSoon:hidden";
-    const longDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
     let items = [];
 
     const storage = {
@@ -42,20 +41,7 @@
         setHidden(hidden);
     };
 
-    // "in 3 weeks", "in 5 months", "next year"
-    function untilText(iso) {
-        const [y, m, d] = iso.split("-").map(Number);
-        const days = Math.round((Date.UTC(y, m - 1, d) - Date.now()) / 864e5);
-        if (days <= 1) return days <= 0 ? "out now" : "tomorrow";
-        if (days < 14) return `in ${days} days`;
-        if (days < 60) return `in ${Math.round(days / 7)} weeks`;
-        if (days < 540) return `in ${Math.round(days / 30.44)} months`;
-        return `in ${Math.round(days / 365.25)} years`;
-    }
-    const dateText = (iso) => {
-        const [y, m, d] = iso.split("-").map(Number);
-        return longDate.format(new Date(y, m - 1, d));
-    };
+    const { untilText, dateText } = Lists;
 
     // not the ones already on either list (added since the server worked the list out)
     function shown() {

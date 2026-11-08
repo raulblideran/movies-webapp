@@ -50,6 +50,31 @@ public class TmdbMetadataTests : IClassFixture<TestApp>
         Assert.Equal(new[] { "Ridley Scott:Director", "Sigourney Weaver:Cast", "John Hurt:Cast" },
             d.Credits!.Select(c => $"{c.Name}:{c.Job}"));
         Assert.Equal("/sw.jpg", d.Credits![1].ProfilePath);
+        Assert.Null(d.UkReleaseDate); // no release_dates in the answer
+    }
+
+    [Fact]
+    public void The_uk_release_is_cinemas_first_then_limited_then_digital_never_a_premiere()
+    {
+        static DateOnly? Uk(string gb) => TmdbDetails.From("movie", Parse($$"""
+            { "id": 1, "title": "X", "release_date": "2021-10-14", "release_dates": { "results": [
+              { "iso_3166_1": "US", "release_dates": [ { "release_date": "2021-10-01T00:00:00.000Z", "type": 3 } ] },
+              { "iso_3166_1": "GB", "release_dates": [ {{gb}} ] }
+            ] } }
+            """)).UkReleaseDate;
+
+        // Ron's Gone Wrong: London Film Festival, then cinemas, then Channel 4
+        Assert.Equal(new DateOnly(2021, 10, 15), Uk("""
+            { "release_date": "2021-10-09T00:00:00.000Z", "type": 1, "note": "London Film Festival" },
+            { "release_date": "2024-12-22T00:00:00.000Z", "type": 6 },
+            { "release_date": "2021-10-15T00:00:00.000Z", "type": 3 }
+            """));
+        // straight to streaming
+        Assert.Equal(new DateOnly(2026, 9, 30), Uk("""{ "release_date": "2026-09-30T00:00:00.000Z", "type": 4 }"""));
+        // only a premiere: no UK release yet
+        Assert.Null(Uk("""{ "release_date": "2026-05-01T00:00:00.000Z", "type": 1 }"""));
+        // a series never has one
+        Assert.Null(TmdbDetails.From("tv", Parse("""{ "id": 2, "name": "S", "first_air_date": "2020-01-01" }""")).UkReleaseDate);
     }
 
     [Fact]

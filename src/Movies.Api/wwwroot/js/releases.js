@@ -121,9 +121,10 @@
             });
         };
         const gone = releases.filter(isSold);
-        const statusEl = document.getElementById("statusFilters");
+        // a whole group (heading and chips) shows or hides
+        const group = (id, on) => document.getElementById(id).closest(".filter-group").classList.toggle("hidden", !on);
         // nothing has gone yet: no point offering it
-        statusEl.classList.toggle("hidden", !gone.length);
+        group("statusFilters", gone.length);
         if (!gone.length) filter.status = "shelf";
         chips("statusFilters", "status", [
             ["shelf", `On the shelf (${releases.length - gone.length})`],
@@ -133,12 +134,12 @@
         // where they went: only when the sold ones are showing, and they went to more than one place
         const vias = Object.keys(CHANNELS).filter((k) => gone.some((r) => r.soldVia === k));
         const showVia = filter.status !== "shelf" && vias.length > 1;
-        document.getElementById("viaFilters").classList.toggle("hidden", !showVia);
+        group("viaFilters", showVia);
         if (!showVia) filter.via = "all";
         chips("viaFilters", "via", [["all", "Anywhere"], ...vias.map((k) => [k, `${k === "FacebookMarketplace" ? "FB Marketplace" : CHANNELS[k]} (${gone.filter((r) => r.soldVia === k).length})`])], { after: filters });
         // releases with no titles linked: shown (and countable) only when there are some, as something to fix
         const orphans = releases.filter((r) => inStatus(r) && inVia(r) && !r.titleIds.length).length;
-        document.getElementById("titleFilters").classList.toggle("hidden", !orphans);
+        group("titleFilters", orphans);
         if (!orphans) filter.titles = "all";
         chips("titleFilters", "titles", [["all", "Any titles"], ["none", `No titles linked (${orphans})`]]);
         // the other groups count within the status (and channel) chosen
@@ -268,8 +269,27 @@
         { key: "added", label: "Added", value: (r) => r.createdAt, html: (r) => esc(r.createdAt.slice(0, 10).split("-").reverse().join("/")) },
     ];
 
+    // The Filters button: shows the panel, and says how many filters are on ("Filters (2)"), as on the other pages.
+    // "On the shelf" is the starting point, so only a different status counts.
+    const FILTER_DEFAULTS = { status: "shelf", via: "all", titles: "all", format: "all", edition: "all", place: "all" };
+    function updateFilterCount() {
+        const active = Object.entries(FILTER_DEFAULTS).filter(([k, v]) => filter[k] !== v).length;
+        document.getElementById("filterCount").textContent = active ? `(${active})` : "";
+        document.getElementById("clearFilters").classList.toggle("hidden", !active);
+    }
+    document.getElementById("filterToggle").addEventListener("click", (e) => {
+        const open = document.getElementById("filtersSection").classList.toggle("hidden") === false;
+        e.currentTarget.setAttribute("aria-expanded", String(open));
+    });
+    document.getElementById("clearFilters").addEventListener("click", () => {
+        Object.assign(filter, FILTER_DEFAULTS);
+        filters();
+        show();
+    });
+
     function show() {
         if (releases.length) writeUrl();
+        updateFilterCount();
         const pool = releases.filter((r) => inStatus(r) && inVia(r));
         const list = pool
             .filter((r) => (filter.titles === "all" || !r.titleIds.length) && (filter.format === "all" || r.format === filter.format) && (filter.edition === "all" || r.edition === filter.edition) && (filter.place === "all" || r.purchasedFrom === filter.place) && (!filter.q || r._search.includes(filter.q)))

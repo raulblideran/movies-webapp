@@ -80,6 +80,11 @@ public class Title : ITimestamped
     public string? Overview { get; set; }
     /// <summary>TMDB's release date (a series: its first air date). Watches can't be dated before it (WatchSummary.ReleasedOn).</summary>
     public DateOnly? ReleaseDate { get; set; }
+    /// <summary>
+    /// When it comes out (or came out) in the UK, from TMDB's UK release dates: in cinemas, else a limited run, else
+    /// digital (streaming). Null when TMDB has no UK date yet, or for a series. Shown on the watchlist, and decides "Out yet?".
+    /// </summary>
+    public DateOnly? UkReleaseDate { get; set; }
     /// <summary>The YouTube id of its trailer.</summary>
     public string? TrailerKey { get; set; }
     /// <summary>The TMDB collection (franchise) a film belongs to, e.g. "Alien Collection".</summary>

@@ -11,12 +11,15 @@ public class TmdbMetadataService(MoviesDbContext db, TmdbClient tmdb, ILogger<Tm
 {
     /// <summary>Metadata older than this is fetched again (trailers and cast lists do change).</summary>
     public static readonly TimeSpan MaxAge = TimeSpan.FromDays(30);
+    /// <summary>Watchlist titles that aren't out yet are fetched daily instead: their release dates move.</summary>
+    public static readonly TimeSpan UpcomingMaxAge = TimeSpan.FromHours(20);
 
     public static void Clear(Title t)
     {
         t.Runtime = null;
         t.Overview = null;
         t.ReleaseDate = null;
+        t.UkReleaseDate = null;
         t.TrailerKey = null;
         t.CollectionId = null;
         t.CollectionName = null;
@@ -33,6 +36,7 @@ public class TmdbMetadataService(MoviesDbContext db, TmdbClient tmdb, ILogger<Tm
         t.Runtime = d.Runtime;
         t.Overview = d.Overview is { Length: > 4000 } o ? o[..4000] : d.Overview;
         t.ReleaseDate = d.ReleaseDate;
+        t.UkReleaseDate = d.UkReleaseDate;
         t.TrailerKey = d.TrailerKey;
         t.CollectionId = d.CollectionId;
         t.CollectionName = d.CollectionName;
@@ -82,13 +86,20 @@ public class TmdbMetadataService(MoviesDbContext db, TmdbClient tmdb, ILogger<Tm
         }
     }
 
-    /// <summary>Every title with a TMDB link that was never fetched, or not for a while. Saves as it goes.</summary>
+    /// <summary>
+    /// Every title with a TMDB link that was never fetched, or not for a while (a day for a watchlist title that isn't
+    /// out yet, or has no date). Saves as it goes.
+    /// </summary>
     public async Task<int> SyncStaleAsync(TimeSpan delay, CancellationToken ct)
     {
         if (!tmdb.Enabled) return 0;
         var cutoff = DateTime.UtcNow - MaxAge;
+        var upcomingCutoff = DateTime.UtcNow - UpcomingMaxAge;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var ids = await db.Titles
-            .Where(t => t.TmdbId != null && t.TmdbMediaType != null && (t.TmdbSyncedAt == null || t.TmdbSyncedAt < cutoff))
+            .Where(t => t.TmdbId != null && t.TmdbMediaType != null && (t.TmdbSyncedAt == null || t.TmdbSyncedAt < cutoff
+                || (t.TmdbSyncedAt < upcomingCutoff && t.List == TitleList.Watchlist
+                    && (t.UkReleaseDate != null ? t.UkReleaseDate > today : t.ReleaseDate == null || t.ReleaseDate > today))))
             .OrderBy(t => t.TmdbSyncedAt != null).ThenBy(t => t.TmdbSyncedAt)
             .Select(t => t.Id)
             .ToListAsync(ct);
