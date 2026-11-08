@@ -655,6 +655,13 @@ code,
     padding: 0;
 }
 
+/* the dice on Pick for me: text-sized, so the button is as tall as the others */
+.pick-icon {
+    flex: none;
+    width: 18px;
+    height: 18px;
+}
+
 .btn .caret {
     font-size: 10px;
     transition: transform 0.2s;

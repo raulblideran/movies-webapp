@@ -41,7 +41,9 @@ public record TitleDto(
     string? OriginalLanguage,
     List<string> Countries,
     List<int> DirectorIds,
-    List<int> CastIds)
+    List<int> CastIds,
+    // TMDB's release date (a series: its first air date); null without a TMDB link or a date there
+    DateOnly? ReleaseDate)
 {
     public const string PosterBaseUrl = "https://image.tmdb.org/t/p/w500";
     /// <summary>How many of the cast the title list carries (the Stats page gets them all from /api/titles/people).</summary>
@@ -71,7 +73,8 @@ public record TitleDto(
         t.OriginalLanguage,
         t.Countries,
         Makers(t).Select(c => c.Id).ToList(),
-        TopCast(t).Select(c => c.Id).ToList());
+        TopCast(t).Select(c => c.Id).ToList(),
+        t.ReleaseDate);
 
     private static IEnumerable<Credit> Makers(Title t) => t.Credits.Where(c => c.Job != Credit.Cast);
     private static IEnumerable<Credit> TopCast(Title t) => t.Credits.Where(c => c.Job == Credit.Cast).OrderBy(c => c.Order).Take(CastShown);

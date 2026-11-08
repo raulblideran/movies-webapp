@@ -12,6 +12,9 @@
     let d = null;
 
     const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Only what's out already: TMDB's release date (a series: its first air date) is today or earlier.
+    // Without a date, the release year decides; with neither, there's no telling, so it counts as out.
+    const isOut = (r) => (r.releaseDate ? r.releaseDate <= TitleModal.todayIso() : !r.releaseYear || r.releaseYear <= new Date().getFullYear());
     const randomOf = (xs) => xs[Math.floor(Math.random() * xs.length)];
 
     const tile = (r) => `
@@ -30,8 +33,11 @@
     }
 
     function spin() {
-        const rows = App.getShown();
-        if (!rows.length) return App.showError("Nothing to pick from: clear the search or some filters.");
+        const shown = App.getShown();
+        const rows = shown.filter(isOut);
+        if (!shown.length) return App.showError("Nothing to pick from: clear the search or some filters.");
+        if (!rows.length) return App.showError("Nothing on screen is out yet.");
+        const notOut = shown.length - rows.length;
         const pool = rows.length > 1 ? rows.filter((r) => r.id !== last) : rows;
         const chosen = randomOf(pool);
         last = chosen.id;
@@ -43,7 +49,7 @@
             d.root.classList.add("pick-dialog");
         }
         d.body.innerHTML = `
-            <p class="reel-from muted">From ${rows.length === 1 ? "the only title" : `${rows.length} titles`} on screen</p>
+            <p class="reel-from muted">From ${rows.length === 1 ? "the only title" : `${rows.length} titles`} on screen${notOut ? ` that ${rows.length === 1 ? "is" : "are"} out (${notOut} still to come)` : ""}</p>
             <div class="reel" aria-hidden="true">
                 <div class="reel-strip">${strip.map(tile).join("")}</div>
                 <div class="reel-marker"></div>
