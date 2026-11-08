@@ -9,6 +9,13 @@
     const fmt = (n, dp = 0) =>
         n == null || Number.isNaN(n) ? "–" : Number(n).toLocaleString("en-GB", { maximumFractionDigits: dp, minimumFractionDigits: 0 });
     const tip = (v, l) => `data-v="${esc(v)}" data-l="${esc(l)}"`;
+    // data-k: the thing a click highlights (see "click to highlight" below), named so a redraw or re-sort keeps it
+    const key = (k) => `data-k="${esc(k)}"`;
+    // data-s: which series a mark belongs to, for clicking the chart's legend
+    const ser = (name) => (name ? `data-s="${esc(name)}"` : "");
+    // what shows behind a highlighted row (a bar down its left) or column (a bar along its base); hidden until then
+    const selRow = (x, y, w, h) => `<rect class="viz-sel" x="${x}" y="${y}" width="${w}" height="${h}"/><rect class="viz-sel-bar" x="${x}" y="${y}" width="3" height="${h}"/>`;
+    const selCol = (x, y, w, h) => `<rect class="viz-sel" x="${x}" y="${y}" width="${w}" height="${h}"/><rect class="viz-sel-bar" x="${x}" y="${y + h - 3}" width="${w}" height="3"/>`;
 
     // Clean axis steps: 1, 2 or 5 × 10^k, about `count` of them.
     function ticks(max, count = 4) {
@@ -70,7 +77,7 @@
             const cx = m.l + band * i + band / 2;
             let acc = 0;
             const segs = vals[i];
-            body += `<g class="viz-item">`;
+            body += `<g class="viz-item" ${key(it.full ?? it.label)}>${selCol(m.l + band * i, m.t, band, ph)}`;
             const top = segs.reduce((last, v, k) => (v > 0 ? k : last), -1);
             segs.forEach((v, k) => {
                 if (!(v > 0)) return;
@@ -79,7 +86,7 @@
                 const h = y0 - y1 - (k === top ? 0 : 2); // 2px surface gap between stacked segments
                 const color = highlight?.(it, i) ?? series[k].color;
                 const d = k === top ? vbar(cx - bw / 2, y1, bw, h) : `M${cx - bw / 2},${y1 + (y0 - y1 - h)}h${bw}v${h}h${-bw}Z`;
-                body += `<path class="viz-mark" d="${d}" style="fill:${color}"/>`;
+                body += `<path class="viz-mark" d="${d}" style="fill:${color}" ${series.length > 1 ? ser(series[k].name) : ""}/>`;
             });
             const lines = series.length > 1
                 ? series.map((s, k) => `${s.name}: ${valueFmt(segs[k] || 0)}`).join(" · ")
@@ -94,6 +101,7 @@
         }
         body += `<line class="viz-axis" x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}"/>`;
         el.innerHTML = svg(W, H, body, label);
+        restore(el);
     }
 
     // ---------- horizontal bars ----------
@@ -111,12 +119,13 @@
             const y = i * row + 4;
             const w = top > 0 ? (it.value / top) * pw : 0;
             const name = fit(it.label, labelW - 12);
-            body += `<g class="viz-item"><text class="viz-label" x="${labelW - 8}" y="${y + 12}" dy="0.32em" text-anchor="end">${esc(name)}</text>`;
+            body += `<g class="viz-item" ${key(it.full ?? it.label)}>${selRow(0, y, W, row)}<text class="viz-label" x="${labelW - 8}" y="${y + 12}" dy="0.32em" text-anchor="end">${esc(name)}</text>`;
             body += `<path class="viz-mark" d="${hbar(labelW, y + 3, Math.max(w, 2), 18)}" style="fill:${it.color ?? color}"/>`;
             body += `<text class="viz-value" x="${labelW + Math.max(w, 2) + 6}" y="${y + 12}" dy="0.32em">${esc(it.valueLabel ?? valueFmt(it.value))}</text>`;
             body += `<rect class="viz-hit" x="0" y="${y}" width="${W}" height="${row}" ${tip(it.tip ?? it.valueLabel ?? valueFmt(it.value), it.full ?? it.label)}/></g>`;
         });
         el.innerHTML = svg(W, H, body, label);
+        restore(el);
     }
 
     // ---------- line with area wash and crosshair ----------
@@ -163,9 +172,20 @@
         if (last)
             body += `<circle class="viz-dot" cx="${x(last[1])}" cy="${y(last[0].value)}" r="4" style="fill:${color}"/><text class="viz-value" x="${x(last[1]) - 8}" y="${y(last[0].value) - 10}" text-anchor="end">${esc(valueFmt(last[0].value))}</text>`;
         body += `<line class="viz-axis" x1="${m.l}" x2="${W - m.r}" y1="${y(lo)}" y2="${y(lo)}"/>`;
+        body += `<g class="viz-pins"></g>`;
         body += `<g class="viz-cross" visibility="hidden"><line class="viz-crossline" y1="${m.t}" y2="${m.t + ph}"/><circle class="viz-dot" r="5" style="fill:${color}"/></g>`;
         body += `<rect class="viz-hover" x="${m.l}" y="${m.t}" width="${pw}" height="${ph}" fill="transparent"/>`;
         el.innerHTML = svg(W, H, body, label);
+        const at = (e) => {
+            const r = el.querySelector(".viz-hover").getBoundingClientRect();
+            return Math.max(0, Math.min(points.length - 1, Math.round(((e.clientX - r.left) / r.width) * (points.length - 1))));
+        };
+        pinnable(el, points, at, x, (i, labelled) => {
+            const p = points[i];
+            return `<line class="viz-pinline" x1="${x(i)}" x2="${x(i)}" y1="${m.t}" y2="${m.t + ph}"/>` +
+                (p.value == null ? "" : `<circle class="viz-dot viz-pindot" cx="${x(i)}" cy="${y(p.value)}" r="5" style="fill:${color}"/>`) +
+                (p.value == null || !labelled ? "" : `<text class="viz-value viz-pinvalue" x="${x(i)}" y="${m.t - 5}" text-anchor="middle">${esc(valueFmt(p.value))}</text>`);
+        });
 
         const hover = el.querySelector(".viz-hover"), cross = el.querySelector(".viz-cross");
         const [ln, dot] = cross.children;
@@ -206,7 +226,7 @@
             const s = a0 + gap / 2, e = a1 - gap / 2;
             const large = e - s > Math.PI ? 1 : 0;
             const d = `M${pt(R, s)}A${R},${R} 0 ${large} 1 ${pt(R, e)}L${pt(r, e)}A${r},${r} 0 ${large} 0 ${pt(r, s)}Z`;
-            body += `<path class="viz-mark viz-seg" d="${d}" style="fill:${it.color}" ${tip(`${valueFmt(it.value)} · ${fmt((frac * 100), 1)}%`, it.label)}/>`;
+            body += `<path class="viz-mark viz-seg" d="${d}" style="fill:${it.color}" ${key(it.label)} ${tip(`${valueFmt(it.value)} · ${fmt((frac * 100), 1)}%`, it.label)}/>`;
             a0 = a1;
         }
         body += `<text class="viz-center" x="${c}" y="${c - 4}" text-anchor="middle">${esc(center ?? fmt(total))}</text>`;
@@ -215,10 +235,11 @@
             .filter((i) => i.value > 0)
             .map(
                 (it) =>
-                    `<li ${tip(`${valueFmt(it.value)} · ${fmt((it.value / total) * 100, 1)}%`, it.label)}><span class="viz-key" style="background:${it.color}"></span><span class="viz-legend-name">${esc(it.label)}</span><span class="viz-legend-value">${fmt((it.value / total) * 100, 0)}%</span></li>`,
+                    `<li ${key(it.label)} ${tip(`${valueFmt(it.value)} · ${fmt((it.value / total) * 100, 1)}%`, it.label)}><span class="viz-key" style="background:${it.color}"></span><span class="viz-legend-name">${esc(it.label)}</span><span class="viz-legend-value">${fmt((it.value / total) * 100, 0)}%</span></li>`,
             )
             .join("");
         el.innerHTML = `<div class="viz-donut"><svg class="viz-svg" viewBox="0 0 ${S} ${S}" role="img" aria-label="${esc(label)}">${body}</svg><ul class="viz-legend">${legend}</ul></div>`;
+        restore(el);
     }
 
     // ---------- heatmap ----------
@@ -246,10 +267,11 @@
                 const step = v <= 0 ? 0 : Math.max(1, Math.ceil((v / max) * 5)); // 5 sequential steps
                 const [tv, tl] = tipFor ? tipFor(ri, ci, v) : [fmt(v), `${rl} · ${cols[ci]}`];
                 const off = diagonal && ri === ci;
-                body += `<rect class="viz-cell${off ? " is-diagonal" : ""}" data-step="${step}" x="${rowLabelW + ci * size + 1}" y="${yy + 1}" width="${size - 2}" height="${size - 2}" rx="${Math.min(4, size / 5)}" ${off ? "" : tip(tv, tl)}/>`;
+                body += `<rect class="viz-cell${off ? " is-diagonal" : ""}" data-step="${step}" x="${rowLabelW + ci * size + 1}" y="${yy + 1}" width="${size - 2}" height="${size - 2}" rx="${Math.min(4, size / 5)}" ${off ? "" : `${tip(tv, tl)} ${key(`${ri}:${ci}`)}`}/>`;
             });
         });
         el.innerHTML = svg(Math.max(W, rowLabelW + cols.length * size), H, body, label) + scaleLegend(max);
+        restore(el);
     }
     function scaleLegend(max) {
         return `<div class="viz-scale" aria-hidden="true"><span>0</span>${[1, 2, 3, 4, 5].map((s) => `<i data-step="${s}"></i>`).join("")}<span>${fmt(max)}</span></div>`;
@@ -283,10 +305,11 @@
         points.forEach((p, i) => {
             const cx = x(p.x) + (bubbles ? 0 : jit(i, 1) * 3), cy = y(p.y + (bubbles ? 0 : jit(i, 2)));
             const rr = bubbles ? 4 + Math.sqrt((p.n ?? 1) / maxN) * 14 : 4;
-            body += `<g class="viz-item"><circle class="viz-mark viz-dot${bubbles ? " is-bubble" : ""}" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rr.toFixed(1)}" style="fill:${p.color ?? "var(--viz-main)"}"/>`;
+            body += `<g class="viz-item" ${key(i)}><circle class="viz-mark viz-dot${bubbles ? " is-bubble" : ""}" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rr.toFixed(1)}" style="fill:${p.color ?? "var(--viz-main)"}"/>`;
             body += `<circle class="viz-hit" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${Math.max(12, rr + 2)}" ${tip(p.tipV ?? `${xLabel} ${xFmt(p.x)} · ${yLabel} ${yFmt(p.y)}`, p.label)}/></g>`;
         });
         el.innerHTML = svg(W, H, body, label);
+        restore(el);
     }
 
 
@@ -304,10 +327,10 @@
         let body = yAxis({ list: t.list.map((v) => v + yMin) }, m.l, W - m.r, y, valueFmt);
         for (const s of series) {
             const pts = s.values.map((v, i) => (v == null ? null : [x(i), y(v)])).filter(Boolean);
-            if (pts.length > 1) body += `<path class="viz-line" d="${pts.map(([a, b], i) => `${i ? "L" : "M"}${a.toFixed(1)},${b.toFixed(1)}`).join("")}" style="stroke:${s.color}"/>`;
+            if (pts.length > 1) body += `<path class="viz-line" d="${pts.map(([a, b], i) => `${i ? "L" : "M"}${a.toFixed(1)},${b.toFixed(1)}`).join("")}" style="stroke:${s.color}" ${ser(s.name)}/>`;
             const lastI = s.values.map((v, i) => (v == null ? -1 : i)).filter((i) => i >= 0).pop();
-            if (lastI != null) body += `<circle class="viz-dot" cx="${x(lastI)}" cy="${y(s.values[lastI])}" r="4" style="fill:${s.color}"/>`;
-            if (pts.length === 1 && points.length > 1) body += `<circle class="viz-dot" cx="${pts[0][0]}" cy="${pts[0][1]}" r="4" style="fill:${s.color}"/>`;
+            if (lastI != null) body += `<circle class="viz-dot" cx="${x(lastI)}" cy="${y(s.values[lastI])}" r="4" style="fill:${s.color}" ${ser(s.name)}/>`;
+            if (pts.length === 1 && points.length > 1) body += `<circle class="viz-dot" cx="${pts[0][0]}" cy="${pts[0][1]}" r="4" style="fill:${s.color}" ${ser(s.name)}/>`;
         }
         const room = Math.max(1, Math.floor(pw / 56));
         const cand = points.map((p, i) => i).filter((i) => points[i].tick ?? true);
@@ -316,9 +339,17 @@
             if (k % every === 0) body += `<text class="viz-tick" x="${x(i)}" y="${H - 8}" text-anchor="middle">${esc(points[i].tickLabel ?? points[i].label)}</text>`;
         });
         body += `<line class="viz-axis" x1="${m.l}" x2="${W - m.r}" y1="${y(yMin)}" y2="${y(yMin)}"/>`;
+        body += `<g class="viz-pins"></g>`;
         body += `<g class="viz-cross" visibility="hidden"><line class="viz-crossline" y1="${m.t}" y2="${m.t + ph}"/></g>`;
         body += `<rect class="viz-hover" x="${m.l - 8}" y="${m.t}" width="${pw + 16}" height="${ph}" fill="transparent"/>`;
         el.innerHTML = svg(W, H, body, label);
+        const at = (e) => {
+            const r = el.querySelector(".viz-hover").getBoundingClientRect();
+            return Math.max(0, Math.min(points.length - 1, Math.round(((e.clientX - r.left - 8) / (r.width - 16)) * (points.length - 1))));
+        };
+        pinnable(el, points, at, x, (i) =>
+            `<line class="viz-pinline" x1="${x(i)}" x2="${x(i)}" y1="${m.t}" y2="${m.t + ph}"/>` +
+            series.map((s) => (s.values[i] == null ? "" : `<circle class="viz-dot viz-pindot" cx="${x(i)}" cy="${y(s.values[i])}" r="5" style="fill:${s.color}" ${ser(s.name)}/>`)).join(""));
 
         const hover = el.querySelector(".viz-hover"), cross = el.querySelector(".viz-cross"), ln = cross.firstChild;
         hover.addEventListener("pointermove", (e) => {
@@ -355,12 +386,13 @@
             const name = fit(it.label, labelW - 12);
             const pos = it.value >= 0;
             const d = pos ? hbar(zero, y + 3, w, 18) : `M${zero},${y + 3}H${zero - w + 4}Q${zero - w},${y + 3} ${zero - w},${y + 7}V${y + 17}Q${zero - w},${y + 21} ${zero - w + 4},${y + 21}H${zero}Z`;
-            body += `<g class="viz-item"><text class="viz-label" x="${labelW - 8}" y="${y + 12}" dy="0.32em" text-anchor="end">${esc(name)}</text>`;
+            body += `<g class="viz-item" ${key(it.full ?? it.label)}>${selRow(0, y, W, row)}<text class="viz-label" x="${labelW - 8}" y="${y + 12}" dy="0.32em" text-anchor="end">${esc(name)}</text>`;
             body += `<path class="viz-mark" d="${d}" style="fill:${pos ? "var(--viz-pos)" : "var(--viz-neg)"}"/>`;
             body += `<text class="viz-value" x="${pos ? zero + w + 6 : zero - w - 6}" y="${y + 12}" dy="0.32em" text-anchor="${pos ? "start" : "end"}">${esc(it.valueLabel ?? valueFmt(it.value))}</text>`;
             body += `<rect class="viz-hit" x="0" y="${y}" width="${W}" height="${row}" ${tip(it.tip ?? it.valueLabel ?? valueFmt(it.value), it.full ?? it.label)}/></g>`;
         });
         el.innerHTML = svg(W, H, body, label);
+        restore(el);
     }
 
     // ---------- dumbbell: two values per row, joined ----------
@@ -391,19 +423,20 @@
         items.forEach((it, i) => {
             const y = axisH + i * row, cy = y + row / 2;
             const xa = x(it.a), xb = x(it.b);
-            body += `<g class="viz-item"><text class="viz-label" x="${labelW - 10}" y="${cy}" dy="0.32em" text-anchor="end">${esc(fit(it.label, labelW - 14))}</text>`;
+            body += `<g class="viz-item" ${key(it.full ?? it.label)}>${selRow(0, y, W, row)}<text class="viz-label" x="${labelW - 10}" y="${cy}" dy="0.32em" text-anchor="end">${esc(fit(it.label, labelW - 14))}</text>`;
             if (Math.abs(xb - xa) > 1) body += `<line class="viz-mark viz-link" x1="${xa.toFixed(1)}" x2="${xb.toFixed(1)}" y1="${cy}" y2="${cy}"/>`;
-            body += `<circle class="viz-mark viz-dot" cx="${xa.toFixed(1)}" cy="${cy}" r="5.5" style="fill:${A.color}"/>`;
-            body += `<circle class="viz-mark viz-dot" cx="${xb.toFixed(1)}" cy="${cy}" r="5.5" style="fill:${B.color}"/>`;
+            body += `<circle class="viz-mark viz-dot" cx="${xa.toFixed(1)}" cy="${cy}" r="5.5" style="fill:${A.color}" ${ser(A.name)}/>`;
+            body += `<circle class="viz-mark viz-dot" cx="${xb.toFixed(1)}" cy="${cy}" r="5.5" style="fill:${B.color}" ${ser(B.name)}/>`;
             if (it.valueLabel) body += `<text class="viz-value" x="${W - 4}" y="${cy}" dy="0.32em" text-anchor="end">${esc(it.valueLabel)}</text>`;
             body += `<rect class="viz-hit" x="0" y="${y}" width="${W}" height="${row}" ${tip(it.tip ?? `${A.name} ${xFmt(it.a)} · ${B.name} ${xFmt(it.b)}`, it.full ?? it.label)}/></g>`;
         });
         el.innerHTML = svg(W, H, body, label);
+        restore(el);
     }
 
     // ---------- legend for multi-series charts ----------
     const legend = (series) =>
-        `<ul class="viz-legend viz-legend-row">${series.map((s) => `<li><span class="viz-key" style="background:${s.color}"></span><span class="viz-legend-name">${esc(s.name)}</span></li>`).join("")}</ul>`;
+        `<ul class="viz-legend viz-legend-row">${series.map((s) => `<li ${ser(s.name)}><span class="viz-key" style="background:${s.color}"></span><span class="viz-legend-name">${esc(s.name)}</span></li>`).join("")}</ul>`;
 
     // ---------- table view ----------
     function table(head, rows) {
@@ -411,6 +444,106 @@
             .map((r) => `<tr>${r.map((c, i) => (i ? `<td>${esc(c)}</td>` : `<th scope="row">${esc(c)}</th>`)).join("")}</tr>`)
             .join("")}</tbody></table>`;
     }
+
+    // ---------- click to highlight ----------
+    // Clicking a mark (a bar, a row, a column, a dot, a slice, a cell) highlights it; clicking it again clears it, and
+    // several can be on at once. On a line chart a click pins the readout at that point instead. Highlights are kept
+    // per chart by key, so a redraw (a resize, or re-sorting the Paid vs CeX chart) keeps them on the same things.
+    // Clicking a legend entry brings that series forward in its card (and dims the rest); click again to undo.
+    const marked = new WeakMap(); // chart container -> Set of keys
+    const keysOf = (el) => {
+        if (!marked.has(el)) marked.set(el, new Set());
+        return marked.get(el);
+    };
+    function restore(el) {
+        el.dataset.vizHost = "";
+        const on = marked.get(el);
+        if (on?.size) el.querySelectorAll("[data-k]").forEach((n) => n.classList.toggle("is-marked", on.has(n.dataset.k)));
+        focusSeries(el.closest(".viz-card"));
+        syncClear(el.closest(".viz-card"));
+    }
+    // the series picked in a card's legend stand out on its chart
+    function focusSeries(card) {
+        if (!card) return;
+        const focus = new Set([...card.querySelectorAll(".viz-legend-row li.is-focus")].map((x) => x.dataset.s));
+        card.classList.toggle("has-focus", focus.size > 0);
+        card.querySelectorAll(".viz-svg [data-s]").forEach((m) => m.classList.toggle("is-focus", focus.has(m.dataset.s)));
+    }
+    // line charts: pin(i, labelled) draws the pinned readout at point i, keyed by the point's label. A pin too close
+    // to the one before it (x(i) in px) leaves its value out, so labels never pile up on each other.
+    const pinners = new WeakMap(), pinDraws = new WeakMap();
+    function pinnable(el, points, at, x, pin) {
+        el.dataset.vizHost = "";
+        const keyOf = (i) => String(points[i].full ?? points[i].label);
+        const draw = () => {
+            const on = keysOf(el);
+            let lastX = -Infinity;
+            el.querySelector(".viz-pins").innerHTML = points
+                .map((_, i) => {
+                    if (!on.has(keyOf(i))) return "";
+                    const room = x(i) - lastX >= 40;
+                    if (room) lastX = x(i);
+                    return pin(i, room);
+                })
+                .join("");
+            focusSeries(el.closest(".viz-card"));
+            syncClear(el.closest(".viz-card"));
+        };
+        pinners.set(el, (e) => {
+            const k = keyOf(at(e)), on = keysOf(el);
+            on.has(k) ? on.delete(k) : on.add(k);
+            draw();
+        });
+        pinDraws.set(el, draw);
+        draw();
+    }
+
+    // A card with anything highlighted in it (marks, pins, a picked series, table rows) gets a "Clear highlights"
+    // button in its header; it clears them all and goes away again.
+    function syncClear(card) {
+        if (!card) return;
+        const any = !!card.querySelector(".is-marked, .viz-pinline, .viz-legend-row li.is-focus");
+        let btn = card.querySelector(".viz-clear");
+        if (!btn && any) {
+            btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "chip viz-clear";
+            btn.textContent = "Clear highlights";
+            (card.querySelector(".viz-head") ?? card).prepend(btn);
+        }
+        if (btn) btn.hidden = !any;
+    }
+    function clearCard(card) {
+        card.querySelectorAll("[data-viz-host]").forEach((host) => {
+            marked.get(host)?.clear();
+            pinDraws.get(host)?.();
+        });
+        card.querySelectorAll(".is-marked, .is-focus").forEach((n) => n.classList.remove("is-marked", "is-focus"));
+        focusSeries(card);
+        syncClear(card);
+    }
+    document.addEventListener("click", (e) => {
+        const t = e.target;
+        if (!(t instanceof Element)) return;
+        const clear = t.closest(".viz-clear");
+        if (clear) return clearCard(clear.closest(".viz-card"));
+        const host = t.closest("[data-viz-host]");
+        if (host && t.closest(".viz-hover")) return pinners.get(host)?.(e);
+        const n = host && t.closest("[data-k]");
+        if (n) {
+            const on = keysOf(host), k = n.dataset.k;
+            on.has(k) ? on.delete(k) : on.add(k);
+            host.querySelectorAll("[data-k]").forEach((m) => m.dataset.k === k && m.classList.toggle("is-marked", on.has(k)));
+            return syncClear(host.closest(".viz-card"));
+        }
+        // a series legend (drawn next to the chart, in the same card)
+        const li = t.closest(".viz-legend-row li[data-s]");
+        const card = li?.closest(".viz-card");
+        if (!card) return;
+        li.classList.toggle("is-focus");
+        focusSeries(card);
+        syncClear(card);
+    });
 
     // ---------- shared tooltip ----------
     const Tip = (() => {
@@ -445,5 +578,5 @@
         return { show, hide };
     })();
 
-    window.Charts = { columns, hbars, line, lines, divbars, dumbbell, donut, heatmap, scatter, legend, table, fmt, esc };
+    window.Charts = { columns, hbars, line, lines, divbars, dumbbell, donut, heatmap, scatter, legend, table, fmt, esc, syncClear };
 })();

@@ -193,4 +193,15 @@ public class ReleasesApiTests : IClassFixture<TestApp>
         // deleting the release leaves its titles alone
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/titles/{lion2}")).StatusCode);
     }
+
+    [Fact]
+    public async Task Doorway_to_Dorkness_is_a_shop()
+    {
+        await _app.CreateUserAsync("doorwayeditor", "correct-horse-battery", "Editor");
+        var client = await _app.SignedInWithMfaAsync("doorwayeditor", "correct-horse-battery");
+        var created = await client.PostAsJsonAsync("/api/releases",
+            new { name = "Terrifier", format = "UltraHdBluRay", edition = "Standard", purchasedFrom = "DoorwayToDorkness" });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal("DoorwayToDorkness", (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("purchasedFrom").GetString());
+    }
 }

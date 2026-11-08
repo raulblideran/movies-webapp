@@ -548,7 +548,7 @@
 
     function edit(r, presetTitleIds, ctx) {
         const isNew = !r;
-        r = r ?? { name: "", format: "BluRay", edition: "Standard", pricePaid: null, purchasedFrom: "Other", boughtOn: null, notes: "", cexUrl: "", titleIds: presetTitleIds, soldVia: null };
+        r = r ?? { name: "", format: "BluRay", edition: "Standard", pricePaid: null, purchasedFrom: "Cex", boughtOn: null, notes: "", cexUrl: "", titleIds: presetTitleIds, soldVia: null };
         const wasSold = isSold(r);
         const v = (x) => (x == null ? "" : esc(x));
         const options = (map, current) => Object.entries(map).map(([k, l]) => `<option value="${k}"${k === current ? " selected" : ""}>${esc(l)}</option>`).join("");

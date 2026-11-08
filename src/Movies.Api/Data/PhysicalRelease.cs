@@ -24,6 +24,7 @@ public enum PurchasePlace
     Zavvi,
     Amazon,
     ForbiddenPlanet,
+    DoorwayToDorkness,
 }
 
 /// <summary>Where a release went when it left the shelf. Null on a release means it's still on the shelf.</summary>

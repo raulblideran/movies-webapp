@@ -9,7 +9,7 @@
     const FORMATS = { Dvd: "DVD", BluRay: "Blu-ray", UltraHdBluRay: "4K Blu-ray" };
     const EDITIONS = { Standard: "Standard", Steelbook: "Steelbook", BoxSet: "Box set" };
     // where a release was bought, in the order the editor lists them
-    const PLACES = { Cex: "CeX", Hmv: "HMV", Ebay: "eBay", Zavvi: "Zavvi", Amazon: "Amazon", ForbiddenPlanet: "Forbidden Planet", Other: "Other" };
+    const PLACES = { Cex: "CeX", Hmv: "HMV", Ebay: "eBay", Zavvi: "Zavvi", Amazon: "Amazon", ForbiddenPlanet: "Forbidden Planet", DoorwayToDorkness: "Doorway to Dorkness", Other: "Other" };
     // "4K Blu-ray Steelbook"; a standard edition is just the format
     const label = (r) => `${FORMATS[r.format] ?? r.format}${r.edition && r.edition !== "Standard" ? ` ${EDITIONS[r.edition] ?? r.edition}` : ""}`;
     // Each format's colour: the theme's chart slot (0 = --chart-1), the same in the Stats charts. 4K gold, Blu-ray blue, DVD green.
@@ -88,7 +88,9 @@
 
     // ---------- table view ----------
     // columns: [{ key, label, value: row => sortable value, html?: row => cell html, num?: true, wrap?: true }]
+    // The row last opened stays highlighted (by its id, so it survives re-sorting and saving), to show where you were.
     function renderTable(container, { rows, columns, sort, onSort, onRow, caption }) {
+        const marked = container.dataset.marked;
         const col = columns.find((c) => c.key === sort?.key);
         const sorted = col
             ? [...rows].sort((a, b) => {
@@ -112,7 +114,7 @@
                     <tbody>${sorted
                         .map(
                             (r, i) =>
-                                `<tr tabindex="0" data-i="${i}">${columns
+                                `<tr tabindex="0" data-i="${i}"${r.id != null && String(r.id) === marked ? ' class="is-marked"' : ""}>${columns
                                     .map((c, k) => {
                                         const v = c.html ? c.html(r) : esc(c.value(r) ?? "");
                                         const cls = [c.num && "num", c.wrap && "wrap"].filter(Boolean).join(" ");
@@ -130,7 +132,13 @@
             };
         });
         container.querySelectorAll("tbody tr").forEach((tr) => {
-            const open = () => onRow?.(sorted[Number(tr.dataset.i)], sorted);
+            const open = () => {
+                const row = sorted[Number(tr.dataset.i)];
+                container.querySelectorAll("tbody tr.is-marked").forEach((m) => m.classList.remove("is-marked"));
+                tr.classList.add("is-marked");
+                if (row.id != null) container.dataset.marked = String(row.id);
+                onRow?.(row, sorted);
+            };
             tr.onclick = open;
             tr.onkeydown = (e) => {
                 if (e.key === "Enter") open();

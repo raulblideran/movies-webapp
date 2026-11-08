@@ -5253,6 +5253,124 @@ a.tag-own:focus-visible {
     outline: none;
 }
 
+/* ---------- click a row to highlight it (js/tables.js; the admin table marks the record it opened) ----------
+   Built from the theme's own accent, so every theme gets its colour. */
+
+.viz-table tbody tr,
+.table tbody tr {
+    cursor: pointer;
+}
+
+.viz-table tbody tr:hover,
+.table tbody tr:hover {
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+/* room for the marker bar, so it never sits on the text */
+.viz-table :is(th, td):first-child,
+.table :is(th, td):first-child {
+    padding-left: 8px;
+}
+
+:is(.viz-table, .table, .data-table) tbody tr.is-marked {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+:is(.viz-table, .table, .data-table) tbody tr.is-marked > :first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* stat tiles */
+.kpi {
+    cursor: pointer;
+}
+
+.kpi.is-marked {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* charts (js/charts.js): a highlighted row or column gets the table rows' tint and accent bar; a dot, slice or
+   cell gets a ring in the ink colour, since those are often filled with the accent already */
+.viz-item,
+.viz-seg,
+.viz-cell:not(.is-diagonal),
+.viz-legend li[data-k],
+.viz-legend-row li[data-s] {
+    cursor: pointer;
+}
+
+.viz-sel,
+.viz-sel-bar {
+    display: none;
+}
+
+.viz-item.is-marked > .viz-sel {
+    display: inline;
+    fill: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.viz-item.is-marked > .viz-sel-bar {
+    display: inline;
+    fill: var(--accent);
+}
+
+.viz-item.is-marked .viz-dot,
+.viz-seg.is-marked,
+.viz-cell.is-marked {
+    stroke: var(--ink);
+    stroke-width: 2.5;
+}
+
+.viz-legend li[data-k] {
+    margin: 0 -6px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.viz-legend li.is-marked {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    box-shadow: inset 3px 0 0 var(--accent);
+    color: var(--ink);
+}
+
+/* shown in a chart card's header while anything in it is highlighted */
+.viz-clear {
+    float: right;
+    margin: -2px 0 6px 10px;
+    padding: 3px 10px;
+    font-size: 12px;
+}
+
+.viz-clear[hidden] {
+    display: none;
+}
+
+/* line charts: a click pins the readout at that point */
+.viz-pinline {
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+
+.viz-pindot {
+    stroke: var(--ink);
+}
+
+/* a series picked in the legend stands out; the others fade back */
+.viz-card.has-focus .viz-svg [data-s]:not(.is-focus) {
+    opacity: 0.18;
+}
+
+.viz-card.has-focus .viz-legend-row li:not(.is-focus) {
+    opacity: 0.45;
+}
+
+.viz-legend-row li.is-focus {
+    color: var(--ink);
+    font-weight: 600;
+}
+
 /* ---------- motion preferences ---------- */
 
 @media (prefers-reduced-motion: reduce) {
