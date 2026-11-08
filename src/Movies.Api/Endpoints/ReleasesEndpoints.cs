@@ -131,6 +131,7 @@ public static class ReleasesEndpoints
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         var sku = string.IsNullOrWhiteSpace(req.CexUrl) ? null : CexItemsService.ExtractSku(req.CexUrl);
+        CexDetails? linked = null;
         if (sku != r.CexSku)
         {
             r.CexSku = sku;
@@ -138,8 +139,10 @@ public static class ReleasesEndpoints
             r.CexBoxName = null;
             r.ImageUrl = null;
             // Best effort: the name and picture come from CeX; the daily price snapshot fills them in otherwise.
-            if (sku is not null && await cex.GetAsync(sku, ct) is { } d)
+            // Fresh rather than cached, as it also becomes today's price below.
+            if (sku is not null && await cex.GetAsync(sku, bypassCache: true, ct) is { } d)
             {
+                linked = d;
                 r.CexBoxName = d.BoxName;
                 r.ImageUrl = d.ImageUrl;
             }
@@ -158,6 +161,12 @@ public static class ReleasesEndpoints
         r.SoldOn = r.IsSold ? req.SoldOn : null;
         r.SoldFor = r.IsSold ? req.SoldFor : null;
         r.Payout = r.SoldVia == SaleChannel.Cex ? req.Payout : null;
+
+        // A newly linked release on the shelf gets today's CeX price now, so the stats count it straight away
+        // instead of after the next hourly snapshot run.
+        if (linked is not null && !r.IsSold
+            && !await db.CexPriceSnapshots.AnyAsync(s => s.Sku == linked.Sku && s.Date == CexHistoryService.Today, ct))
+            db.CexPriceSnapshots.Add(CexHistoryService.SnapshotOf(linked, CexHistoryService.Today));
 
         r.TitleLinks.RemoveAll(l => !titleIds.Contains(l.TitleId));
         foreach (var id in titleIds.Where(id => r.TitleLinks.All(l => l.TitleId != id)))

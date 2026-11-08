@@ -8,6 +8,18 @@ public class CexHistoryService(MoviesDbContext db, CexClient cex, ILogger<CexHis
 {
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
 
+    /// <summary>A day's row from CeX's answer for one product.</summary>
+    public static CexPriceSnapshot SnapshotOf(CexDetails d, DateOnly date) => new()
+    {
+        Sku = d.Sku,
+        Date = date,
+        BoxName = d.BoxName,
+        Category = d.Category,
+        SellPrice = d.SellPrice,
+        CashPrice = d.CashPrice,
+        ExchangePrice = d.ExchangePrice,
+    };
+
     /// <summary>
     /// Distinct CeX SKUs of the releases on the shelf. Traded in or sold ones aren't owned any more, so their
     /// prices stop being recorded (the snapshots from before the sale stay), unless another copy is still owned.
@@ -31,16 +43,7 @@ public class CexHistoryService(MoviesDbContext db, CexClient cex, ILogger<CexHis
             var d = await cex.GetAsync(sku, bypassCache: true, ct);
             if (d is not null)
             {
-                db.CexPriceSnapshots.Add(new CexPriceSnapshot
-                {
-                    Sku = sku,
-                    Date = today,
-                    BoxName = d.BoxName,
-                    Category = d.Category,
-                    SellPrice = d.SellPrice,
-                    CashPrice = d.CashPrice,
-                    ExchangePrice = d.ExchangePrice,
-                });
+                db.CexPriceSnapshots.Add(SnapshotOf(d, today));
                 // keep the releases' CeX name and picture current
                 foreach (var r in await db.Releases.Where(r => r.CexSku == sku).ToListAsync(ct))
                 {

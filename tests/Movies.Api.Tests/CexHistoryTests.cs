@@ -147,3 +147,44 @@ public class CexHistoryTests : IClassFixture<FakeCexApp>
         Assert.Equal(3m, points[0].GetProperty("cash").GetDecimal());
     }
 }
+
+/// <summary>Saving a CeX link on a release records today's price straight away (own fixture: it adds a product CeX doesn't know).</summary>
+public class ReleaseLinkSnapshotTests(FakeCexApp app) : IClassFixture<FakeCexApp>
+{
+    [Fact]
+    public async Task Linking_a_release_records_todays_price_at_once()
+    {
+        await app.CreateUserAsync("linkeditor", "correct-horse-battery", "Editor");
+        var client = await app.SignedInWithMfaAsync("linkeditor", "correct-horse-battery");
+        const string cex = "https://uk.webuy.com/product-detail?id=";
+        async Task<int> SnapsAsync(string sku)
+        {
+            using var scope = app.Services.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<MoviesDbContext>().CexPriceSnapshots
+                .CountAsync(s => s.Sku == sku && s.Date == CexHistoryService.Today);
+        }
+        async Task<int> PostAsync(object body)
+        {
+            var res = await client.PostAsJsonAsync("/api/releases", body);
+            Assert.Equal(HttpStatusCode.Created, res.StatusCode);
+            return (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        }
+
+        // a new release with a link: today's price is there before any hourly run
+        var id = await PostAsync(new { name = "Vision", format = "Dvd", edition = "Standard", pricePaid = 10m, cexUrl = cex + "5000000000001" });
+        Assert.Equal(1, await SnapsAsync("5000000000001"));
+        // a second copy of the same product doesn't add another row for the day
+        await PostAsync(new { name = "Vision again", format = "Dvd", edition = "Standard", cexUrl = cex + "5000000000001" });
+        Assert.Equal(1, await SnapsAsync("5000000000001"));
+        // linking an existing release later does the same
+        var put = await client.PutAsJsonAsync($"/api/releases/{id}", new { name = "Vision", format = "Dvd", edition = "Standard", pricePaid = 10m, cexUrl = cex + "5000000000002" });
+        put.EnsureSuccessStatusCode();
+        Assert.Equal(1, await SnapsAsync("5000000000002"));
+        // a release already traded in isn't on the shelf, so its price isn't recorded
+        await PostAsync(new { name = "Gone", format = "Dvd", edition = "Standard", cexUrl = cex + "5000000000003", soldVia = "Ebay", soldOn = "2026-11-01", soldFor = 3m });
+        Assert.Equal(0, await SnapsAsync("5000000000003"));
+        // CeX not knowing the product: the release still saves, with no price
+        await PostAsync(new { name = "Unknown", format = "Dvd", edition = "Standard", cexUrl = cex + "missing" });
+        Assert.Equal(0, await SnapsAsync("missing"));
+    }
+}

@@ -171,7 +171,7 @@
                       valueSection(A),
                       concentrationSection(A, I),
                       valued ? timeSection(I, totalsByDay(I), paidValued) : "",
-                      valued ? priceSection(priced) : "",
+                      valued ? priceSection(priced, A) : "",
                       valued ? sellSection(I, priced, { cash, voucher, sell, paidCex: paidValued }) : section("c-sell", "CeX trade values", linked.length
                           ? `The server checks CeX for the ${plural(linked.length, "release")} on the shelf with a CeX link a couple of minutes after it starts, then every day. Come back shortly.`
                           : "Add CeX links to releases (wherever you bought them) to see what CeX would pay for them.", []),
@@ -438,8 +438,28 @@
         ["name", "A–Z", (a, b) => a.name.localeCompare(b.name)],
     ];
 
-    function priceSection(priced) {
+    // The shelf releases the chart can't draw, and why, so a new one that's missing doesn't look like a bug.
+    function leftOut(shelf) {
+        const groups = [
+            ["waiting for CeX's price", shelf.filter((i) => i.linked && !i.latest)],
+            ["no price paid", shelf.filter((i) => i.latest && !(i.priced && i.paid > 0))],
+            ["no CeX link", shelf.filter((i) => !i.linked)],
+        ].filter(([, items]) => items.length);
+        const names = (items) => {
+            const shown = items.slice(0, 8).map((i) => esc(i.name));
+            return items.length > shown.length ? `${shown.join(", ")} and ${fmt(items.length - shown.length)} more` : shown.join(", ");
+        };
+        return {
+            count: sum(groups.map(([, items]) => items.length)),
+            sub: groups.map(([why, items]) => `${fmt(items.length)} ${why}`).join(", "),
+            note: groups.map(([why, items]) => `<strong>${why[0].toUpperCase()}${why.slice(1)}:</strong> ${names(items)}`).join("<br>"),
+            rows: groups.flatMap(([why, items]) => items.map((i) => [i.name, i.priced ? gbp(i.paid) : "–", i.latest ? gbp(i.latest.sell) : "–", `Not shown: ${why}`])),
+        };
+    }
+
+    function priceSection(priced, shelf) {
         const rows = priced.map((i) => ({ name: i.name, paid: i.paid, sell: i.latest.sell, diff: i.latest.sell - i.paid }));
+        const out = leftOut(shelf);
         const up = rows.filter((r) => r.diff > 0).length, down = rows.filter((r) => r.diff < 0).length;
         const top = Math.max(5, Math.ceil(Math.max(...rows.flatMap((r) => [r.paid, r.sell])) / 10) * 10);
         const diffLabel = (d) => (Math.abs(d) < 0.005 ? "same" : signed(d));
@@ -460,11 +480,12 @@
         priceDraw = draw;
         const chips = `<div class="chips price-sort" role="group" aria-label="Order by">${PRICE_SORTS.map(([k, l]) => `<button type="button" class="chip" data-price-sort="${k}" aria-pressed="${priceSort === k}">${l}</button>`).join("")}</div>`;
         return section("c-price", "Paid vs CeX's price", "What each release on the shelf cost you, against what CeX sells it for today: their shop price, so what buying it again would cost.", [
-            card("Release by release", `${plural(up, "release")} would cost more at CeX now than you paid, ${fmt(down)} less · square-root scale, so the cheap ones don't bunch up`, draw, {
+            card("Release by release", `${plural(up, "release")} would cost more at CeX now than you paid, ${fmt(down)} less · square-root scale, so the cheap ones don't bunch up${out.count ? ` · ${fmt(out.count)} not shown: ${out.sub}` : ""}`, draw, {
                 size: "is-wide",
                 extra: `<div class="price-controls">${legend([M.paid, M.sell])}${chips}</div>`,
+                note: out.count ? out.note : "",
                 head: ["Release", "Paid", "CeX sells for", "Difference"],
-                rows: [...rows].sort((a, b) => b.diff - a.diff).map((r) => [r.name, gbp(r.paid), gbp(r.sell), diffLabel(r.diff)]),
+                rows: [...[...rows].sort((a, b) => b.diff - a.diff).map((r) => [r.name, gbp(r.paid), gbp(r.sell), diffLabel(r.diff)]), ...out.rows],
             }),
         ]);
     }
