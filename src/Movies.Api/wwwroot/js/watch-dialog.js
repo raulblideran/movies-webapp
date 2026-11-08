@@ -38,7 +38,7 @@
                 ${title ? "" : `
                 <div class="title-pick">
                     <label class="label" for="wd-title-${uid}">Title</label>
-                    <input id="wd-title-${uid}" name="titleSearch" class="input" autocomplete="off" placeholder="Start typing a title…" role="combobox" aria-expanded="false" aria-controls="wd-titles-${uid}">
+                    <input id="wd-title-${uid}" name="titleSearch" class="input" data-clearable autocomplete="off" placeholder="Start typing a title…" role="combobox" aria-expanded="false" aria-controls="wd-titles-${uid}">
                     <ul class="title-pick-list hidden" id="wd-titles-${uid}" role="listbox"></ul>
                 </div>`}
                 <div>

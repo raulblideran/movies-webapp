@@ -157,8 +157,10 @@
                 input.blur();
             }
         });
+        // a click outside the picker (its clear button counts as inside) puts the chosen store back
+        const picker = input.closest(".store-picker");
         document.addEventListener("click", (e) => {
-            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            if (!picker.contains(e.target) && !dropdown.contains(e.target)) {
                 setDropdown(false);
                 if (!input.value.trim()) input.value = locationLabel();
             }
