@@ -188,8 +188,33 @@
         return { get: () => view };
     }
 
+    // When CeX refused the site, it stops asking for 6 hours. Says so under a CeX price (or the lack of one),
+    // with "Ask CeX now" for editors; retry() asks again once the pause is lifted.
+    async function cexPause(container, retry) {
+        let until = null;
+        try {
+            until = (await (await fetch("/api/cex/status", { credentials: "same-origin" })).json()).pausedUntil;
+        } catch {}
+        if (!until || !container.isConnected) return;
+        const at = new Date(until).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+        const note = document.createElement("div");
+        note.className = "cex-paused";
+        note.innerHTML = `<p>CeX turned the site away for asking too often, so it isn't asking again until ${esc(at)}.</p>${
+            window.Auth?.me?.canEdit ? `<button type="button" class="btn btn-small">Ask CeX now</button>` : ""}`;
+        note.querySelector("button")?.addEventListener("click", async (e) => {
+            e.currentTarget.disabled = true;
+            try {
+                await Auth.api("POST", "/api/cex/resume");
+                retry();
+            } catch (err) {
+                note.querySelector("p").textContent = err.message;
+            }
+        });
+        container.appendChild(note);
+    }
+
     window.Shelf = {
         FORMATS, EDITIONS, PLACES, CHANNELS, FORMAT_SLOT, label, formatTag, titleShare, money, esc, renderTable, viewToggle,
-        day, isSold, saleVerb, saleBadge, salePrice, saleLine, saleNet, signed, kept, nearestPoint,
+        day, isSold, saleVerb, saleBadge, salePrice, saleLine, saleNet, signed, kept, nearestPoint, cexPause,
     };
 })();

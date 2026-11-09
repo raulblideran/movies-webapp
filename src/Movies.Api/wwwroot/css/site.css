@@ -2319,6 +2319,12 @@ a.tag-own:focus-visible {
     font-variant-numeric: tabular-nums;
 }
 
+.cex-entry .cex-asof {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
 .cex-entry .is-cash dd {
     color: var(--ok);
 }
@@ -6108,4 +6114,24 @@ a.person-card:focus-visible img,
     .soon-strip {
         grid-auto-columns: 132px;
     }
+}
+
+/* "CeX turned the site away…" under a CeX price, with "Ask CeX now" for editors */
+.cex-paused {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
+.cex-paused p {
+    flex: 1 1 220px;
+    margin: 0;
+}
+
+.stub .cex-paused {
+    justify-content: center;
 }

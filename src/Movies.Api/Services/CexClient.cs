@@ -11,7 +11,9 @@ public record CexDetails(
     decimal CashPrice,
     decimal ExchangePrice,
     string? Category = null,
-    string? ImageUrl = null);
+    string? ImageUrl = null,
+    // set when CeX didn't answer and these are the last prices recorded (CexHistoryService), from that day
+    DateOnly? AsOf = null);
 
 public class CexOptions
 {
@@ -40,6 +42,17 @@ public class CexClient(HttpClient http, IMemoryCache cache, Microsoft.Extensions
     /// True for a while after CeX refuses us (403/429). Calls are skipped until then, so retries don't keep a block alive.
     /// </summary>
     public bool Refused => cache.TryGetValue(RefusedKey, out _);
+
+    /// <summary>When the pause after a refusal ends, or null when CeX calls aren't paused.</summary>
+    public DateTimeOffset? PausedUntil => cache.TryGetValue<DateTimeOffset>(RefusedKey, out var until) ? until : null;
+
+    /// <summary>Lifts the pause by hand. If CeX still refuses, the next call pauses again after that one request.</summary>
+    public void Resume()
+    {
+        if (!Refused) return;
+        cache.Remove(RefusedKey);
+        logger.LogInformation("CeX pause lifted by hand");
+    }
 
     public Task<CexDetails?> GetAsync(string sku, CancellationToken ct = default) =>
         GetAsync(sku, bypassCache: false, ct);
@@ -132,7 +145,7 @@ public class CexClient(HttpClient http, IMemoryCache cache, Microsoft.Extensions
             using var resp = await http.GetAsync(requestUri, ct);
             if (resp.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests)
             {
-                cache.Set(RefusedKey, true, RefusedPauseFor);
+                cache.Set(RefusedKey, DateTimeOffset.UtcNow + RefusedPauseFor, RefusedPauseFor);
                 logger.LogWarning("CeX refused us ({Status}) for {Url}; pausing CeX calls for {Pause}", (int)resp.StatusCode, url, RefusedPauseFor);
                 return null;
             }

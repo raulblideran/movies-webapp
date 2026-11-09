@@ -84,6 +84,50 @@ public class CexRefusedTests(RefusingCexApp app) : IClassFixture<RefusingCexApp>
             Assert.Equal(1, app.Calls);
         }
     }
+
+    [Fact]
+    public async Task The_pause_shows_its_end_and_an_editor_can_lift_it()
+    {
+        var cex = app.Services.GetRequiredService<CexClient>();
+        Assert.Null(await cex.GetAsync("3000000000020", bypassCache: true)); // refused: paused
+        var anon = app.CreateClient();
+        var until = (await anon.GetFromJsonAsync<JsonElement>("/api/cex/status")).GetProperty("pausedUntil").GetDateTimeOffset();
+        Assert.InRange(until - DateTimeOffset.UtcNow, TimeSpan.FromHours(5.9), TimeSpan.FromHours(6));
+
+        // only editors may lift it
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anon.PostAsync("/api/cex/resume", null)).StatusCode);
+        await app.CreateUserAsync("pause-editor", "correct-horse-battery", "Editor");
+        var editor = await app.SignedInWithMfaAsync("pause-editor", "correct-horse-battery");
+        Assert.Equal(HttpStatusCode.NoContent, (await editor.PostAsync("/api/cex/resume", null)).StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await anon.GetFromJsonAsync<JsonElement>("/api/cex/status")).GetProperty("pausedUntil").ValueKind);
+
+        // the next lookup asks CeX again (one request), and a refusal pauses it again
+        var calls = app.Calls;
+        Assert.Null(await cex.GetAsync("3000000000020", bypassCache: true));
+        Assert.Equal(calls + 1, app.Calls);
+        Assert.True(cex.Refused);
+    }
+
+    [Fact]
+    public async Task While_cex_is_not_answering_a_lookup_gives_the_last_recorded_prices_and_their_date()
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MoviesDbContext>();
+            db.CexPriceSnapshots.AddRange(
+                new CexPriceSnapshot { Sku = "3000000000009", Date = new DateOnly(2026, 11, 7), BoxName = "Old", SellPrice = 9, CashPrice = 4, ExchangePrice = 5 },
+                new CexPriceSnapshot { Sku = "3000000000009", Date = new DateOnly(2026, 11, 8), BoxName = "Box", Category = "Blu-Ray Movies", SellPrice = 8, CashPrice = 3, ExchangePrice = 4 });
+            await db.SaveChangesAsync();
+        }
+
+        var client = app.CreateClient();
+        var c = await client.GetFromJsonAsync<JsonElement>("/api/cex/3000000000009");
+        Assert.Equal("2026-11-08", c.GetProperty("asOf").GetString());
+        Assert.Equal("Box", c.GetProperty("boxName").GetString());
+        Assert.Equal(3, c.GetProperty("cashPrice").GetDecimal());
+        // nothing recorded: still "not found"
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/cex/3000000000010")).StatusCode);
+    }
 }
 
 public class CexHistoryTests : IClassFixture<FakeCexApp>

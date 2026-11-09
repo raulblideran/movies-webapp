@@ -196,20 +196,30 @@
         if (r.cexSku && sold) {
             await cexAroundSale(r, d);
         } else if (r.cexSku) {
-            try {
-                const c = await api("GET", `/api/cex/${encodeURIComponent(r.cexSku)}`);
-                d.$("[data-cex]").innerHTML = `
-                    <div class="cex-entry">
-                        <a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link" title="${esc(c.boxName)}">${esc(c.boxName)}</a>
-                        <dl>
-                            <div><dt>Sells for</dt><dd>£${c.sellPrice}</dd></div>
-                            <div class="is-cash"><dt>Cash</dt><dd>£${c.cashPrice}</dd></div>
-                            <div class="is-voucher"><dt>Voucher</dt><dd>£${c.exchangePrice}</dd></div>
-                        </dl>
-                    </div>`;
-            } catch {
-                if (d.root.isConnected) d.$("[data-cex]").innerHTML = `<p class="status-bad">CeX didn't return prices for <a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link">${esc(r.cexSku)}</a>.</p>`;
-            }
+            await showCex(r, d);
+        }
+    }
+
+    // CeX's prices for an unsold release (the last ones recorded when CeX isn't answering)
+    async function showCex(r, d) {
+        try {
+            const c = await api("GET", `/api/cex/${encodeURIComponent(r.cexSku)}`);
+            d.$("[data-cex]").innerHTML = `
+                <div class="cex-entry">
+                    <a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link" title="${esc(c.boxName)}">${esc(c.boxName)}</a>
+                    <dl>
+                        <div><dt>Sells for</dt><dd>£${c.sellPrice}</dd></div>
+                        <div class="is-cash"><dt>Cash</dt><dd>£${c.cashPrice}</dd></div>
+                        <div class="is-voucher"><dt>Voucher</dt><dd>£${c.exchangePrice}</dd></div>
+                    </dl>
+                    ${c.asOf ? `<p class="cex-asof">CeX isn't answering right now: these are its prices on ${day(c.asOf)}.</p>` : ""}
+                </div>`;
+            d.$(".release-cex h3").textContent = c.asOf ? "At CeX" : "At CeX today"; // older prices aren't today's
+            if (c.asOf) await Shelf.cexPause(d.$("[data-cex] .cex-entry"), () => showCex(r, d));
+        } catch {
+            if (!d.root.isConnected) return;
+            d.$("[data-cex]").innerHTML = `<p class="status-bad">CeX didn't return prices for <a href="${esc(r.cexUrl)}" target="_blank" rel="noopener" class="link">${esc(r.cexSku)}</a>.</p>`;
+            await Shelf.cexPause(d.$("[data-cex]"), () => showCex(r, d));
         }
     }
 
@@ -660,7 +670,7 @@
             }
             hint.classList.remove("hidden");
             hint.innerHTML = `
-                <p class="field-hint">CeX offers <strong>${money(c.cashPrice)}</strong> cash · <strong>${money(c.exchangePrice)}</strong> voucher today</p>
+                <p class="field-hint">CeX ${c.asOf ? "offered" : "offers"} <strong>${money(c.cashPrice)}</strong> cash · <strong>${money(c.exchangePrice)}</strong> voucher ${c.asOf ? `on ${day(c.asOf)} (it isn't answering right now)` : "today"}</p>
                 <div class="sale-hint-use">
                     <button type="button" class="btn btn-small" data-use="Cash">Use ${money(c.cashPrice)} cash</button>
                     <button type="button" class="btn btn-small" data-use="Voucher">Use ${money(c.exchangePrice)} voucher</button>

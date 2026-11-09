@@ -512,11 +512,17 @@
         if (row.collectionId) showFranchise(row);
 
         // CeX pricing loads after the modal is visible
+        await showCexPricing(row);
+    }
+
+    async function showCexPricing(row) {
         if (cexReleases(row).length > 0) {
             let rows = "";
+            let stale = false; // CeX didn't answer for one of them
             for (const { cexSku: sku, cexUrl: link } of cexReleases(row)) {
                 const details = await fetchCex(sku);
                 if (current !== row) return; // modal was closed or switched meanwhile
+                if (!details || details.asOf) stale = true;
                 rows += details
                     ? `
                     <div class="cex-entry">
@@ -526,11 +532,20 @@
                             <div class="is-cash"><dt>Cash</dt><dd>£${details.cashPrice}</dd></div>
                             <div class="is-voucher"><dt>Voucher</dt><dd>£${details.exchangePrice}</dd></div>
                         </dl>
+                        ${details.asOf ? `<p class="cex-asof">CeX isn't answering right now: these are its prices on ${formatLongDate(details.asOf)}.</p>` : ""}
                     </div>`
                     : `<p class="status-bad">CeX didn't return prices for <a href="${esc(link)}" target="_blank" rel="noopener" class="link">${esc(sku)}</a>.</p>`;
             }
             $("cexPricing").innerHTML = rows;
+            $("cexPricing").previousElementSibling.textContent = stale ? "At CeX" : "At CeX today"; // older prices aren't today's
             fitTicket();
+            if (stale && window.Shelf?.cexPause) {
+                await Shelf.cexPause($("cexPricing"), () => {
+                    cexReleases(row).forEach((r) => cexCache.delete(r.cexSku));
+                    if (current === row) showCexPricing(row);
+                });
+                if (current === row) fitTicket();
+            }
         }
     }
 

@@ -1,6 +1,8 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.EntityFrameworkCore;
 using Movies.Api.Auth;
+using Movies.Api.Data;
 using Movies.Api.Services;
 
 namespace Movies.Api.Endpoints;
@@ -9,10 +11,24 @@ public static partial class ExternalEndpoints
 {
     public static void MapExternalEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/cex/{sku}", async (string sku, CexClient cex, CancellationToken ct) =>
+        // Whether CeX calls are paused after it refused us (see CexClient), and lifting that by hand.
+        app.MapGet("/api/cex/status", (CexClient cex) => Results.Ok(new { cex.PausedUntil }));
+        app.MapPost("/api/cex/resume", (CexClient cex) =>
+        {
+            cex.Resume();
+            return Results.NoContent();
+        }).RequireAuthorization(Policies.Editor);
+
+        app.MapGet("/api/cex/{sku}", async (string sku, CexClient cex, MoviesDbContext db, CancellationToken ct) =>
         {
             if (!SkuRegex().IsMatch(sku)) return Results.BadRequest();
-            return await cex.GetAsync(sku, ct) is { } d ? Results.Ok(d) : Results.NotFound();
+            if (await cex.GetAsync(sku, ct) is { } d) return Results.Ok(d);
+            // CeX isn't answering (often a pause after it refused us): the last prices recorded, with their date
+            var last = await db.CexPriceSnapshots.AsNoTracking().Where(s => s.Sku == sku)
+                .OrderByDescending(s => s.Date).FirstOrDefaultAsync(ct);
+            return last is null
+                ? Results.NotFound()
+                : Results.Ok(new CexDetails(sku, last.BoxName ?? sku, last.SellPrice, last.CashPrice, last.ExchangePrice, last.Category, AsOf: last.Date));
         }).RequireRateLimiting("cex");
 
         app.MapGet("/api/tmdb/search", async (string q, int? year, bool? anime, TmdbClient tmdb, CancellationToken ct) =>
